@@ -1,5 +1,19 @@
 # Changelog
 
+## Fase 7 — Firma, entrega y cierre (2026-09-28)
+
+- Se corrigió el menú de perfil Base UI para que las páginas autenticadas rendericen sin error de contexto.
+- Se añadió el registro de firma física o de que no aplica, preparación del documento emitido, catálogo de medios de entrega y evidencia privada con SHA-256. El número del receptor se guarda enmascarado.
+- La entrega permanece pendiente hasta que la confirma la cuenta propietaria; solo entonces el personal puede cerrar el expediente y generar un informe PDF privado con resumen, cronología, evidencias y código de verificación.
+- Se bloquearon las transiciones repetidas y el cierre anticipado; los accesos y descargas autorizadas quedan en la auditoría. No se implementaron reapertura, anulación ni notificaciones de entrega.
+- `php -d ffi.enable=true artisan test --compact tests/Feature/TramiteWorkflowTest.php` pasó en Turso: 4 pruebas y 503 aserciones. `pnpm run build`, Pint y React Doctor (100/100) pasaron. `pnpm run types:check` mantiene errores de tipos del starter kit Base UI en props `asChild` y `delayDuration`.
+
+## Fase 6 — Numeración y emisión del documento oficial (2026-09-28)
+
+- Se reservó el correlativo documental en Turso con actualización atómica; una falla posterior de generación consume el número y evita reutilizarlo.
+- Se emite el PDF privado desde la versión exacta del borrador aprobado y se registra número, emisor, contenido de snapshot, páginas y SHA-256. Las descargas comprueban autorización, ruta e integridad.
+- La prueba de emisión en Turso verificó fallos, reserva no reutilizada, acceso e integridad. El generador PDF es propio y de texto; no reproduce el diseño gráfico de la plantilla del sistema de referencia.
+
 ## Fase 5 — Observaciones, correcciones y decisiones (2026-09-28)
 
 - Se vinculó cada expediente estudiantil con su propietario y se añadió la consulta de "Mis trámites"; estudiantes ajenos reciben 403 y solo ven estados, comentarios y observaciones marcadas como visibles.
@@ -46,7 +60,7 @@
 
 - `turso/libsql` 0.2.5 continúa declarado en Composer. Aunque la conexión HTTP no lo usa, Composer lo carga automáticamente al arrancar PHP y requiere FFI. Retirarlo de `composer.json` y `composer.lock` requiere autorización para cambiar dependencias; está pendiente.
 - Turso no acepta `SELECT ... FOR UPDATE`; los flujos deberán usar transacciones o actualizaciones atómicas compatibles con SQLite/libSQL. La conexión no reintenta escrituras HTTP ante fallos de red cuyo resultado pueda ser ambiguo.
-- Aún no se migraron procesos documentales ni se implementó la numeración de expedientes; esos flujos siguen pendientes.
+- Los siete pasos principales del expediente están implementados. El PDF oficial y el informe de cierre conservan contenido e integridad, pero su maquetación de texto no reproduce el diseño de las plantillas PDF del sistema de referencia.
 
 ## Fase 0 — Evaluación de viabilidad Turso/libSQL (2026-09-27)
 

@@ -1264,7 +1264,8 @@ test('signature delivery and closure require confirmation and produce an auditab
                 ->where('entrega.receptor_documento', '*****678')
                 ->where('puede_confirmar_entrega', true));
         $this->actingAs($foreignStudent)->get(route('estudiante.tramites.show', $tramiteId))->assertForbidden();
-        $this->post(route('tramites.entrega.cerrar', $tramiteId), ['resumen' => 'Intento de cierre previo a la recepción.'])
+        $this->actingAs($assistant)
+            ->post(route('tramites.entrega.cerrar', $tramiteId), ['resumen' => 'Intento de cierre previo a la recepción.'])
             ->assertStatus(409);
         $this->post(route('tramites.entrega.confirmar', $tramiteId), [])->assertSessionHasErrors('confirmar');
         $this->actingAs($foreignStudent)
