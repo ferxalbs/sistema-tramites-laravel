@@ -1,11 +1,103 @@
 <?php
 
+use App\Http\Controllers\TramiteAsignacionController;
+use App\Http\Controllers\TramiteBorradorController;
+use App\Http\Controllers\TramiteController;
+use App\Http\Controllers\TramiteDocumentoFinalController;
+use App\Http\Controllers\TramiteEntregaController;
+use App\Http\Controllers\TramiteEstudianteController;
+use App\Http\Controllers\TramiteRevisionController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', function (Request $request) {
+        if (in_array($request->user()->rol, ['asistente', 'administrador'], true)) {
+            return redirect()->route('tramites.index');
+        }
+
+        return Inertia::render('dashboard');
+    })->name('dashboard');
+
+    Route::middleware('role:asistente,administrador')->group(function (): void {
+        Route::resource('tramites', TramiteController::class)->only(['index', 'create', 'store', 'show']);
+        Route::get('tramites/{tramite}/borradores/crear', [TramiteBorradorController::class, 'create'])
+            ->name('tramites.borradores.create');
+        Route::post('tramites/{tramite}/borradores', [TramiteBorradorController::class, 'store'])
+            ->name('tramites.borradores.store');
+        Route::post('tramites/{tramite}/preparar-asignacion', [TramiteBorradorController::class, 'prepareAssignment'])
+            ->name('tramites.asignacion.prepare');
+        Route::post('tramites/{tramite}/documentos', [TramiteController::class, 'upload'])
+            ->name('tramites.documentos.store');
+        Route::get('tramites/{tramite}/documentos/{documento}/descargar', [TramiteController::class, 'download'])
+            ->name('tramites.documentos.descargar');
+    });
+
+    Route::middleware('role:asistente')->group(function (): void {
+        Route::get('asignaciones', [TramiteAsignacionController::class, 'index'])->name('tramites.asignaciones.index');
+        Route::get('tramites/{tramite}/asignar', [TramiteAsignacionController::class, 'create'])->name('tramites.asignaciones.create');
+        Route::post('tramites/{tramite}/asignar', [TramiteAsignacionController::class, 'store'])->name('tramites.asignaciones.store');
+        Route::get('tramites/{tramite}/reasignar', [TramiteAsignacionController::class, 'reassign'])->name('tramites.asignaciones.reassign');
+        Route::post('tramites/{tramite}/reasignar', [TramiteAsignacionController::class, 'update'])->name('tramites.asignaciones.update');
+        Route::post('tramites/{tramite}/cancelar-asignacion', [TramiteAsignacionController::class, 'cancel'])->name('tramites.asignaciones.cancel');
+        Route::get('tramites/{tramite}/revision/corregir', [TramiteBorradorController::class, 'correction'])
+            ->name('tramites.revision.correction');
+        Route::post('tramites/{tramite}/revision/corregir', [TramiteBorradorController::class, 'correct'])
+            ->name('tramites.revision.correct');
+        Route::get('tramites/{tramite}/documento-final', [TramiteDocumentoFinalController::class, 'preview'])
+            ->name('tramites.documento-final.preview');
+        Route::post('tramites/{tramite}/documento-final', [TramiteDocumentoFinalController::class, 'emit'])
+            ->name('tramites.documento-final.emit');
+    });
+
+    Route::middleware('role:docente')->group(function (): void {
+        Route::get('mis-asignaciones', [TramiteAsignacionController::class, 'docenteIndex'])->name('asignaciones.docente.index');
+        Route::get('mis-asignaciones/{tramite}', [TramiteAsignacionController::class, 'docenteShow'])->name('asignaciones.docente.show');
+    });
+
+    Route::middleware('role:administrador')->group(function (): void {
+        Route::get('revisiones-oficina', [TramiteAsignacionController::class, 'oficinaIndex'])->name('asignaciones.oficina.index');
+        Route::get('revisiones-oficina/{tramite}', [TramiteAsignacionController::class, 'oficinaShow'])->name('asignaciones.oficina.show');
+    });
+
+    Route::middleware('role:docente,administrador')->group(function (): void {
+        Route::post('tramites/{tramite}/revision/iniciar', [TramiteRevisionController::class, 'start'])
+            ->name('tramites.revision.start');
+        Route::post('tramites/{tramite}/revision/observar', [TramiteRevisionController::class, 'observe'])
+            ->name('tramites.revision.observe');
+        Route::post('tramites/{tramite}/revision/decidir', [TramiteRevisionController::class, 'decide'])
+            ->name('tramites.revision.decide');
+    });
+
+    Route::middleware('role:estudiante')->group(function (): void {
+        Route::get('mis-tramites', [TramiteEstudianteController::class, 'index'])->name('estudiante.tramites.index');
+        Route::get('mis-tramites/{tramite}', [TramiteEstudianteController::class, 'show'])->name('estudiante.tramites.show');
+    });
+
+    Route::middleware('role:asistente,administrador')->group(function (): void {
+        Route::get('tramites/{tramite}/entrega', [TramiteEntregaController::class, 'show'])->name('tramites.entrega.show');
+        Route::post('tramites/{tramite}/entrega/preparar', [TramiteEntregaController::class, 'prepare'])->name('tramites.entrega.prepare');
+        Route::post('tramites/{tramite}/entrega/firma', [TramiteEntregaController::class, 'registerSignature'])->name('tramites.entrega.firma');
+        Route::post('tramites/{tramite}/entrega/registrar', [TramiteEntregaController::class, 'registerDelivery'])->name('tramites.entrega.registrar');
+        Route::post('tramites/{tramite}/entrega/cerrar', [TramiteEntregaController::class, 'close'])->name('tramites.entrega.cerrar');
+    });
+
+    Route::post('tramites/{tramite}/entrega/confirmar', [TramiteEntregaController::class, 'confirm'])
+        ->middleware('role:asistente,administrador,estudiante')
+        ->name('tramites.entrega.confirmar');
+
+    Route::get('tramites/{tramite}/entrega/firmas/{firma}/descargar', [TramiteEntregaController::class, 'downloadSignature'])
+        ->name('tramites.firmas.descargar');
+    Route::get('tramites/{tramite}/entrega/evidencias/{evidencia}/descargar', [TramiteEntregaController::class, 'downloadEvidence'])
+        ->name('tramites.evidencias.descargar');
+    Route::get('tramites/{tramite}/informes-cierre/{informe}/descargar', [TramiteEntregaController::class, 'downloadReport'])
+        ->name('tramites.informes-cierre.descargar');
+
+    Route::get('tramites/{tramite}/documentos-finales/{documento}/descargar', [TramiteDocumentoFinalController::class, 'download'])
+        ->name('tramites.documento-final.descargar');
 });
 
 require __DIR__.'/settings.php';

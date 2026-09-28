@@ -1,5 +1,8 @@
-import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, ClipboardCheck, ClipboardList, FolderGit2, LayoutGrid, Plus } from 'lucide-react';
+import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
+import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
+import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,15 +17,11 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
+import type { Auth, NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+type PageProps = {
+    auth: Auth;
+};
 
 const footerNavItems: NavItem[] = [
     {
@@ -38,6 +37,62 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<PageProps>().props;
+    const mainNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+    ];
+
+    if (['asistente', 'administrador'].includes(auth.user.rol)) {
+        mainNavItems.push(
+            {
+                title: 'Bandeja de trámites',
+                href: TramiteController.index(),
+                icon: ClipboardList,
+            },
+            {
+                title: 'Registrar trámite',
+                href: TramiteController.create(),
+                icon: Plus,
+            },
+        );
+    }
+
+    if (auth.user.rol === 'asistente') {
+        mainNavItems.push({
+            title: 'Asignaciones',
+            href: TramiteAsignacionController.index(),
+            icon: ClipboardCheck,
+        });
+    }
+
+    if (auth.user.rol === 'docente') {
+        mainNavItems.push({
+            title: 'Mis asignaciones',
+            href: TramiteAsignacionController.docenteIndex(),
+            icon: ClipboardCheck,
+        });
+    }
+
+    if (auth.user.rol === 'administrador') {
+        mainNavItems.push({
+            title: 'Revisión de oficina',
+            href: TramiteAsignacionController.oficinaIndex(),
+            icon: ClipboardCheck,
+        });
+    }
+
+    if (auth.user.rol === 'estudiante') {
+        mainNavItems.push({
+            title: 'Mis trámites',
+            href: TramiteEstudianteController.index(),
+            icon: ClipboardList,
+        });
+    }
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>

@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'libsql'),
 
     /*
     |--------------------------------------------------------------------------
@@ -42,6 +42,15 @@ return [
             'journal_mode' => null,
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
+        ],
+
+        'libsql' => [
+            'driver' => 'libsql',
+            'database' => env('DB_DATABASE', 'turso'),
+            'turso_url' => env('TURSO_DATABASE_URL'),
+            'auth_token' => env('TURSO_AUTH_TOKEN'),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
         ],
 
         'mysql' => [
