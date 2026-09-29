@@ -38,26 +38,27 @@ export default function FormatosSalida({
     return (
         <>
             <Head title="Formatos de salida" />
-            <main>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Formatos de salida</CardTitle>
-                        <CardDescription>
-                            Informe y Memorando del catálogo institucional. Un
-                            formato inactivo no admite nuevos borradores.
-                        </CardDescription>
-                    </CardHeader>
-                </Card>
-                {formatos.map((formato) => (
-                    <Card key={formato.id}>
-                        <CardHeader>
-                            <CardTitle>{formato.codigo}</CardTitle>
-                            <CardDescription>
-                                {formato.permite_modalidad_multiple
-                                    ? 'Admite memorando simple o múltiple.'
-                                    : 'Sin modalidad múltiple.'}
-                            </CardDescription>
-                        </CardHeader>
+            <div className="flex flex-col gap-6">
+                <header className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                        Formatos de salida
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Informe y Memorando del catálogo institucional. Un formato inactivo no admite nuevos borradores.
+                    </p>
+                </header>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {formatos.map((formato) => (
+                        <Card key={formato.id} className="transition-all hover:border-foreground/20">
+                            <CardHeader>
+                                <CardTitle>{formato.codigo}</CardTitle>
+                                <CardDescription>
+                                    {formato.permite_modalidad_multiple
+                                        ? 'Admite memorando simple o múltiple.'
+                                        : 'Sin modalidad múltiple.'}
+                                </CardDescription>
+                            </CardHeader>
                         <Form
                             {...update.form({ format: formato.id })}
                             disableWhileProcessing
@@ -141,7 +142,8 @@ export default function FormatosSalida({
                         </Form>
                     </Card>
                 ))}
-            </main>
+                </div>
+            </div>
         </>
     );
 }

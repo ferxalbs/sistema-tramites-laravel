@@ -35,28 +35,28 @@ export default function TiposTramite({ tipos }: { tipos: TramiteType[] }) {
     return (
         <>
             <Head title="Tipos de trámite" />
-            <main>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Tipos de trámite</CardTitle>
-                        <CardDescription>
-                            Catálogo provisional del sistema fuente. Un tipo
-                            inactivo ya no puede seleccionarse en una nueva
-                            recepción.
-                        </CardDescription>
-                    </CardHeader>
-                </Card>
-                {tipos.map((tipo) => (
-                    <Card key={tipo.id}>
-                        <CardHeader>
-                            <CardTitle>{tipo.codigo}</CardTitle>
-                            <CardDescription>
-                                {tipo.clasificacion_sugerida
-                                    ? `Clasificación: ${tipo.clasificacion_sugerida}. `
-                                    : 'Todas las clasificaciones. '}
-                                {tipo.es_demostracion ? 'Provisional.' : ''}
-                            </CardDescription>
-                        </CardHeader>
+            <div className="flex flex-col gap-6">
+                <header className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                        Tipos de trámite
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Catálogo provisional del sistema. Un tipo inactivo no puede seleccionarse en nuevas recepciones.
+                    </p>
+                </header>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {tipos.map((tipo) => (
+                        <Card key={tipo.id} className="transition-all hover:border-foreground/20">
+                            <CardHeader>
+                                <CardTitle>{tipo.codigo}</CardTitle>
+                                <CardDescription>
+                                    {tipo.clasificacion_sugerida
+                                        ? `Clasificación: ${tipo.clasificacion_sugerida}. `
+                                        : 'Todas las clasificaciones. '}
+                                    {tipo.es_demostracion ? 'Provisional.' : ''}
+                                </CardDescription>
+                            </CardHeader>
                         <Form
                             {...update.form({ type: tipo.id })}
                             disableWhileProcessing
@@ -140,7 +140,8 @@ export default function TiposTramite({ tipos }: { tipos: TramiteType[] }) {
                         </Form>
                     </Card>
                 ))}
-            </main>
+                </div>
+            </div>
         </>
     );
 }

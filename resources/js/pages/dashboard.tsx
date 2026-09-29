@@ -1,12 +1,32 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowRight, ClipboardList } from 'lucide-react';
+import {
+    AlertCircle,
+    AlertTriangle,
+    ArrowRight,
+    Bell,
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    Filter,
+    FolderKanban,
+    RotateCcw,
+    Timer,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -69,8 +89,8 @@ type Props = {
 };
 
 const titles: Record<Role, string> = {
-    estudiante: 'Panel del Estudiante/Egresado',
-    asistente: 'Panel operativo',
+    estudiante: 'Panel del Estudiante / Egresado',
+    asistente: 'Panel Operativo',
     docente: 'Panel del Docente',
     administrador: 'Panel de Administración',
 };
@@ -93,6 +113,7 @@ export default function Dashboard({
         notificationUnreadCount: number;
     }>().props;
     const [current, setCurrent] = useState(filters);
+
     const classificationOptions = [
         { value: 'todos', label: 'Todas las clasificaciones' },
         ...Object.entries(catalogs.clasificaciones).map(([value, label]) => ({
@@ -135,12 +156,24 @@ export default function Dashboard({
             label: medio.nombre,
         })),
     ];
+
     const listHref =
         role === 'estudiante'
             ? TramiteEstudianteController.index()
             : role === 'docente'
               ? TramiteAsignacionController.docenteIndex()
               : TramiteController.index();
+
+    const hasActiveFilters = Boolean(
+        current.desde ||
+            current.hasta ||
+            current.clasificacion ||
+            current.programa ||
+            current.tipo ||
+            current.estado ||
+            current.revisor ||
+            current.medio,
+    );
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -160,205 +193,214 @@ export default function Dashboard({
         );
     }
 
+    function resetFilters() {
+        const cleared = {
+            desde: '',
+            hasta: '',
+            clasificacion: '',
+            programa: '',
+            tipo: '',
+            estado: '',
+            revisor: '',
+            medio: '',
+        };
+        setCurrent(cleared);
+        router.get(dashboard(), {}, { preserveState: true, replace: true });
+    }
+
     return (
         <>
             <Head title={titles[role]} />
-            <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
+            <div className="flex flex-col gap-6">
+                {/* Header Section */}
+                <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                             {titles[role]}
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Expedientes y actividad visibles para su rol.
+                            Expedientes, indicadores de gestión y actividad en tiempo real.
                         </p>
                     </div>
                     <Button variant="outline" render={<Link href={listHref} />}>
-                        <ClipboardList data-icon="inline-start" /> Ver
-                        expedientes
+                        <ClipboardList data-icon="inline-start" />
+                        Ver expedientes
                         <ArrowRight data-icon="inline-end" />
                     </Button>
                 </header>
 
+                {/* Filters Section */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Filtrar indicadores</CardTitle>
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-base font-semibold">
+                            Filtrar indicadores
+                        </CardTitle>
+                        <CardDescription>
+                            Ajuste el rango de fechas y parámetros para segmentar las estadísticas.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form
-                            onSubmit={submitFilters}
-                            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]"
-                        >
-                            <label className="grid gap-1 text-sm">
-                                Desde
-                                <Input
-                                    type="date"
-                                    value={current.desde}
-                                    onChange={(event) =>
-                                        setCurrent({
-                                            ...current,
-                                            desde: event.target.value,
-                                        })
-                                    }
-                                />
-                            </label>
-                            <label className="grid gap-1 text-sm">
-                                Hasta
-                                <Input
-                                    type="date"
-                                    value={current.hasta}
-                                    onChange={(event) =>
-                                        setCurrent({
-                                            ...current,
-                                            hasta: event.target.value,
-                                        })
-                                    }
-                                />
-                            </label>
-                            <div className="grid gap-1 text-sm">
-                                <span>Clasificación</span>
-                                <Select
-                                    items={classificationOptions}
-                                    value={current.clasificacion || 'todos'}
-                                    onValueChange={(value) =>
-                                        setCurrent({
-                                            ...current,
-                                            clasificacion:
-                                                value === 'todos'
-                                                    ? ''
-                                                    : (value ?? ''),
-                                        })
-                                    }
-                                >
-                                    <SelectTrigger
-                                        aria-label="Filtrar clasificación"
-                                        className="w-full"
-                                    >
-                                        <SelectValue placeholder="Todas" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {classificationOptions.map(
-                                                (option) => (
-                                                    <SelectItem
-                                                        key={option.value}
-                                                        value={option.value}
-                                                    >
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ),
-                                            )}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <DashboardSelect
-                                label="Programa"
-                                value={current.programa}
-                                options={programOptions}
-                                onChange={(programa) =>
-                                    setCurrent({ ...current, programa })
-                                }
-                            />
-                            <div className="grid gap-1 text-sm">
-                                <span>Estado</span>
-                                <Select
-                                    items={stateOptions}
-                                    value={current.estado || 'todos'}
-                                    onValueChange={(value) =>
-                                        setCurrent({
-                                            ...current,
-                                            estado:
-                                                value === 'todos'
-                                                    ? ''
-                                                    : (value ?? ''),
-                                        })
-                                    }
-                                >
-                                    <SelectTrigger
-                                        aria-label="Filtrar estado"
-                                        className="w-full"
-                                    >
-                                        <SelectValue placeholder="Todos" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {stateOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <DashboardSelect
-                                label="Tipo de trámite"
-                                value={current.tipo}
-                                options={typeOptions}
-                                onChange={(tipo) =>
-                                    setCurrent({ ...current, tipo })
-                                }
-                            />
-                            {catalogs.revisores.length > 0 && (
+                        <form onSubmit={submitFilters} className="flex flex-col gap-5">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="filter-desde">Desde</Label>
+                                    <Input
+                                        id="filter-desde"
+                                        type="date"
+                                        value={current.desde}
+                                        onChange={(event) =>
+                                            setCurrent({
+                                                ...current,
+                                                desde: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="filter-hasta">Hasta</Label>
+                                    <Input
+                                        id="filter-hasta"
+                                        type="date"
+                                        value={current.hasta}
+                                        onChange={(event) =>
+                                            setCurrent({
+                                                ...current,
+                                                hasta: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
                                 <DashboardSelect
-                                    label="Revisor activo"
-                                    value={current.revisor}
-                                    options={reviewerOptions}
-                                    onChange={(revisor) =>
-                                        setCurrent({ ...current, revisor })
+                                    label="Clasificación"
+                                    value={current.clasificacion}
+                                    options={classificationOptions}
+                                    onChange={(clasificacion) =>
+                                        setCurrent({ ...current, clasificacion })
                                     }
                                 />
-                            )}
-                            <DashboardSelect
-                                label="Medio de entrega"
-                                value={current.medio}
-                                options={deliveryOptions}
-                                onChange={(medio) =>
-                                    setCurrent({ ...current, medio })
-                                }
-                            />
-                            <Button type="submit" className="self-end">
-                                Aplicar
-                            </Button>
+                                <DashboardSelect
+                                    label="Programa"
+                                    value={current.programa}
+                                    options={programOptions}
+                                    onChange={(programa) =>
+                                        setCurrent({ ...current, programa })
+                                    }
+                                />
+                                <DashboardSelect
+                                    label="Estado"
+                                    value={current.estado}
+                                    options={stateOptions}
+                                    onChange={(estado) =>
+                                        setCurrent({ ...current, estado })
+                                    }
+                                />
+                                <DashboardSelect
+                                    label="Tipo de trámite"
+                                    value={current.tipo}
+                                    options={typeOptions}
+                                    onChange={(tipo) =>
+                                        setCurrent({ ...current, tipo })
+                                    }
+                                />
+                                {catalogs.revisores.length > 0 && (
+                                    <DashboardSelect
+                                        label="Revisor activo"
+                                        value={current.revisor}
+                                        options={reviewerOptions}
+                                        onChange={(revisor) =>
+                                            setCurrent({ ...current, revisor })
+                                        }
+                                    />
+                                )}
+                                <DashboardSelect
+                                    label="Medio de entrega"
+                                    value={current.medio}
+                                    options={deliveryOptions}
+                                    onChange={(medio) =>
+                                        setCurrent({ ...current, medio })
+                                    }
+                                />
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/50 pt-3">
+                                {hasActiveFilters && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={resetFilters}
+                                    >
+                                        <RotateCcw data-icon="inline-start" />
+                                        Limpiar filtros
+                                    </Button>
+                                )}
+                                <Button type="submit">
+                                    <Filter data-icon="inline-start" />
+                                    Aplicar filtros
+                                </Button>
+                            </div>
                         </form>
                     </CardContent>
                 </Card>
 
+                {/* Metrics Section */}
                 <section
-                    className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                    className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
                     aria-label="Indicadores de expedientes"
                 >
-                    <Metric label="Expedientes" value={summary.total} />
+                    <Metric
+                        label="Expedientes"
+                        value={summary.total}
+                        icon={FolderKanban}
+                        description="Total registrados en el periodo"
+                    />
                     <Metric
                         label="En trámite"
                         value={summary.total - summary.cerrados}
+                        icon={Clock}
+                        description="Expedientes en atención activa"
                     />
-                    <Metric label="Cerrados" value={summary.cerrados} />
-                    <Metric label="Por vencer" value={summary.proximos} />
-                    <Metric label="Vencidos" value={summary.vencidos} />
                     <Metric
-                        label="Tiempo medio de atención"
+                        label="Cerrados"
+                        value={summary.cerrados}
+                        icon={CheckCircle2}
+                        description="Finalizados o atendidos"
+                    />
+                    <Metric
+                        label="Por vencer"
+                        value={summary.proximos}
+                        icon={AlertCircle}
+                        description="Plazos próximos a vencer"
+                    />
+                    <Metric
+                        label="Vencidos"
+                        value={summary.vencidos}
+                        icon={AlertTriangle}
+                        description="Excedieron plazo estimado"
+                    />
+                    <Metric
+                        label="Tiempo medio"
                         value={
                             summary.horas_promedio_atencion === null
                                 ? '—'
                                 : `${summary.horas_promedio_atencion} h`
                         }
+                        icon={Timer}
+                        description="Promedio de horas de atención"
                     />
                     <Metric
-                        label="Notificaciones nuevas"
+                        label="Notificaciones"
                         value={notificationUnreadCount}
+                        icon={Bell}
+                        description="Mensajes sin leer"
                     />
                 </section>
-                <p className="text-sm text-muted-foreground">
-                    Los indicadores de vencimiento corresponden a plazos
-                    estimados referenciales.
+
+                <p className="text-xs text-muted-foreground">
+                    Los indicadores de vencimiento corresponden a plazos estimados referenciales conforme a normativa.
                 </p>
 
-                <div className="grid gap-4 lg:grid-cols-2">
+                {/* State Distribution & Recent Activity */}
+                <div className="grid gap-6 lg:grid-cols-2">
                     <BarList
                         title="Expedientes por estado"
                         items={states.map((state) => ({
@@ -366,68 +408,81 @@ export default function Dashboard({
                             total: state.total,
                         }))}
                     />
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Actividad reciente</CardTitle>
+                            <CardDescription>
+                                Últimos movimientos y actualizaciones en expedientes
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {activity.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No hay actividad reciente disponible.
+                                <p className="py-6 text-center text-sm text-muted-foreground">
+                                    No hay actividad reciente disponible para los filtros aplicados.
                                 </p>
                             ) : (
-                                <ol className="divide-y">
+                                <div className="flex flex-col divide-y divide-border/60">
                                     {activity.map((item, index) => (
-                                        <li
+                                        <div
                                             key={`${item.tramite_id}-${item.fecha}-${index}`}
-                                            className="py-3 first:pt-0"
+                                            className="flex flex-col justify-between gap-2 py-3.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center"
                                         >
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                {item.linkable ? (
-                                                    <Link
-                                                        className="font-medium text-primary hover:underline"
-                                                        href={activityHref(
-                                                            role,
-                                                            item.tramite_id,
-                                                        )}
-                                                    >
-                                                        {item.codigo}
-                                                    </Link>
-                                                ) : (
-                                                    <strong>
-                                                        {item.codigo}
-                                                    </strong>
-                                                )}
+                                            <div className="flex min-w-0 flex-col gap-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {item.linkable ? (
+                                                        <Link
+                                                            className="text-sm font-semibold text-primary hover:underline"
+                                                            href={activityHref(
+                                                                role,
+                                                                item.tramite_id,
+                                                            )}
+                                                        >
+                                                            {item.codigo}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-sm font-semibold text-foreground">
+                                                            {item.codigo}
+                                                        </span>
+                                                    )}
+                                                    <span className="max-w-xs truncate text-xs text-muted-foreground">
+                                                        • {item.asunto}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {item.title}
+                                                </span>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="text-xs font-normal"
+                                                >
+                                                    {item.estado}
+                                                </Badge>
                                                 {item.fecha && (
                                                     <time
-                                                        className="text-xs text-muted-foreground"
+                                                        className="whitespace-nowrap text-xs text-muted-foreground"
                                                         dateTime={item.fecha}
                                                     >
                                                         {dateTimeFormatter.format(
-                                                            new Date(
-                                                                item.fecha,
-                                                            ),
+                                                            new Date(item.fecha),
                                                         )}
                                                     </time>
                                                 )}
                                             </div>
-                                            <p className="text-sm">
-                                                {item.title}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {item.asunto} · {item.estado}
-                                            </p>
-                                        </li>
+                                        </div>
                                     ))}
-                                </ol>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
+                {/* Administrator Analytics Section */}
                 {role === 'administrador' && adminCharts && (
                     <section
-                        className="grid gap-4 lg:grid-cols-2"
+                        className="grid gap-6 lg:grid-cols-2"
                         aria-label="Indicadores de administración"
                     >
                         <Card>
@@ -435,22 +490,31 @@ export default function Dashboard({
                                 <CardTitle>
                                     Registrados y cerrados por mes
                                 </CardTitle>
+                                <CardDescription>
+                                    Evolución mensual de flujo de trámites
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ul className="space-y-3">
+                                <div className="flex flex-col divide-y divide-border/60">
                                     {adminCharts.monthly.map((month) => (
-                                        <li
+                                        <div
                                             key={month.periodo}
-                                            className="flex items-center justify-between gap-4 text-sm"
+                                            className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0"
                                         >
-                                            <span>{month.periodo}</span>
-                                            <span className="tabular-nums">
-                                                {month.registrados} registrados
-                                                · {month.cerrados} cerrados
+                                            <span className="font-medium text-foreground">
+                                                {month.periodo}
                                             </span>
-                                        </li>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="tabular-nums">
+                                                    {month.registrados} reg.
+                                                </Badge>
+                                                <Badge variant="secondary" className="tabular-nums">
+                                                    {month.cerrados} cerr.
+                                                </Badge>
+                                            </div>
+                                        </div>
                                     ))}
-                                </ul>
+                                </div>
                             </CardContent>
                         </Card>
                         <BarList
@@ -467,7 +531,7 @@ export default function Dashboard({
                         />
                     </section>
                 )}
-            </main>
+            </div>
         </>
     );
 }
@@ -480,14 +544,36 @@ function activityHref(role: Role, tramiteId: number) {
     return TramiteController.show({ tramite: tramiteId });
 }
 
-function Metric({ label, value }: { label: string; value: number | string }) {
+function Metric({
+    label,
+    value,
+    icon: Icon,
+    description,
+}: {
+    label: string;
+    value: number | string;
+    icon: React.ComponentType<{ className?: string }>;
+    description?: string;
+}) {
     return (
-        <Card>
+        <Card className="transition-all hover:border-foreground/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardDescription className="text-sm font-medium">
+                    {label}
+                </CardDescription>
+                <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <Icon className="size-4" />
+                </div>
+            </CardHeader>
             <CardContent>
-                <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-2 text-3xl font-semibold tabular-nums">
+                <div className="text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">
                     {value}
-                </p>
+                </div>
+                {description && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {description}
+                    </p>
+                )}
             </CardContent>
         </Card>
     );
@@ -505,8 +591,8 @@ function DashboardSelect({
     onChange: (value: string) => void;
 }) {
     return (
-        <div className="grid gap-1 text-sm">
-            <span>{label}</span>
+        <div className="flex flex-col gap-2">
+            <Label>{label}</Label>
             <Select
                 items={options}
                 value={value || 'todos'}
@@ -541,33 +627,41 @@ function BarList({ title, items }: { title: string; items: ChartItem[] }) {
         <Card>
             <CardHeader>
                 <CardTitle>{title}</CardTitle>
+                <CardDescription>
+                    Distribución cuantitativa por categoría
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 {items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="py-6 text-center text-sm text-muted-foreground">
                         Sin datos para los filtros seleccionados.
                     </p>
                 ) : (
-                    <ul className="space-y-4">
+                    <div className="flex flex-col gap-4">
                         {items.map((item, index) => (
-                            <li key={`${item.nombre}-${index}`}>
-                                <div className="mb-1 flex justify-between gap-3 text-sm">
-                                    <span>{item.nombre}</span>
-                                    <strong className="tabular-nums">
+                            <div
+                                key={`${item.nombre}-${index}`}
+                                className="flex flex-col gap-1.5"
+                            >
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="font-medium text-foreground">
+                                        {item.nombre}
+                                    </span>
+                                    <span className="tabular-nums font-semibold text-muted-foreground">
                                         {item.total}
-                                    </strong>
+                                    </span>
                                 </div>
-                                <div className="h-2 rounded-full bg-muted">
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                     <div
-                                        className="h-2 rounded-full bg-primary"
+                                        className="h-full rounded-full bg-primary transition-all duration-300"
                                         style={{
-                                            width: `${(item.total / max) * 100}%`,
+                                            width: `${Math.min(100, Math.max(0, (item.total / max) * 100))}%`,
                                         }}
                                     />
                                 </div>
-                            </li>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 )}
             </CardContent>
         </Card>
