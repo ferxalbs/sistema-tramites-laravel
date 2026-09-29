@@ -60,6 +60,19 @@ class GenerateTramiteFinalDocument
                 throw new RuntimeException('No fue posible verificar la integridad del documento oficial.');
             }
 
+        } catch (HttpExceptionInterface $exception) {
+            $this->limpiarArchivo($ruta);
+            $this->marcarFallo($reserva, $actor, $exception);
+
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->limpiarArchivo($ruta);
+            $this->marcarFallo($reserva, $actor, $exception);
+
+            throw new RuntimeException('No se pudo generar el documento oficial. El correlativo quedó consumido.', previous: $exception);
+        }
+
+        try {
             return DB::transaction(function () use ($reserva, $ruta, $hash, $tamano, $pdf, $actor): TramiteDocumentoFinal {
                 $actualizado = DB::table('tramite_documentos_finales')
                     ->where('id', $reserva['documento_id'])
@@ -108,16 +121,29 @@ class GenerateTramiteFinalDocument
 
                 return TramiteDocumentoFinal::query()->findOrFail($reserva['documento_id']);
             });
-        } catch (HttpExceptionInterface $exception) {
-            $this->limpiarArchivo($ruta);
-            $this->marcarFallo($reserva, $actor, $exception);
-
-            throw $exception;
         } catch (Throwable $exception) {
-            $this->limpiarArchivo($ruta);
-            $this->marcarFallo($reserva, $actor, $exception);
+            try {
+                $documento = TramiteDocumentoFinal::query()->find($reserva['documento_id']);
+                $numeroEmitido = TramiteNumeracionDocumental::query()
+                    ->whereKey($reserva['numeracion_id'])
+                    ->where('estado', 'emitida')
+                    ->exists();
+                $archivo = Storage::disk('local')->path($ruta);
 
-            throw new RuntimeException('No se pudo generar el documento oficial. El correlativo quedó consumido.', previous: $exception);
+                if ($documento?->estado === 'emitido'
+                    && $documento->activo
+                    && $documento->ruta === $ruta
+                    && $documento->sha256 === $hash
+                    && $numeroEmitido
+                    && is_file($archivo)
+                    && hash_equals($hash, (string) hash_file('sha256', $archivo))) {
+                    return $documento;
+                }
+            } catch (Throwable) {
+                // Una lectura fallida tampoco autoriza borrar el archivo ni liberar la reserva.
+            }
+
+            throw new RuntimeException('No se pudo confirmar la emisión. Consulte el expediente antes de reintentar: la reserva y el archivo se conservaron para reconciliación.', previous: $exception);
         }
     }
 

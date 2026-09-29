@@ -5,6 +5,7 @@ use App\Database\TursoHttpClient;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -47,8 +48,8 @@ test('Turso HTTP pipeline serializes named bindings and verifies its response', 
         'want_rows' => true,
     ]], closeStream: true);
 
-    expect($response['results'][0]['response']['result']['rows'][0][0]['value'])->toBe(42);
-    Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
+    expect($response['results'][0]['response']['result']['rows'][0][0]['value'])->toBe('42');
+    Http::assertSent(function (Request $request): bool {
         $data = $request->data();
         $steps = $data['requests'][0]['batch']['steps'];
         $bindings = $steps[1]['stmt']['named_args'];
@@ -129,7 +130,7 @@ test('Turso connection carries its baton across begin, write, and commit without
     $requests = [];
     $statementResult = ['affected_row_count' => 0, 'cols' => [], 'rows' => []];
 
-    Http::fake(function (\Illuminate\Http\Client\Request $request) use (&$requests, $statementResult) {
+    Http::fake(function (Request $request) use (&$requests, $statementResult) {
         $body = $request->data();
         $requests[] = $body;
         $requestIndex = count($requests) - 1;
@@ -186,6 +187,95 @@ test('Turso connection carries its baton across begin, write, and commit without
         ->and($requests[1]['requests'][0]['stmt']['sql'])->toBe('UPDATE counters SET value = value + 1')
         ->and($requests[2]['baton'])->toBe('transaction-baton-2')
         ->and($requests[2]['requests'][0]['stmt']['sql'])->toBe('COMMIT')
+        ->and($requests[2]['requests'][1]['type'])->toBe('close');
+});
+
+test('Turso connection decodes SQL value types after the HTTP client receives them', function () {
+    Http::fake(fn () => Http::response([
+        'baton' => null,
+        'base_url' => null,
+        'results' => [
+            [
+                'type' => 'ok',
+                'response' => [
+                    'type' => 'batch',
+                    'result' => [
+                        'step_results' => [
+                            ['affected_row_count' => 0, 'cols' => [], 'rows' => []],
+                            [
+                                'affected_row_count' => 0,
+                                'cols' => array_map(fn (string $name): array => ['name' => $name], ['id', 'large_id', 'ratio', 'label', 'missing', 'binary']),
+                                'rows' => [[
+                                    ['type' => 'integer', 'value' => '42'],
+                                    ['type' => 'integer', 'value' => '9223372036854775808'],
+                                    ['type' => 'float', 'value' => 1.5],
+                                    ['type' => 'text', 'value' => 'Expediente'],
+                                    ['type' => 'null'],
+                                    ['type' => 'blob', 'base64' => 'AP8'],
+                                ]],
+                            ],
+                        ],
+                        'step_errors' => [null, null],
+                    ],
+                ],
+            ],
+            ['type' => 'ok', 'response' => ['type' => 'close']],
+        ],
+    ]));
+
+    $connection = new TursoConnection(new TursoHttpClient('libsql://example.turso.io', 'test-token'), 'turso');
+    $row = $connection->selectOne('SELECT id, large_id, ratio, label, missing, binary FROM probe');
+
+    expect($row->id)->toBe(42)
+        ->and($row->large_id)->toBe('9223372036854775808')
+        ->and($row->ratio)->toBe(1.5)
+        ->and($row->label)->toBe('Expediente')
+        ->and($row->missing)->toBeNull()
+        ->and($row->binary)->toBe("\x00\xFF");
+    Http::assertSentCount(1);
+});
+
+test('Turso connection rolls back on the latest baton after a failed transaction callback', function () {
+    $requests = [];
+    $statementResult = ['affected_row_count' => 1, 'cols' => [], 'rows' => []];
+
+    Http::fake(function (Request $request) use (&$requests, $statementResult) {
+        $requests[] = $request->data();
+        $index = count($requests);
+
+        return Http::response([
+            'baton' => $index === 3 ? null : 'transaction-baton-'.$index,
+            'base_url' => null,
+            'results' => $index === 1
+                ? [[
+                    'type' => 'ok',
+                    'response' => [
+                        'type' => 'batch',
+                        'result' => [
+                            'step_results' => [$statementResult, $statementResult],
+                            'step_errors' => [null, null],
+                        ],
+                    ],
+                ]]
+                : [
+                    ['type' => 'ok', 'response' => ['type' => 'execute', 'result' => $statementResult]],
+                    ...($index === 3 ? [['type' => 'ok', 'response' => ['type' => 'close']]] : []),
+                ],
+        ]);
+    });
+
+    $connection = new TursoConnection(new TursoHttpClient('libsql://example.turso.io', 'test-token'), 'turso');
+
+    expect(fn () => $connection->transaction(function (TursoConnection $connection): void {
+        $connection->statement('UPDATE counters SET value = value + 1');
+        throw new RuntimeException('Stop this transaction.');
+    }))->toThrow(RuntimeException::class, 'Stop this transaction.');
+
+    expect($connection->transactionLevel())->toBe(0)
+        ->and($requests)->toHaveCount(3)
+        ->and($requests[1]['baton'])->toBe('transaction-baton-1')
+        ->and($requests[2]['baton'])->toBe('transaction-baton-2')
+        ->and($requests[2]['requests'][0]['stmt']['sql'])->toBe('ROLLBACK')
         ->and($requests[2]['requests'][1]['type'])->toBe('close');
 });
 

@@ -17,6 +17,7 @@ import {
     InputOTPGroup,
     InputOTPSlot,
 } from '@/components/ui/input-otp';
+import { Spinner } from '@/components/ui/spinner';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
 import { store } from '@/routes/two-factor/login';
 
@@ -31,18 +32,18 @@ export default function TwoFactorChallenge() {
     }>(() => {
         if (showRecoveryInput) {
             return {
-                title: 'Recovery code',
+                title: 'Código de recuperación',
                 description:
-                    'Please confirm access to your account by entering one of your emergency recovery codes.',
-                toggleText: 'login using an authentication code',
+                    'Por favor confirma el acceso a tu cuenta ingresando uno de tus códigos de recuperación de emergencia.',
+                toggleText: 'iniciar sesión con código de autenticación',
             };
         }
 
         return {
-            title: 'Authentication code',
+            title: 'Autenticación en dos pasos',
             description:
-                'Enter the authentication code provided by your authenticator application.',
-            toggleText: 'login using a recovery code',
+                'Ingresa el código de 6 dígitos generado por tu aplicación autenticadora.',
+            toggleText: 'usar código de recuperación de emergencia',
         };
     }, [showRecoveryInput]);
 
@@ -54,12 +55,14 @@ export default function TwoFactorChallenge() {
 
     return (
         <>
-            <Head title="Two-factor authentication" />
+            <Head title="Autenticación de dos factores" />
 
-            <Card className="w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle>{authConfigContent.title}</CardTitle>
-                    <CardDescription>
+            <Card className="w-full shadow-sm border-border/80">
+                <CardHeader className="space-y-1">
+                    <CardTitle className="text-xl font-bold tracking-tight">
+                        {authConfigContent.title}
+                    </CardTitle>
+                    <CardDescription className="text-sm">
                         {authConfigContent.description}
                     </CardDescription>
                 </CardHeader>
@@ -78,7 +81,7 @@ export default function TwoFactorChallenge() {
                                         <Input
                                             name="recovery_code"
                                             type="text"
-                                            placeholder="Enter recovery code"
+                                            placeholder="Ingresa código de recuperación"
                                             autoFocus={showRecoveryInput}
                                             required
                                         />
@@ -115,11 +118,11 @@ export default function TwoFactorChallenge() {
                                     </div>
                                 )}
 
-                                <div className="text-center text-sm text-muted-foreground">
-                                    <span>or you can </span>
+                                <div className="text-center text-xs text-muted-foreground">
+                                    <span>¿Problemas con el código? También puedes </span>
                                     <button
                                         type="button"
-                                        className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                        className="cursor-pointer text-primary underline underline-offset-4 hover:opacity-80"
                                         onClick={() =>
                                             toggleRecoveryMode(clearErrors)
                                         }
@@ -127,19 +130,26 @@ export default function TwoFactorChallenge() {
                                         {authConfigContent.toggleText}
                                     </button>
                                 </div>
+
+                                <Button
+                                    type="submit"
+                                    form="two-factor-form"
+                                    className="w-full mt-2"
+                                    disabled={processing}
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Spinner className="mr-2 h-4 w-4" />
+                                            Verificando...
+                                        </>
+                                    ) : (
+                                        'Continuar'
+                                    )}
+                                </Button>
                             </>
                         )}
                     </Form>
                 </CardContent>
-                <CardFooter className="flex-col gap-2">
-                    <Button
-                        type="submit"
-                        form="two-factor-form"
-                        className="w-full"
-                    >
-                        Continue
-                    </Button>
-                </CardFooter>
             </Card>
         </>
     );

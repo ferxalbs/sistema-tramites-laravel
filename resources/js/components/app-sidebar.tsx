@@ -1,5 +1,14 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, ClipboardCheck, ClipboardList, FolderGit2, LayoutGrid, Plus } from 'lucide-react';
+import {
+    BookOpen,
+    CircleHelp,
+    ClipboardCheck,
+    ClipboardList,
+    FolderGit2,
+    LayoutGrid,
+    Plus,
+    Search,
+} from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
@@ -17,6 +26,8 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as searchIndex } from '@/routes/search';
+import { index as supportIndex } from '@/routes/support';
 import type { Auth, NavItem } from '@/types';
 
 type PageProps = {
@@ -92,6 +103,20 @@ export function AppSidebar() {
             icon: ClipboardList,
         });
     }
+
+    if (['asistente', 'docente', 'administrador'].includes(auth.user.rol)) {
+        mainNavItems.push({
+            title: 'Buscar',
+            href: searchIndex(),
+            icon: Search,
+        });
+    }
+
+    mainNavItems.push({
+        title: 'Ayuda',
+        href: supportIndex(),
+        icon: CircleHelp,
+    });
 
     return (
         <Sidebar collapsible="icon" variant="inset">

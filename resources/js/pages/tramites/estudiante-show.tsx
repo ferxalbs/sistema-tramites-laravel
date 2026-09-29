@@ -40,7 +40,7 @@ type Props = {
     } | null;
     puede_confirmar_entrega: boolean;
     informe_cierre: { numero_paginas: number; url_descarga: string } | null;
-    historial: Array<{ estado: string; label: string; fecha: string | null }>;
+    historial: Array<{ estado: string; label: string; descripcion: string; fecha: string | null }>;
 };
 
 export default function EstudianteTramiteShow({ tramite, comentario_publico, observaciones_visibles, documento_final, entrega, puede_confirmar_entrega, informe_cierre, historial }: Props) {
@@ -178,6 +178,7 @@ export default function EstudianteTramiteShow({ tramite, comentario_publico, obs
                                         <MoveRight className="mt-0.5 size-4 shrink-0 text-primary" />
                                         <div>
                                             <p className="font-medium">{evento.label}</p>
+                                            <p className="text-muted-foreground">{evento.descripcion}</p>
                                             {evento.fecha && <time className="text-xs text-muted-foreground">{formatDateTime(evento.fecha)}</time>}
                                         </div>
                                     </li>

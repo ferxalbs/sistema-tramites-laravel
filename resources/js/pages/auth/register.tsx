@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
 
@@ -23,20 +24,23 @@ type Props = {
 export default function Register({ passwordRules }: Props) {
     return (
         <>
-            <Head title="Register" />
+            <Head title="Crear Cuenta" />
 
-            <Card className="w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle>Create an account</CardTitle>
-                    <CardDescription>
-                        Enter your details below to create your account
+            <Card className="w-full shadow-sm border-border/80">
+                <CardHeader className="space-y-1">
+                    <CardTitle className="text-xl font-bold tracking-tight">
+                        Crear Cuenta
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                        Ingresa tus datos para registrarte en el portal de trámites
                     </CardDescription>
                     <CardAction>
                         <Button
                             variant="link"
+                            className="text-xs font-medium text-primary hover:underline px-0"
                             render={<Link href={login()} />}
                         >
-                            Log In
+                            Iniciar sesión
                         </Button>
                     </CardAction>
                 </CardHeader>
@@ -47,10 +51,10 @@ export default function Register({ passwordRules }: Props) {
                         resetOnSuccess={['password', 'password_confirmation']}
                         disableWhileProcessing
                     >
-                        {({ errors }) => (
+                        {({ processing, errors }) => (
                             <div className="flex flex-col gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="name">Name</Label>
+                                    <Label htmlFor="name">Nombre completo</Label>
                                     <Input
                                         id="name"
                                         type="text"
@@ -59,13 +63,13 @@ export default function Register({ passwordRules }: Props) {
                                         tabIndex={1}
                                         autoComplete="name"
                                         name="name"
-                                        placeholder="Full name"
+                                        placeholder="Ej. Juan Pérez Ramos"
                                     />
                                     <InputError message={errors.name} />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Email</Label>
+                                    <Label htmlFor="email">Correo electrónico</Label>
                                     <Input
                                         id="email"
                                         type="email"
@@ -73,20 +77,20 @@ export default function Register({ passwordRules }: Props) {
                                         tabIndex={2}
                                         autoComplete="email"
                                         name="email"
-                                        placeholder="m@example.com"
+                                        placeholder="usuario@correo.com"
                                     />
                                     <InputError message={errors.email} />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="password">Password</Label>
+                                    <Label htmlFor="password">Contraseña</Label>
                                     <PasswordInput
                                         id="password"
                                         required
                                         tabIndex={3}
                                         autoComplete="new-password"
                                         name="password"
-                                        placeholder="Password"
+                                        placeholder="••••••••"
                                         passwordrules={passwordRules}
                                     />
                                     <InputError message={errors.password} />
@@ -94,7 +98,7 @@ export default function Register({ passwordRules }: Props) {
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="password_confirmation">
-                                        Confirm password
+                                        Confirmar contraseña
                                     </Label>
                                     <PasswordInput
                                         id="password_confirmation"
@@ -102,27 +106,38 @@ export default function Register({ passwordRules }: Props) {
                                         tabIndex={4}
                                         autoComplete="new-password"
                                         name="password_confirmation"
-                                        placeholder="Confirm password"
+                                        placeholder="••••••••"
                                         passwordrules={passwordRules}
                                     />
                                     <InputError
                                         message={errors.password_confirmation}
                                     />
                                 </div>
+
+                                <Button
+                                    type="submit"
+                                    className="w-full mt-2"
+                                    tabIndex={5}
+                                    disabled={processing}
+                                    data-test="register-user-button"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Spinner className="mr-2 h-4 w-4" />
+                                            Registrando cuenta...
+                                        </>
+                                    ) : (
+                                        'Crear cuenta'
+                                    )}
+                                </Button>
                             </div>
                         )}
                     </Form>
                 </CardContent>
-                <CardFooter className="flex-col gap-2">
-                    <Button
-                        type="submit"
-                        form="register-form"
-                        className="w-full"
-                        tabIndex={5}
-                        data-test="register-user-button"
-                    >
-                        Create account
-                    </Button>
+                <CardFooter className="flex flex-col gap-2 pt-0 pb-6 text-center text-xs text-muted-foreground">
+                    <p>
+                        Al registrarte aceptas las políticas institucionales y de gestión de documentos.
+                    </p>
                 </CardFooter>
             </Card>
         </>

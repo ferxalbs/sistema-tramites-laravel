@@ -1,127 +1,312 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, ClipboardList, FileCheck, Layers } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { dashboard } from '@/routes';
+import { Head, Link, router } from '@inertiajs/react';
+import { ArrowRight, ClipboardList } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
+import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { dashboard } from '@/routes';
 
-export default function Dashboard() {
+type Role = 'estudiante' | 'asistente' | 'docente' | 'administrador';
+type StateCount = { codigo: string; nombre: string; total: number };
+type Activity = {
+    tramite_id: number;
+    codigo: string;
+    asunto: string;
+    title: string;
+    estado: string;
+    fecha: string | null;
+    linkable: boolean;
+};
+type ChartItem = { nombre: string; total: number };
+type MonthlyItem = { periodo: string; registrados: number; cerrados: number };
+
+type Props = {
+    role: Role;
+    filters: {
+        desde: string;
+        hasta: string;
+        clasificacion: string;
+        estado: string;
+    };
+    catalogs: {
+        clasificaciones: Record<string, string>;
+        estados: Record<string, string>;
+    };
+    summary: { total: number; cerrados: number };
+    states: StateCount[];
+    activity: Activity[];
+    adminCharts: {
+        monthly: MonthlyItem[];
+        types: ChartItem[];
+        load: ChartItem[];
+        users: ChartItem[];
+    } | null;
+};
+
+const titles: Record<Role, string> = {
+    estudiante: 'Panel del Estudiante/Egresado',
+    asistente: 'Panel operativo',
+    docente: 'Panel del Docente',
+    administrador: 'Panel de Administración',
+};
+
+const dateTimeFormatter = new Intl.DateTimeFormat('es-PE', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+});
+
+export default function Dashboard({
+    role,
+    filters,
+    catalogs,
+    summary,
+    states,
+    activity,
+    adminCharts,
+}: Props) {
+    const [current, setCurrent] = useState(filters);
+    const classificationOptions = [
+        { value: 'todos', label: 'Todas las clasificaciones' },
+        ...Object.entries(catalogs.clasificaciones).map(([value, label]) => ({ value, label })),
+    ];
+    const stateOptions = [
+        { value: 'todos', label: 'Todos los estados' },
+        ...Object.entries(catalogs.estados).map(([value, label]) => ({ value, label })),
+    ];
+    const listHref =
+        role === 'estudiante'
+            ? TramiteEstudianteController.index()
+            : role === 'docente'
+              ? TramiteAsignacionController.docenteIndex()
+              : TramiteController.index();
+
+    function submitFilters(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        router.get(
+            dashboard(),
+            {
+                desde: current.desde || undefined,
+                hasta: current.hasta || undefined,
+                clasificacion: current.clasificacion || undefined,
+                estado: current.estado || undefined,
+            },
+            { preserveState: true, replace: true },
+        );
+    }
+
     return (
         <>
-            <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Mis trámites</CardTitle>
-                            <CardDescription>
-                                Consulta y da seguimiento a tus trámites activos.
-                            </CardDescription>
-                            <CardAction>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    render={
-                                        <Link
-                                            href={TramiteEstudianteController.index()}
-                                        />
-                                    }
+            <Head title={titles[role]} />
+            <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+                <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            {titles[role]}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Expedientes y actividad visibles para su rol.
+                        </p>
+                    </div>
+                    <Button variant="outline" render={<Link href={listHref} />}>
+                        <ClipboardList data-icon="inline-start" /> Ver expedientes
+                        <ArrowRight data-icon="inline-end" />
+                    </Button>
+                </header>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Filtrar indicadores</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={submitFilters} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+                            <label className="grid gap-1 text-sm">
+                                Desde
+                                <Input
+                                    type="date"
+                                    value={current.desde}
+                                    onChange={(event) => setCurrent({ ...current, desde: event.target.value })}
+                                />
+                            </label>
+                            <label className="grid gap-1 text-sm">
+                                Hasta
+                                <Input
+                                    type="date"
+                                    value={current.hasta}
+                                    onChange={(event) => setCurrent({ ...current, hasta: event.target.value })}
+                                />
+                            </label>
+                            <div className="grid gap-1 text-sm">
+                                <span>Clasificación</span>
+                                <Select
+                                    items={classificationOptions}
+                                    value={current.clasificacion || 'todos'}
+                                    onValueChange={(value) => setCurrent({ ...current, clasificacion: value === 'todos' ? '' : (value ?? '') })}
                                 >
-                                    <ClipboardList />
-                                </Button>
-                            </CardAction>
-                        </CardHeader>
-                        <CardContent>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full justify-between"
-                                render={
-                                    <Link
-                                        href={TramiteEstudianteController.index()}
-                                    />
-                                }
-                            >
-                                <span>Ver listado</span>
-                                <ArrowRight />
-                            </Button>
-                        </CardContent>
-                    </Card>
+                                    <SelectTrigger aria-label="Filtrar clasificación" className="w-full">
+                                        <SelectValue placeholder="Todas" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {classificationOptions.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-1 text-sm">
+                                <span>Estado</span>
+                                <Select
+                                    items={stateOptions}
+                                    value={current.estado || 'todos'}
+                                    onValueChange={(value) => setCurrent({ ...current, estado: value === 'todos' ? '' : (value ?? '') })}
+                                >
+                                    <SelectTrigger aria-label="Filtrar estado" className="w-full">
+                                        <SelectValue placeholder="Todos" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {stateOptions.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button type="submit" className="self-end">Aplicar</Button>
+                        </form>
+                    </CardContent>
+                </Card>
 
+                <section className="grid gap-3 sm:grid-cols-3" aria-label="Indicadores de expedientes">
+                    <Metric label="Expedientes" value={summary.total} />
+                    <Metric label="En trámite" value={summary.total - summary.cerrados} />
+                    <Metric label="Cerrados" value={summary.cerrados} />
+                </section>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <BarList title="Expedientes por estado" items={states.map((state) => ({ nombre: state.nombre, total: state.total }))} />
                     <Card>
                         <CardHeader>
-                            <CardTitle>Estado de solicitudes</CardTitle>
-                            <CardDescription>
-                                Revisa el progreso en tiempo real de cada etapa.
-                            </CardDescription>
-                            <CardAction>
-                                <Button variant="ghost" size="icon" disabled>
-                                    <FileCheck />
-                                </Button>
-                            </CardAction>
+                            <CardTitle>Actividad reciente</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Los trámites son procesados y revisados por el
-                                personal docente y administrativo.
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Sistema institucional</CardTitle>
-                            <CardDescription>
-                                Gestión digital y entrega de documentación.
-                            </CardDescription>
-                            <CardAction>
-                                <Button variant="ghost" size="icon" disabled>
-                                    <Layers />
-                                </Button>
-                            </CardAction>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Plataforma de seguimiento y control de trámites
-                                académicos y administrativos.
-                            </p>
+                            {activity.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No hay actividad reciente disponible.</p>
+                            ) : (
+                                <ol className="divide-y">
+                                    {activity.map((item, index) => (
+                                        <li key={`${item.tramite_id}-${item.fecha}-${index}`} className="py-3 first:pt-0">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                {item.linkable ? (
+                                                    <Link className="font-medium text-primary hover:underline" href={activityHref(role, item.tramite_id)}>
+                                                        {item.codigo}
+                                                    </Link>
+                                                ) : (
+                                                    <strong>{item.codigo}</strong>
+                                                )}
+                                                {item.fecha && (
+                                                    <time className="text-xs text-muted-foreground" dateTime={item.fecha}>
+                                                        {dateTimeFormatter.format(new Date(item.fecha))}
+                                                    </time>
+                                                )}
+                                            </div>
+                                            <p className="text-sm">{item.title}</p>
+                                            <p className="text-sm text-muted-foreground">{item.asunto} · {item.estado}</p>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
 
-                <Card className="flex-1">
-                    <CardHeader>
-                        <CardTitle>Bienvenido al Sistema de Trámites</CardTitle>
-                        <CardDescription>
-                            Utiliza la barra lateral para navegar entre las
-                            diferentes secciones según tu rol asignado.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4 text-sm text-muted-foreground">
-                        <p>
-                            Desde este panel podrás acceder a los módulos de
-                            gestión de trámites, historial de documentos,
-                            revisiones y asignaciones pertinentes.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+                {role === 'administrador' && adminCharts && (
+                    <section className="grid gap-4 lg:grid-cols-2" aria-label="Indicadores de administración">
+                        <Card>
+                            <CardHeader><CardTitle>Registrados y cerrados por mes</CardTitle></CardHeader>
+                            <CardContent>
+                                <ul className="space-y-3">
+                                    {adminCharts.monthly.map((month) => (
+                                        <li key={month.periodo} className="flex items-center justify-between gap-4 text-sm">
+                                            <span>{month.periodo}</span>
+                                            <span className="tabular-nums">{month.registrados} registrados · {month.cerrados} cerrados</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                        <BarList title="Tipos de trámite" items={adminCharts.types} />
+                        <BarList title="Carga activa por revisor" items={adminCharts.load} />
+                        <BarList title="Usuarios por mes y rol" items={adminCharts.users} />
+                    </section>
+                )}
+            </main>
         </>
     );
 }
 
+function activityHref(role: Role, tramiteId: number) {
+    if (role === 'estudiante') return TramiteEstudianteController.show({ tramite: tramiteId });
+    if (role === 'docente') return TramiteAsignacionController.docenteShow({ tramite: tramiteId });
+    return TramiteController.show({ tramite: tramiteId });
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+    return (
+        <Card>
+            <CardContent>
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
+            </CardContent>
+        </Card>
+    );
+}
+
+function BarList({ title, items }: { title: string; items: ChartItem[] }) {
+    const max = Math.max(1, ...items.map((item) => item.total));
+
+    return (
+        <Card>
+            <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+            <CardContent>
+                {items.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin datos para los filtros seleccionados.</p>
+                ) : (
+                    <ul className="space-y-4">
+                        {items.map((item, index) => (
+                            <li key={`${item.nombre}-${index}`}>
+                                <div className="mb-1 flex justify-between gap-3 text-sm">
+                                    <span>{item.nombre}</span>
+                                    <strong className="tabular-nums">{item.total}</strong>
+                                </div>
+                                <div className="h-2 rounded-full bg-muted">
+                                    <div className="h-2 rounded-full bg-primary" style={{ width: `${(item.total / max) * 100}%` }} />
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 Dashboard.layout = {
-    breadcrumbs: [
-        {
-            title: 'Dashboard',
-            href: dashboard(),
-        },
-    ],
+    breadcrumbs: [{ title: 'Dashboard', href: dashboard() }],
 };

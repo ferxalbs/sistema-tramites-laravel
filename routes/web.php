@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\TramiteAsignacionController;
 use App\Http\Controllers\TramiteBorradorController;
 use App\Http\Controllers\TramiteController;
@@ -8,31 +10,40 @@ use App\Http\Controllers\TramiteEntregaController;
 use App\Http\Controllers\TramiteEstudianteController;
 use App\Http\Controllers\TramiteRevisionController;
 use App\Http\Controllers\TramiteVerificacionPublicaController;
+use App\Services\SupportKnowledgeBase;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 Route::inertia('/', 'welcome')->name('home');
-Route::inertia('ayuda', 'ayuda')->name('support.index');
+Route::get('ayuda', fn (Request $request, SupportKnowledgeBase $support): InertiaResponse => Inertia::render('ayuda', $support->forRequest($request)))
+    ->name('support.index');
 Route::get('verificar-documento', [TramiteVerificacionPublicaController::class, 'show'])
     ->middleware('throttle:30,1')
     ->withoutMiddleware([
-        Illuminate\Session\Middleware\StartSession::class,
-        Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
     ])
     ->name('documentos.verificar');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function (Request $request) {
-        if (in_array($request->user()->rol, ['asistente', 'administrador'], true)) {
-            return redirect()->route('tramites.index');
-        }
+    Route::get('dashboard', DashboardController::class)
+        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->name('dashboard');
 
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('buscar', GlobalSearchController::class)
+        ->middleware('role:asistente,docente,administrador')
+        ->name('search.index');
 
     Route::middleware('role:asistente,administrador')->group(function (): void {
         Route::resource('tramites', TramiteController::class)->only(['index', 'create', 'store', 'show']);
+        Route::get('tramites/{tramite}/comprobante', [TramiteController::class, 'receipt'])
+            ->name('tramites.receipt');
         Route::get('tramites/{tramite}/borradores/crear', [TramiteBorradorController::class, 'create'])
             ->name('tramites.borradores.create');
         Route::post('tramites/{tramite}/borradores', [TramiteBorradorController::class, 'store'])

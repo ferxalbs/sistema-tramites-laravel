@@ -16,20 +16,21 @@ import { send } from '@/routes/verification';
 export default function VerifyEmail({ status }: { status?: string }) {
     return (
         <>
-            <Head title="Email verification" />
+            <Head title="Verificación de Correo" />
 
             {status === 'verification-link-sent' && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
+                <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
+                    Se ha enviado un nuevo enlace de verificación al correo electrónico que proporcionaste durante el registro.
                 </div>
             )}
 
-            <Card className="w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle>Email verification</CardTitle>
-                    <CardDescription>
-                        Please verify your email address by clicking on the link we just emailed to you.
+            <Card className="w-full shadow-sm border-border/80">
+                <CardHeader className="space-y-1">
+                    <CardTitle className="text-xl font-bold tracking-tight">
+                        Verificación de Correo
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                        Por favor verifica tu correo electrónico haciendo clic en el enlace que te acabamos de enviar.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
@@ -41,8 +42,14 @@ export default function VerifyEmail({ status }: { status?: string }) {
                                 variant="secondary"
                                 className="w-full"
                             >
-                                {processing && <Spinner />}
-                                Resend verification email
+                                {processing ? (
+                                    <>
+                                        <Spinner className="mr-2 h-4 w-4" />
+                                        Reenviando correo...
+                                    </>
+                                ) : (
+                                    'Reenviar correo de verificación'
+                                )}
                             </Button>
                         )}
                     </Form>
@@ -52,7 +59,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                         href={logout()}
                         className="mx-auto block text-sm"
                     >
-                        Log out
+                        Cerrar sesión
                     </TextLink>
                 </CardFooter>
             </Card>

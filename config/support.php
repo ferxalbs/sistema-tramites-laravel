@@ -25,7 +25,7 @@ return [
         ],
         'estado-observado' => [
             'question' => '¿Qué significa Observado?',
-            'answer' => 'El revisor encontró puntos que deben atenderse antes de continuar. Revise la notificación y las indicaciones visibles; si aún no aparece una acción disponible, contacte al personal responsable.',
+            'answer' => 'El revisor encontró puntos que deben atenderse antes de continuar. Revise las observaciones visibles y coordine la subsanación presencial con Mesa de Partes.',
             'assistant' => true,
             'faq' => true,
         ],
@@ -37,7 +37,7 @@ return [
         ],
         'recibir-documento' => [
             'question' => '¿Cómo recibo mi documento?',
-            'answer' => 'Cuando el documento esté autorizado, el sistema mostrará la entrega disponible y enviará una notificación interna. La descarga y confirmación se realizan desde el expediente autorizado.',
+            'answer' => 'Cuando el documento esté autorizado, consulte la entrega en su expediente. La descarga y confirmación se realizan desde el expediente autorizado.',
             'assistant' => true,
             'faq' => true,
         ],
@@ -61,7 +61,7 @@ return [
         ],
         'corregir-observacion' => [
             'question' => '¿Cómo corrijo una observación?',
-            'answer' => 'Revise los puntos visibles y siga las indicaciones del personal responsable. El portal todavía no permite adjuntar una corrección directamente; no envíe archivos por enlaces externos no confirmados.',
+            'answer' => 'Revise los puntos visibles y entregue la subsanación físicamente en Mesa de Partes. El asistente registra la corrección; el estudiante no adjunta archivos desde este portal.',
             'assistant' => true,
             'faq' => true,
         ],

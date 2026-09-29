@@ -1,5 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, ClipboardCheck, Download, FileCheck2, FilePlus2, FileText, Send } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, FileCheck2, FilePlus2, FileText, Printer, Send } from 'lucide-react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
@@ -150,6 +150,10 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" render={<Link href={TramiteController.receipt({ tramite: tramite.id })} />}>
+                            <Printer data-icon="inline-start" />
+                            Comprobante
+                        </Button>
                         {['digitalizado', 'borrador_preparado'].includes(tramite.estado) && (
                             <Button render={<Link href={TramiteBorradorController.create({ tramite: tramite.id })} />}>
                                 <FilePlus2 />

@@ -1,4 +1,5 @@
 import { Head } from '@inertiajs/react';
+import SupportWidget from '@/components/support-widget';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -146,6 +147,7 @@ export default function VerificacionPublica({
                     </CardContent>
                 </Card>
             </main>
+            <SupportWidget />
         </>
     );
 }

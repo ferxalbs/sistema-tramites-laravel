@@ -5,14 +5,19 @@ use App\Models\TramiteAsignacion;
 use App\Models\TramiteBorrador;
 use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEntrega;
+use App\Models\TramiteEvento;
 use App\Models\TramiteNumeracionDocumental;
 use App\Models\TramitePlantilla;
 use App\Models\TramiteRondaRevision;
 use App\Models\TramiteSerieDocumental;
 use App\Models\User;
 use App\Services\PdfDocumentGenerator;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -1001,6 +1006,213 @@ test('official document issuance consumes failed numbers and verifies the privat
     }
 });
 
+test('official document emission reconciles a lost commit response without deleting the PDF or reusing a number', function () {
+    [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
+
+    $commits = 0;
+    Event::listen(TransactionCommitted::class, function () use (&$commits): void {
+        $commits++;
+
+        if ($commits === 2) {
+            throw new RuntimeException('Simulated lost response after the final commit.');
+        }
+    });
+
+    $this->actingAs($assistant)
+        ->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
+        ->assertRedirect(route('tramites.show', $tramite));
+
+    $documento = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->firstOrFail();
+    $numeracion = TramiteNumeracionDocumental::query()->findOrFail($documento->numeracion_id);
+    $archivo = Storage::disk('local')->path($documento->ruta);
+
+    expect($commits)->toBe(2)
+        ->and($documento->estado)->toBe('emitido')
+        ->and($numeracion->estado)->toBe('emitida')
+        ->and($numeracion->correlativo)->toBe(1)
+        ->and(is_file($archivo))->toBeTrue()
+        ->and(hash_file('sha256', $archivo))->toBe($documento->sha256)
+        ->and(TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->count())->toBe(1)
+        ->and(TramiteEvento::query()->where('tramite_id', $tramite->id)->pluck('accion')->all())->toBe(['numero_reservado', 'documento_final_emitido']);
+
+    $this->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])->assertStatus(409);
+    expect(TramiteSerieDocumental::query()->where('tipo_documento_salida', 'informe')->value('ultimo_correlativo'))->toBe(1);
+});
+
+test('lost reservation commit response leaves one reserved number and blocks a second reservation', function () {
+    [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
+    $commits = 0;
+    Event::listen(TransactionCommitted::class, function () use (&$commits): void {
+        $commits++;
+
+        if ($commits === 1) {
+            throw new RuntimeException('Simulated lost response after reserving the number.');
+        }
+    });
+
+    $this->actingAs($assistant)
+        ->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
+        ->assertSessionHasErrors('documento');
+
+    $documento = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->firstOrFail();
+    $numeracion = TramiteNumeracionDocumental::query()->findOrFail($documento->numeracion_id);
+
+    expect($commits)->toBe(1)
+        ->and($documento->estado)->toBe('generando')
+        ->and($numeracion->estado)->toBe('reservada')
+        ->and($numeracion->correlativo)->toBe(1)
+        ->and(TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->count())->toBe(1)
+        ->and(TramiteSerieDocumental::query()->where('tipo_documento_salida', 'informe')->value('ultimo_correlativo'))->toBe(1);
+
+    $this->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])->assertStatus(409);
+    expect(TramiteNumeracionDocumental::query()->where('tramite_id', $tramite->id)->count())->toBe(1);
+});
+
+test('interrupted final transaction keeps the reserved number and PDF for reconciliation', function () {
+    [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
+    $interrupted = false;
+    DB::listen(function (QueryExecuted $query) use (&$interrupted): void {
+        if (! $interrupted
+            && str_starts_with(strtolower(trim($query->sql)), 'update')
+            && str_contains($query->sql, 'tramite_documentos_finales')) {
+            $interrupted = true;
+
+            throw new RuntimeException('Simulated interruption before the final commit.');
+        }
+    });
+
+    $this->actingAs($assistant)
+        ->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
+        ->assertSessionHasErrors('documento');
+
+    $documento = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->firstOrFail();
+    $numeracion = TramiteNumeracionDocumental::query()->findOrFail($documento->numeracion_id);
+    $archivos = Storage::disk('local')->allFiles('documentos-finales');
+
+    expect($interrupted)->toBeTrue()
+        ->and($documento->estado)->toBe('generando')
+        ->and($numeracion->estado)->toBe('reservada')
+        ->and($numeracion->correlativo)->toBe(1)
+        ->and($archivos)->toHaveCount(1)
+        ->and(str_starts_with(Storage::disk('local')->get($archivos[0]), '%PDF-'))->toBeTrue()
+        ->and(TramiteEvento::query()->where('tramite_id', $tramite->id)->pluck('accion')->all())->toBe(['numero_reservado']);
+});
+
+test('CLI reconciliation closes an inconclusive reservation without releasing its correlativo', function () {
+    [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
+    $commits = 0;
+    Event::listen(TransactionCommitted::class, function () use (&$commits): void {
+        $commits++;
+
+        if ($commits === 1) {
+            throw new RuntimeException('Simulated lost reservation response.');
+        }
+    });
+
+    $this->actingAs($assistant)
+        ->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
+        ->assertSessionHasErrors('documento');
+    $documento = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->firstOrFail();
+
+    expect(Artisan::call('documents:reconcile-reservation', ['documento' => $documento->id]))->toBe(0)
+        ->and($documento->fresh()->estado)->toBe('generando')
+        ->and(Artisan::call('documents:reconcile-reservation', ['documento' => $documento->id, '--fail' => true]))->toBe(1)
+        ->and($documento->fresh()->estado)->toBe('generando');
+
+    expect(Artisan::call('documents:reconcile-reservation', [
+        'documento' => $documento->id,
+        '--fail' => true,
+        '--reason' => 'Respuesta de reserva perdida; proceso original concluido.',
+    ]))->toBe(0);
+    expect($documento->refresh()->estado)->toBe('fallido')
+        ->and($documento->activo)->toBeFalse()
+        ->and($documento->numeracion()->value('estado'))->toBe('fallida')
+        ->and(TramiteSerieDocumental::query()->where('tipo_documento_salida', 'informe')->value('ultimo_correlativo'))->toBe(1)
+        ->and(TramiteEvento::query()->where('tramite_id', $tramite->id)->where('accion', 'reserva_reconciliada_cli')->count())->toBe(1);
+
+    expect(Artisan::call('documents:reconcile-reservation', ['documento' => $documento->id, '--fail' => true]))->toBe(0)
+        ->and(TramiteEvento::query()->where('tramite_id', $tramite->id)->where('accion', 'reserva_reconciliada_cli')->count())->toBe(1);
+
+    $this->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
+        ->assertRedirect(route('tramites.show', $tramite));
+    $emitido = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->where('estado', 'emitido')->firstOrFail();
+    expect($emitido->numeracion()->value('correlativo'))->toBe(2)
+        ->and($emitido->numero_documento)->toContain('-000002')
+        ->and(Artisan::call('documents:reconcile-reservation', [
+            'documento' => $emitido->id,
+            '--fail' => true,
+            '--reason' => 'No debe aceptarse.',
+        ]))->toBe(1)
+        ->and($emitido->fresh()->estado)->toBe('emitido');
+});
+
+test('CLI reconciliation can be inspected again after losing its own commit response', function () {
+    [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
+    $commits = 0;
+    Event::listen(TransactionCommitted::class, function () use (&$commits): void {
+        $commits++;
+
+        if ($commits <= 2) {
+            throw new RuntimeException('Simulated lost commit response.');
+        }
+    });
+
+    $this->actingAs($assistant)
+        ->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
+        ->assertSessionHasErrors('documento');
+    $documento = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->firstOrFail();
+
+    expect(Artisan::call('documents:reconcile-reservation', [
+        'documento' => $documento->id,
+        '--fail' => true,
+        '--reason' => 'Prueba de respuesta perdida.',
+    ]))->toBe(1)
+        ->and($documento->fresh()->estado)->toBe('fallido')
+        ->and($documento->numeracion()->value('estado'))->toBe('fallida')
+        ->and(TramiteSerieDocumental::query()->where('tipo_documento_salida', 'informe')->value('ultimo_correlativo'))->toBe(1);
+
+    expect(Artisan::call('documents:reconcile-reservation', ['documento' => $documento->id]))->toBe(0)
+        ->and(Artisan::call('documents:reconcile-reservation', ['documento' => $documento->id, '--fail' => true]))->toBe(0)
+        ->and(TramiteEvento::query()->where('tramite_id', $tramite->id)->where('accion', 'reserva_reconciliada_cli')->count())->toBe(1);
+});
+
+/** @return array{User, Tramite} */
+function createApprovedTramiteForNumberingTest(): array
+{
+    Storage::fake('local');
+    config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
+
+    $assistant = User::factory()->create(['rol' => 'asistente', 'activo' => true]);
+    $administrator = User::factory()->create(['rol' => 'administrador', 'activo' => true]);
+    $reviewer = User::factory()->create(['rol' => 'docente', 'activo' => true]);
+    $tramite = Tramite::factory()->create(['estado' => 'aprobado', 'recibido_por' => $assistant->id]);
+    $plantilla = TramitePlantilla::factory()->create(['tipo_documento_salida' => 'informe', 'modalidad' => 'unica']);
+    $borrador = TramiteBorrador::factory()->create([
+        'tramite_id' => $tramite->id,
+        'plantilla_id' => $plantilla->id,
+        'remitente_id' => $administrator->id,
+        'firmante_id' => $reviewer->id,
+        'creado_por' => $assistant->id,
+    ]);
+    $asignacion = TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'asignado_por' => $assistant->id,
+        'activa' => false,
+        'estado' => 'finalizada',
+    ]);
+    TramiteRondaRevision::factory()->create([
+        'tramite_id' => $tramite->id,
+        'asignacion_id' => $asignacion->id,
+        'revisor_id' => $reviewer->id,
+        'borrador_id' => $borrador->id,
+        'estado' => 'aprobado',
+        'activa' => false,
+    ]);
+
+    return [$assistant, $tramite];
+}
+
 test('signature delivery and closure require confirmation and produce an auditable private report', function () {
     if (! configureDisposableTursoConnection()) {
         $this->markTestSkipped('Set separate TURSO_TEST_* credentials and confirm the database is disposable.');
@@ -1385,6 +1597,235 @@ test('signature delivery and closure require confirmation and produce an auditab
             DB::setDefaultConnection($defaultConnection);
         }
     }
+});
+
+test('intake receipt preserves the initial state and excludes private fields', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $tramite = Tramite::factory()->create([
+        'propietario_id' => $student->id,
+        'recibido_por' => $assistant->id,
+        'persona_nombre' => 'Interesada de prueba',
+        'persona_identificador' => 'DNI-PRIVADO-12345678',
+        'descripcion' => 'Nota privada del expediente',
+        'asunto' => 'Solicitud de constancia',
+        'fecha_recepcion' => '2026-09-28',
+        'estado' => 'cerrado',
+    ]);
+    TramiteEvento::query()->create([
+        'tramite_id' => $tramite->id,
+        'usuario_id' => $assistant->id,
+        'accion' => 'recepcion',
+        'descripcion' => 'Dato interno de recepción',
+        'estado_nuevo' => 'recibido_oficina',
+        'metadatos' => ['ruta_privada' => 'secreto-de-prueba'],
+    ]);
+
+    $this->get(route('tramites.receipt', $tramite))->assertRedirect(route('login'));
+    $this->actingAs($student)->get(route('tramites.receipt', $tramite))->assertForbidden();
+
+    $this->actingAs($assistant);
+    $response = $this->get(route('tramites.receipt', $tramite));
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('tramites/comprobante')
+        ->where('comprobante.codigo', $tramite->codigo)
+        ->where('comprobante.fecha_recepcion', '2026-09-28')
+        ->where('comprobante.tipo_tramite', 'Formulario Único de Trámite')
+        ->where('comprobante.estado_inicial', 'Recibido en oficina')
+        ->where('comprobante.interesado', 'Interesada de prueba')
+        ->where('comprobante.asunto', 'Solicitud de constancia')
+        ->missing('comprobante.persona_identificador')
+        ->missing('comprobante.descripcion')
+        ->missing('comprobante.ruta_privada'));
+    expect($response->getContent())->not->toContain('DNI-PRIVADO-12345678', 'Nota privada del expediente', 'secreto-de-prueba');
+
+    $this->actingAs($administrator)->get(route('tramites.receipt', $tramite))->assertOk();
+    $assistant->forceFill(['activo' => false])->save();
+    $this->actingAs($assistant)->get(route('tramites.receipt', $tramite))->assertForbidden();
+});
+
+test('global search restricts results by role and assignment', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $reviewer = User::factory()->create(['rol' => 'docente', 'name' => 'Docente Reservado']);
+    $otherReviewer = User::factory()->create(['rol' => 'docente']);
+    $student = User::factory()->create(['rol' => 'estudiante', 'name' => 'Estudiante Visible']);
+    $tramite = Tramite::factory()->create([
+        'codigo' => 'TRM-SEARCH-000001',
+        'asunto' => 'Consulta reservada',
+        'propietario_id' => $student->id,
+        'persona_nombre' => 'Persona Privada',
+        'persona_identificador' => 'DNI-PRIVADO-555',
+        'estado' => 'asignado',
+    ]);
+    TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'asignado_por' => $assistant->id,
+        'destino' => 'docente',
+        'activa' => true,
+    ]);
+
+    $this->get(route('search.index', ['q' => 'SEARCH']))->assertRedirect(route('login'));
+    $this->actingAs($student)->get(route('search.index', ['q' => 'SEARCH']))->assertForbidden();
+    $this->actingAs($otherReviewer)->get(route('search.index', ['q' => 'SEARCH']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.expedientes', 0)->has('results.personas', 0));
+    $this->actingAs($reviewer)->get(route('search.index', ['q' => 'SEARCH']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('results.expedientes.0.codigo', 'TRM-SEARCH-000001')
+        ->has('results.personas', 0)
+        ->has('results.documentos', 0));
+
+    $assistantResponse = $this->actingAs($assistant)->get(route('search.index', ['q' => 'DNI-PRIVADO-555']));
+    $assistantResponse->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('results.expedientes.0.codigo', 'TRM-SEARCH-000001')
+        ->missing('results.expedientes.0.persona_identificador'));
+
+    $this->actingAs($assistant)->get(route('search.index', ['q' => 'Docente Reservado']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.personas', 0));
+    $this->actingAs($administrator)->get(route('search.index', ['q' => 'Docente Reservado']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('results.personas.0.name', 'Docente Reservado'));
+    $assistant->forceFill(['activo' => false])->save();
+    $this->actingAs($assistant)->get(route('search.index', ['q' => 'SEARCH']))->assertForbidden();
+});
+
+test('global search limits results, treats wildcard characters literally, and finds issued documents', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $tramite = Tramite::factory()->create(['codigo' => 'TRM-X%-001', 'asunto' => 'Caso de prueba']);
+    Tramite::factory()->create(['codigo' => 'TRM-XA-002', 'asunto' => 'Otro caso']);
+    $documento = TramiteDocumentoFinal::factory()->create([
+        'tramite_id' => $tramite->id,
+        'numero_documento' => 'OFI-SEARCH-001',
+        'codigo_verificacion' => 'ABCD-EFGH-SEARCH',
+        'estado' => 'emitido',
+        'activo' => true,
+        'fecha_emision' => now(),
+    ]);
+
+    $this->actingAs($assistant)->get(route('search.index', ['q' => '  X%  ']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('query', 'X%')
+        ->has('results.expedientes', 1)
+        ->where('results.expedientes.0.codigo', 'TRM-X%-001'));
+    $this->get(route('search.index', ['q' => 'OFI-SEARCH-001']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('results.documentos.0.id', $documento->id)
+        ->where('results.documentos.0.tramite_id', $tramite->id)
+        ->missing('results.documentos.0.ruta'));
+    $this->get(route('search.index', ['q' => 'A']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('status', 'short')->has('results.expedientes', 0));
+    $this->get(route('search.index', ['q' => str_repeat('A', 81)]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('status', 'too_long')->has('results.expedientes', 0));
+
+    for ($index = 0; $index < 13; $index++) {
+        Tramite::factory()->create(['asunto' => 'LIMITE GLOBAL '.$index]);
+    }
+
+    $this->get(route('search.index', ['q' => 'LIMITE GLOBAL']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.expedientes', 12));
+});
+
+test('student timeline shows ordered public milestones and observations only to the owner', function () {
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $otherStudent = User::factory()->create(['rol' => 'estudiante']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $reviewer = User::factory()->create(['rol' => 'docente', 'name' => 'Revisor Confidencial']);
+    $tramite = Tramite::factory()->create([
+        'propietario_id' => $student->id,
+        'recibido_por' => $assistant->id,
+        'estado' => 'observado',
+    ]);
+    $asignacion = TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'asignado_por' => $assistant->id,
+        'activa' => false,
+    ]);
+    $borrador = TramiteBorrador::factory()->create(['tramite_id' => $tramite->id]);
+    $ronda = TramiteRondaRevision::factory()->create([
+        'tramite_id' => $tramite->id,
+        'asignacion_id' => $asignacion->id,
+        'revisor_id' => $reviewer->id,
+        'borrador_id' => $borrador->id,
+        'estado' => 'observada',
+        'activa' => false,
+    ]);
+
+    TramiteEvento::query()->create([
+        'tramite_id' => $tramite->id,
+        'usuario_id' => $assistant->id,
+        'accion' => 'recepcion',
+        'descripcion' => 'Nota privada de recepción.',
+        'estado_nuevo' => 'recibido_oficina',
+    ]);
+    TramiteEvento::query()->create([
+        'tramite_id' => $tramite->id,
+        'usuario_id' => $assistant->id,
+        'accion' => 'asignacion_creada',
+        'descripcion' => 'Asignado a Revisor Confidencial.',
+        'estado_anterior' => 'pendiente_asignacion',
+        'estado_nuevo' => 'asignado',
+    ]);
+    TramiteEvento::query()->create([
+        'tramite_id' => $tramite->id,
+        'usuario_id' => $reviewer->id,
+        'accion' => 'observacion',
+        'descripcion' => 'Comentario interno de revisión.',
+        'estado_anterior' => 'en_revision',
+        'estado_nuevo' => 'observado',
+    ]);
+    TramiteEvento::query()->create([
+        'tramite_id' => $tramite->id,
+        'usuario_id' => $assistant->id,
+        'accion' => 'entrega_registrada',
+        'descripcion' => 'Evidencia interna de entrega.',
+        'estado_anterior' => 'listo_entrega',
+        'estado_nuevo' => 'listo_entrega',
+    ]);
+    $ronda->observaciones()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'categoria' => 'Contenido',
+        'titulo' => 'Observación pública',
+        'descripcion' => 'Complete el dato solicitado.',
+        'obligatoria' => true,
+        'visible_para_interesado' => true,
+        'orden' => 1,
+    ]);
+    $ronda->observaciones()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'categoria' => 'Contenido',
+        'titulo' => 'Observación interna',
+        'descripcion' => 'Ruta privada y nota interna.',
+        'obligatoria' => false,
+        'visible_para_interesado' => false,
+        'orden' => 2,
+    ]);
+
+    $this->actingAs($student);
+    $response = $this->get(route('estudiante.tramites.show', $tramite));
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('tramites/estudiante-show')
+        ->has('historial', 5)
+        ->where('historial.0.label', 'Expediente recibido')
+        ->where('historial.1.label', 'Asignado')
+        ->where('historial.2.label', 'Observado')
+        ->where('historial.3.label', 'Entrega registrada')
+        ->where('historial.4.descripcion', 'Complete el dato solicitado.')
+        ->missing('historial.4.id')
+        ->missing('historial.4.usuario_id'));
+    expect($response->getContent())->not->toContain(
+        'Nota privada de recepción.',
+        'Revisor Confidencial',
+        'Comentario interno de revisión.',
+        'Evidencia interna de entrega.',
+        'Ruta privada y nota interna.',
+    );
+
+    $this->actingAs($otherStudent)->get(route('estudiante.tramites.show', $tramite))->assertForbidden();
+    $this->actingAs($assistant)->get(route('estudiante.tramites.show', $tramite))->assertForbidden();
 });
 
 test('public document verification normalizes valid codes and exposes only approved metadata', function () {

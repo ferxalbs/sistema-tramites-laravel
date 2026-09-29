@@ -222,6 +222,26 @@ class TramiteController extends Controller
         return redirect()->route('tramites.show', $tramite)->with('success', 'El documento fue digitalizado.');
     }
 
+    public function receipt(Tramite $tramite): InertiaResponse
+    {
+        $recepcion = $tramite->eventos()->where('accion', 'recepcion')->orderBy('id')->first(['created_at']);
+
+        return Inertia::render('tramites/comprobante', [
+            'institucion' => config('app.name'),
+            'comprobante' => [
+                'tramite_id' => $tramite->id,
+                'codigo' => $tramite->codigo,
+                'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
+                'fecha_registro' => ($recepcion?->created_at ?? $tramite->created_at)?->toIso8601String(),
+                'tipo_tramite' => config('tramites.tipos_documento.'.$tramite->clasificacion.'.'.$tramite->tipo_documento, $tramite->tipo_documento),
+                'estado_inicial' => config('tramites.estados.recibido_oficina'),
+                'destino' => $tramite->destino_nombre ?: 'Pendiente',
+                'interesado' => $tramite->persona_nombre,
+                'asunto' => $tramite->asunto,
+            ],
+        ]);
+    }
+
     public function show(Request $request, Tramite $tramite): InertiaResponse
     {
         $tramite->load([

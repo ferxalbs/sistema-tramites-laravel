@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Tramite;
 use App\Models\TramiteEvento;
+use App\Models\TramiteObservacionRevision;
 use App\Models\TramiteRondaRevision;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -57,15 +58,68 @@ class TramiteEstudianteController extends Controller
         $entrega = $tramite->entregaActual()->with('medio')->first();
         $informeCierre = $tramite->informeCierre()->first();
 
-        $eventos = $tramite->eventos()
-            ->whereNotNull('estado_nuevo')
-            ->orderBy('id')
-            ->get(['estado_nuevo', 'created_at'])
-            ->map(fn (TramiteEvento $evento): array => [
-                'estado' => $evento->estado_nuevo,
-                'label' => config('tramites.estados.'.$evento->estado_nuevo, 'Trámite actualizado'),
+        $hitosPublicos = [
+            'recepcion' => ['Expediente recibido', 'La solicitud fue recibida en la oficina.'],
+            'digitalizacion' => ['Documento digitalizado', 'El documento recibido fue digitalizado.'],
+            'documento_final_emitido' => ['Documento final generado', 'Se generó el documento final oficial.'],
+            'firma_registrada' => ['Firma registrada', 'La firma del documento fue registrada.'],
+            'entrega_registrada' => ['Entrega registrada', 'El documento quedó registrado para entrega.'],
+            'recepcion_confirmada' => ['Recepción confirmada', 'La recepción del documento fue confirmada.'],
+            'expediente_cerrado' => ['Expediente cerrado', 'El expediente fue cerrado después de completar la entrega.'],
+        ];
+        $estadosPublicos = config('tramites.estados', []);
+        $historial = [];
+        $hayRecepcion = false;
+
+        foreach ($tramite->eventos()->orderBy('created_at')->orderBy('id')->get(['id', 'accion', 'estado_anterior', 'estado_nuevo', 'created_at']) as $evento) {
+            $hito = $hitosPublicos[$evento->accion] ?? null;
+            $estado = $evento->estado_nuevo;
+
+            if ($hito === null && (! is_string($estado) || ! isset($estadosPublicos[$estado]) || $estado === $evento->estado_anterior)) {
+                continue;
+            }
+
+            $hayRecepcion = $hayRecepcion || $evento->accion === 'recepcion';
+            $titulo = $hito[0] ?? $estadosPublicos[$estado];
+            $historial[] = [
+                'estado' => $estado ?? $evento->accion,
+                'label' => $titulo,
+                'descripcion' => $hito[1] ?? 'El expediente pasó a '.$titulo.'.',
                 'fecha' => $evento->created_at?->toIso8601String(),
-            ])->all();
+                'orden' => 10,
+                'id' => $evento->id,
+            ];
+        }
+
+        if (! $hayRecepcion) {
+            $historial[] = [
+                'estado' => 'recibido_oficina',
+                'label' => 'Expediente recibido',
+                'descripcion' => 'La solicitud fue recibida en la oficina.',
+                'fecha' => $tramite->fecha_recepcion->startOfDay()->toIso8601String(),
+                'orden' => 1,
+                'id' => 0,
+            ];
+        }
+
+        foreach (TramiteObservacionRevision::query()
+            ->where('tramite_id', $tramite->id)
+            ->where('visible_para_interesado', true)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['id', 'descripcion', 'created_at']) as $observacion) {
+            $historial[] = [
+                'estado' => 'observacion',
+                'label' => 'Observación de revisión',
+                'descripcion' => $observacion->descripcion,
+                'fecha' => $observacion->created_at?->toIso8601String(),
+                'orden' => 30,
+                'id' => $observacion->id,
+            ];
+        }
+
+        usort($historial, static fn (array $a, array $b): int => [$a['fecha'], $a['orden'], $a['id']] <=> [$b['fecha'], $b['orden'], $b['id']]);
+        $historial = array_map(static fn (array $hito): array => array_intersect_key($hito, array_flip(['estado', 'label', 'descripcion', 'fecha'])), $historial);
 
         return Inertia::render('tramites/estudiante-show', [
             'tramite' => [
@@ -106,7 +160,7 @@ class TramiteEstudianteController extends Controller
                 'seccion' => $observacion->seccion,
                 'obligatoria' => $observacion->obligatoria,
             ])->all() ?? [],
-            'historial' => $eventos,
+            'historial' => $historial,
         ]);
     }
 }

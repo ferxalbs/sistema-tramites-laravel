@@ -18,7 +18,7 @@ return [
     'default' => env('CACHE_STORE', 'database'),
 
     // Keep request throttling independent from application database writes.
-    'limiter' => 'file',
+    'limiter' => env('CACHE_LIMITER', 'file'),
 
     /*
     |--------------------------------------------------------------------------
