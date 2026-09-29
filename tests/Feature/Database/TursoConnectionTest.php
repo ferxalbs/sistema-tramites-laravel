@@ -281,6 +281,44 @@ test('Turso connection previews bound SQL without a PDO connection or remote wri
     Http::assertNothingSent();
 });
 
+test('Turso schema inspection omits unsupported pragma schema arguments', function () {
+    $queries = [];
+
+    Http::fake(function (Request $request) use (&$queries) {
+        $queries[] = $request->data()['requests'][0]['batch']['steps'][1]['stmt']['sql'];
+        $emptyResult = ['affected_row_count' => 0, 'cols' => [], 'rows' => []];
+
+        return Http::response([
+            'baton' => null,
+            'base_url' => null,
+            'results' => [
+                [
+                    'type' => 'ok',
+                    'response' => [
+                        'type' => 'batch',
+                        'result' => [
+                            'step_results' => [$emptyResult, $emptyResult],
+                            'step_errors' => [null, null],
+                        ],
+                    ],
+                ],
+                ['type' => 'ok', 'response' => ['type' => 'close']],
+            ],
+        ]);
+    });
+
+    $connection = new TursoConnection(new TursoHttpClient('libsql://example.turso.io', 'test-token'), 'turso');
+    $schema = $connection->getSchemaBuilder();
+
+    expect($schema->getColumns('tramite_documentos'))->toBeEmpty();
+    expect($schema->getIndexes('tramite_documentos'))->toBeEmpty();
+    expect($schema->getForeignKeys('tramite_documentos'))->toBeEmpty();
+    expect($queries)->toHaveCount(4)
+        ->and($queries[0])->toContain("pragma_table_xinfo('tramite_documentos')")
+        ->and($queries[2])->toContain("pragma_index_list('tramite_documentos')")
+        ->and($queries[3])->toContain("pragma_foreign_key_list('tramite_documentos')");
+});
+
 test('Turso connection rolls back on the latest baton after a failed transaction callback', function () {
     $requests = [];
     $statementResult = ['affected_row_count' => 1, 'cols' => [], 'rows' => []];
