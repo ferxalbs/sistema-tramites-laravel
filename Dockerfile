@@ -51,8 +51,7 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
 # 5. Build frontend assets with Vite/pnpm and clean up node_modules to keep image lean
-RUN php artisan wayfinder:generate --with-form \
-    && pnpm run build \
+RUN TURSO_DATABASE_URL=turso://build.invalid TURSO_AUTH_TOKEN=build-placeholder pnpm run build \
     && rm -rf node_modules
 
 # 6. Configure Caddy & entrypoint
