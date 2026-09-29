@@ -135,6 +135,14 @@ class TramiteEstudianteController extends Controller
                 'numero' => $documentoFinal->numero_documento,
                 'url_descarga' => route('tramites.documento-final.descargar', [$tramite->id, $documentoFinal->id]),
             ],
+            'documentos_recepcion' => $tramite->documentos()->orderBy('id')->get(['id', 'nombre_original', 'categoria', 'version', 'vigente'])
+                ->map(fn ($documento): array => [
+                    'id' => $documento->id,
+                    'nombre' => $documento->nombre_original,
+                    'categoria' => $documento->categoria,
+                    'version' => $documento->version,
+                    'vigente' => $documento->vigente,
+                ])->all(),
             'entrega' => $entrega === null ? null : [
                 'medio' => $entrega->medio->nombre,
                 'receptor_nombre' => $entrega->receptor_nombre,

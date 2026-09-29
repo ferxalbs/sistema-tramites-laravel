@@ -33,7 +33,9 @@ return [
     ],
 
     'prioridades' => [
+        'baja' => 'Baja',
         'normal' => 'Normal',
+        'alta' => 'Alta',
         'urgente' => 'Urgente',
     ],
 

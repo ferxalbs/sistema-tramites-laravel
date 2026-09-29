@@ -33,9 +33,11 @@ class GlobalSearchController extends Controller
                 ->when($isReviewer, fn (Builder $builder): Builder => $builder->whereHas('asignaciones', fn (Builder $assignment): Builder => $assignment
                     ->where('revisor_id', $actor->id)
                     ->where('destino', 'docente')
-                    ->where('activa', true)))
+                    ->where(fn (Builder $assignment): Builder => $assignment->where('activa', true)
+                        ->orWhereIn('estado', ['aprobado', 'rechazado']))))
                 ->where(function (Builder $builder) use ($like, $isReviewer): void {
                     $builder->whereRaw("codigo LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("numero_expediente_externo LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("asunto LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("tipo_documento LIKE ? ESCAPE '!'", [$like]);
 
@@ -44,6 +46,9 @@ class GlobalSearchController extends Controller
                             ->orWhereRaw("persona_identificador LIKE ? ESCAPE '!'", [$like])
                             ->orWhereHas('propietario', fn (Builder $owner): Builder => $owner
                                 ->whereRaw("name LIKE ? ESCAPE '!'", [$like])
+                                ->orWhereRaw("nombres LIKE ? ESCAPE '!'", [$like])
+                                ->orWhereRaw("apellidos LIKE ? ESCAPE '!'", [$like])
+                                ->orWhereRaw("dni LIKE ? ESCAPE '!'", [$like])
                                 ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like]));
                     }
                 })
@@ -64,7 +69,12 @@ class GlobalSearchController extends Controller
                     ->when($actor->rol === 'asistente', fn (Builder $builder): Builder => $builder->where('rol', 'estudiante'))
                     ->where(fn (Builder $builder): Builder => $builder
                         ->whereRaw("name LIKE ? ESCAPE '!'", [$like])
-                        ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like]))
+                        ->orWhereRaw("nombres LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("apellidos LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("dni LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereHas('perfilEstudiante', fn (Builder $profile): Builder => $profile->whereRaw("codigo_estudiante LIKE ? ESCAPE '!'", [$like]))
+                        ->orWhereHas('perfilDocente', fn (Builder $profile): Builder => $profile->whereRaw("codigo_docente LIKE ? ESCAPE '!'", [$like])))
                     ->orderBy('name')
                     ->orderBy('id')
                     ->limit(12)
@@ -97,6 +107,7 @@ class GlobalSearchController extends Controller
             'status' => $status,
             'results' => $results,
             'reviewer' => $request->user()->rol === 'docente',
+            'administrator' => $request->user()->rol === 'administrador',
         ]);
     }
 }

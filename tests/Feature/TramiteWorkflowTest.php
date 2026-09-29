@@ -1,11 +1,15 @@
 <?php
 
+use App\Models\PerfilDocente;
+use App\Models\PerfilEstudiante;
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
 use App\Models\TramiteBorrador;
+use App\Models\TramiteDocumento;
 use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEntrega;
 use App\Models\TramiteEvento;
+use App\Models\TramiteMedioEntrega;
 use App\Models\TramiteNumeracionDocumental;
 use App\Models\TramitePlantilla;
 use App\Models\TramiteRondaRevision;
@@ -84,8 +88,9 @@ test('assistant intake can be digitized, searched, audited, and downloaded priva
             'asunto' => 'Solicitud ficticia de prueba',
             'descripcion' => 'Registro artificial para la prueba automatizada.',
             'prioridad' => 'normal',
-            'fecha_recepcion' => now()->toDateString(),
+            'fecha_llegada_oficina' => now()->format('Y-m-d\TH:i'),
             'folios' => 2,
+            'confirmar_recepcion' => '1',
         ];
 
         $this->from(route('tramites.create'))
@@ -95,9 +100,9 @@ test('assistant intake can be digitized, searched, audited, and downloaded priva
         $this->from(route('tramites.create'))
             ->post(route('tramites.store'), [
                 ...$payload,
-                'documento' => UploadedFile::fake()->createWithContent('script.php', '<?php echo 1;'),
+                'documentos' => [['categoria' => 'documento_original', 'archivo' => UploadedFile::fake()->createWithContent('script.php', '<?php echo 1;')]],
             ])
-            ->assertSessionHasErrors('documento');
+            ->assertSessionHasErrors('documentos.0.archivo');
 
         $this->post(route('tramites.store'), $payload)->assertRedirect();
 
@@ -515,7 +520,7 @@ test('assistant intake can be digitized, searched, audited, and downloaded priva
 
         $this->actingAs($student)
             ->get(route('tramites.documentos.descargar', [$tramiteId, $documento->id]))
-            ->assertForbidden();
+            ->assertOk();
 
         $this->actingAs($assistant);
         Storage::disk('local')->put($documento->ruta, 'contenido alterado');
@@ -550,6 +555,7 @@ test('assistant intake can be digitized, searched, audited, and downloaded priva
                 'correccion_reenvio',
                 'inicio_revision',
                 'revision_rechazada',
+                'descarga',
             ]);
     } finally {
         if ($tramiteId !== null) {
@@ -1176,6 +1182,163 @@ test('CLI reconciliation can be inspected again after losing its own commit resp
         ->and(TramiteEvento::query()->where('tramite_id', $tramite->id)->where('accion', 'reserva_reconciliada_cli')->count())->toBe(1);
 });
 
+test('student confirms only their own pending delivery once and leaves an auditable record in SQLite', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente', 'activo' => true]);
+    $student = User::factory()->create(['rol' => 'estudiante', 'activo' => true]);
+    $otherStudent = User::factory()->create(['rol' => 'estudiante', 'activo' => true]);
+    $reviewer = User::factory()->create(['rol' => 'docente', 'activo' => true]);
+    $tramite = Tramite::factory()->create([
+        'estado' => 'listo_entrega',
+        'propietario_id' => $student->id,
+        'recibido_por' => $assistant->id,
+    ]);
+    $documento = TramiteDocumentoFinal::factory()->create([
+        'tramite_id' => $tramite->id,
+        'estado' => 'emitido',
+        'activo' => true,
+    ]);
+    $medio = TramiteMedioEntrega::query()->create([
+        'codigo' => 'presencial',
+        'nombre' => 'Presencial',
+        'tipo' => 'presencial',
+        'requiere_evidencia' => false,
+        'activo' => true,
+    ]);
+    $entrega = TramiteEntrega::query()->create([
+        'tramite_id' => $tramite->id,
+        'documento_final_id' => $documento->id,
+        'medio_entrega_id' => $medio->id,
+        'entregado_por' => $assistant->id,
+        'receptor_usuario_id' => $student->id,
+        'receptor_nombre' => $student->name,
+        'receptor_tipo' => 'Estudiante',
+        'fecha_entrega' => now(),
+        'codigo_confirmacion' => 'CONF-PRUEBA-001',
+        'confirmado' => false,
+        'activa' => true,
+        'estado' => 'registrada',
+    ]);
+
+    $this->post(route('tramites.entrega.confirmar', $tramite), ['confirmar' => true])->assertRedirect(route('login'));
+    $this->actingAs($reviewer)->post(route('tramites.entrega.confirmar', $tramite), ['confirmar' => true])->assertForbidden();
+    $this->actingAs($otherStudent)->post(route('tramites.entrega.confirmar', $tramite), ['confirmar' => true])->assertForbidden();
+    $this->actingAs($student)->get(route('estudiante.tramites.show', $tramite))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('puede_confirmar_entrega', true)->etc());
+    $this->post(route('tramites.entrega.confirmar', $tramite), [])->assertSessionHasErrors('confirmar');
+    expect($entrega->fresh()->confirmado)->toBeFalse();
+
+    $this->post(route('tramites.entrega.confirmar', $tramite), [
+        'confirmar' => '1',
+        'observacion' => 'Documento recibido físicamente por la persona interesada.',
+    ])->assertRedirect();
+    expect($tramite->fresh()->estado)->toBe('entregado')
+        ->and($entrega->refresh()->confirmado)->toBeTrue()
+        ->and($entrega->confirmado_por_estudiante)->toBeTrue();
+    $evidencia = DB::table('tramite_evidencias_entrega')->where('entrega_id', $entrega->id)->sole();
+    expect($evidencia->tipo_evidencia)->toBe('Confirmación manual')
+        ->and($evidencia->registrado_por)->toBe($student->id)
+        ->and($evidencia->codigo_confirmacion)->toBe('CONF-PRUEBA-001');
+    $evento = $tramite->eventos()->where('accion', 'recepcion_confirmada')->sole();
+    expect($evento->usuario_id)->toBe($student->id)
+        ->and($evento->metadatos['confirmado_por_interesado'])->toBeTrue();
+    $this->get(route('estudiante.tramites.show', $tramite))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('tramite.estado', 'entregado')
+        ->where('entrega.confirmado', true)
+        ->where('puede_confirmar_entrega', false)
+        ->etc());
+    $this->post(route('tramites.entrega.confirmar', $tramite), ['confirmar' => true])->assertStatus(409);
+    expect(DB::table('tramite_evidencias_entrega')->where('entrega_id', $entrega->id)->count())->toBe(1);
+});
+
+test('administrator annuls a pending delivery and reopens a closed case without erasing history', function () {
+    [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
+    $administrator = User::factory()->create(['rol' => 'administrador', 'activo' => true]);
+    $student = $tramite->propietario;
+    $medio = TramiteMedioEntrega::query()->create([
+        'codigo' => 'presencial',
+        'nombre' => 'Presencial',
+        'tipo' => 'presencial',
+        'requiere_evidencia' => false,
+        'activo' => true,
+    ]);
+    $payload = [
+        'medio_entrega_id' => $medio->id,
+        'receptor_nombre' => $student->name,
+        'receptor_tipo' => 'Estudiante',
+        'fecha_entrega' => now()->format('Y-m-d\TH:i'),
+        'tipo_evidencia' => 'Confirmación manual',
+    ];
+
+    $this->actingAs($assistant)->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])->assertRedirect();
+    $this->post(route('tramites.entrega.prepare', $tramite))->assertRedirect();
+    $this->post(route('tramites.entrega.registrar', $tramite), $payload)->assertRedirect();
+    $primeraEntrega = $tramite->entregaActual()->firstOrFail();
+    $this->actingAs($administrator)->get(route('tramites.entrega.show', $tramite))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('puede_anular', true)->where('puede_reabrir', false)->etc());
+
+    $motivoAnulacion = 'La entrega fue registrada con datos incorrectos.';
+    $rutaAnular = route('tramites.entrega.anular', [$tramite, $primeraEntrega]);
+    $this->actingAs($assistant)->post($rutaAnular, ['motivo' => $motivoAnulacion])->assertForbidden();
+    $this->actingAs($student)->post($rutaAnular, ['motivo' => $motivoAnulacion])->assertForbidden();
+    $this->actingAs($administrator)->post($rutaAnular, ['motivo' => 'corto'])->assertSessionHasErrors('motivo');
+    $this->post(route('tramites.entrega.anular', [Tramite::factory()->create(), $primeraEntrega]), ['motivo' => $motivoAnulacion])->assertNotFound();
+    $this->post($rutaAnular, ['motivo' => $motivoAnulacion])->assertRedirect(route('tramites.entrega.show', $tramite));
+    expect($primeraEntrega->fresh()->activa)->toBeFalse()
+        ->and($primeraEntrega->fresh()->estado)->toBe('anulada')
+        ->and($tramite->fresh()->estado)->toBe('listo_entrega')
+        ->and(DB::table('tramite_evidencias_entrega')->where('entrega_id', $primeraEntrega->id)->where('activa', true)->count())->toBe(0);
+    expect($tramite->eventos()->where('accion', 'entrega_anulada')->sole()->metadatos['motivo'])->toBe($motivoAnulacion);
+    $this->post($rutaAnular, ['motivo' => $motivoAnulacion])->assertStatus(409);
+
+    $this->actingAs($assistant)->post(route('tramites.entrega.registrar', $tramite), $payload)->assertRedirect();
+    $segundaEntrega = $tramite->entregaActual()->firstOrFail();
+    expect($segundaEntrega->id)->not->toBe($primeraEntrega->id);
+    $this->post(route('tramites.entrega.confirmar', $tramite), ['confirmar' => true])->assertRedirect();
+    $this->actingAs($administrator)->post(route('tramites.entrega.anular', [$tramite, $segundaEntrega]), ['motivo' => $motivoAnulacion])->assertStatus(409);
+    $this->actingAs($assistant);
+    $this->post(route('tramites.entrega.cerrar', $tramite), ['resumen' => 'Primer cierre administrativo después de la entrega corregida.'])->assertRedirect();
+    $primerCierre = $tramite->cierre()->firstOrFail();
+    $primerInforme = $primerCierre->informe()->firstOrFail();
+    $rutaInforme = route('tramites.informes-cierre.descargar', [$tramite, $primerInforme]);
+    $this->get($rutaInforme)->assertOk();
+    $this->actingAs($administrator)->get(route('tramites.entrega.show', $tramite))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('puede_reabrir', true)->where('puede_anular', false)->etc());
+
+    $motivoReapertura = 'Se requiere corregir el informe administrativo de cierre.';
+    $rutaReabrir = route('tramites.entrega.reabrir', $tramite);
+    $this->actingAs($assistant)->post($rutaReabrir, ['motivo' => $motivoReapertura])->assertForbidden();
+    $this->actingAs($administrator)->post($rutaReabrir, ['motivo' => 'corto'])->assertSessionHasErrors('motivo');
+    $this->post($rutaReabrir, ['motivo' => $motivoReapertura])->assertRedirect(route('tramites.entrega.show', $tramite));
+    expect($tramite->fresh()->estado)->toBe('entregado')
+        ->and($primerCierre->fresh()->activo)->toBeFalse()
+        ->and($primerCierre->fresh()->reabierto)->toBeTrue()
+        ->and($primerCierre->fresh()->motivo_reapertura)->toBe($motivoReapertura)
+        ->and($primerCierre->fresh()->reabierto_por)->toBe($administrator->id)
+        ->and($primerInforme->fresh()->activo)->toBeFalse()
+        ->and(Storage::disk('local')->exists($primerInforme->ruta))->toBeTrue();
+    $this->get($rutaInforme)->assertNotFound();
+    $this->post($rutaReabrir, ['motivo' => $motivoReapertura])->assertStatus(409);
+    $this->actingAs($student)->get(route('estudiante.tramites.show', $tramite))->assertOk()->assertDontSee($motivoReapertura);
+
+    $this->actingAs($assistant)->post(route('tramites.entrega.cerrar', $tramite), ['resumen' => 'Segundo cierre tras la reapertura administrativa del expediente.'])->assertRedirect();
+    $segundoCierre = $tramite->cierre()->firstOrFail();
+    $segundoInforme = $segundoCierre->informe()->firstOrFail();
+    expect($segundoCierre->id)->not->toBe($primerCierre->id)
+        ->and($segundoInforme->id)->not->toBe($primerInforme->id)
+        ->and($tramite->fresh()->estado)->toBe('cerrado')
+        ->and(DB::table('tramite_cierres')->where('tramite_id', $tramite->id)->count())->toBe(2)
+        ->and(DB::table('tramite_cierres')->where('tramite_id', $tramite->id)->where('activo', true)->count())->toBe(1)
+        ->and(DB::table('tramite_informes_cierre')->where('tramite_id', $tramite->id)->count())->toBe(2)
+        ->and($tramite->eventos()->where('accion', 'expediente_reabierto')->sole()->metadatos['motivo'])->toBe($motivoReapertura);
+
+    DB::table('tramite_informes_cierre')->where('id', $segundoInforme->id)->update(['activo' => false]);
+    $this->actingAs($administrator)->post($rutaReabrir, ['motivo' => $motivoReapertura])->assertStatus(409);
+    expect($tramite->fresh()->estado)->toBe('cerrado')
+        ->and($segundoCierre->fresh()->activo)->toBeTrue()
+        ->and($segundoCierre->fresh()->reabierto)->toBeFalse();
+});
+
 /** @return array{User, Tramite} */
 function createApprovedTramiteForNumberingTest(): array
 {
@@ -1651,6 +1814,9 @@ test('global search restricts results by role and assignment', function () {
     $reviewer = User::factory()->create(['rol' => 'docente', 'name' => 'Docente Reservado']);
     $otherReviewer = User::factory()->create(['rol' => 'docente']);
     $student = User::factory()->create(['rol' => 'estudiante', 'name' => 'Estudiante Visible']);
+    $student->forceFill(['dni' => '87654321', 'nombres' => 'Nombre Reservado', 'apellidos' => 'Apellido Reservado'])->save();
+    PerfilEstudiante::factory()->create(['user_id' => $student->id, 'codigo_estudiante' => 'EST-SEARCH-555']);
+    PerfilDocente::factory()->create(['user_id' => $reviewer->id, 'codigo_docente' => 'DOC-SEARCH-999']);
     $tramite = Tramite::factory()->create([
         'codigo' => 'TRM-SEARCH-000001',
         'asunto' => 'Consulta reservada',
@@ -1676,6 +1842,10 @@ test('global search restricts results by role and assignment', function () {
         ->where('results.expedientes.0.codigo', 'TRM-SEARCH-000001')
         ->has('results.personas', 0)
         ->has('results.documentos', 0));
+    $this->get(route('search.index', ['q' => '87654321']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('results.expedientes', 0)
+        ->has('results.personas', 0));
 
     $assistantResponse = $this->actingAs($assistant)->get(route('search.index', ['q' => 'DNI-PRIVADO-555']));
     $assistantResponse->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -1684,10 +1854,80 @@ test('global search restricts results by role and assignment', function () {
 
     $this->actingAs($assistant)->get(route('search.index', ['q' => 'Docente Reservado']))
         ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.personas', 0));
+    $this->get(route('search.index', ['q' => 'EST-SEARCH-555']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('results.personas.0.id', $student->id)
+        ->missing('results.personas.0.codigo_estudiante'));
+    $this->get(route('search.index', ['q' => '87654321']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('results.expedientes.0.id', $tramite->id)
+        ->where('results.personas.0.id', $student->id)
+        ->missing('results.personas.0.dni'));
+    $this->get(route('search.index', ['q' => 'DOC-SEARCH-999']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.personas', 0));
     $this->actingAs($administrator)->get(route('search.index', ['q' => 'Docente Reservado']))
         ->assertOk()->assertInertia(fn (Assert $page) => $page->where('results.personas.0.name', 'Docente Reservado'));
+    $this->get(route('search.index', ['q' => 'DOC-SEARCH-999']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('administrator', true)
+        ->where('results.personas.0.id', $reviewer->id)
+        ->missing('results.personas.0.codigo_docente'));
     $assistant->forceFill(['activo' => false])->save();
     $this->actingAs($assistant)->get(route('search.index', ['q' => 'SEARCH']))->assertForbidden();
+});
+
+test('global search opens only a reviewers completed assignment as read only', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $reviewer = User::factory()->create(['rol' => 'docente']);
+    $otherReviewer = User::factory()->create(['rol' => 'docente']);
+    $tramite = Tramite::factory()->create(['codigo' => 'TRM-HISTORICO-001', 'estado' => 'aprobado']);
+    $reviewedDraft = TramiteBorrador::factory()->create([
+        'tramite_id' => $tramite->id,
+        'version' => 1,
+        'es_actual' => false,
+        'asunto' => 'Borrador revisado en la ronda finalizada',
+    ]);
+    TramiteBorrador::factory()->create([
+        'tramite_id' => $tramite->id,
+        'version' => 2,
+        'es_actual' => true,
+        'asunto' => 'Borrador posterior ajeno a la ronda',
+    ]);
+    $assignment = TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'asignado_por' => $assistant->id,
+        'destino' => 'docente',
+        'estado' => 'aprobado',
+        'activa' => false,
+    ]);
+    TramiteRondaRevision::factory()->create([
+        'tramite_id' => $tramite->id,
+        'asignacion_id' => $assignment->id,
+        'revisor_id' => $reviewer->id,
+        'borrador_id' => $reviewedDraft->id,
+        'estado' => 'aprobado',
+        'activa' => false,
+    ]);
+
+    $this->actingAs($reviewer)->get(route('search.index', ['q' => 'HISTORICO']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('results.expedientes.0.id', $tramite->id));
+    $this->get(route('asignaciones.docente.show', $tramite))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('borrador.version', 1)
+        ->where('borrador.asunto', 'Borrador revisado en la ronda finalizada')
+        ->where('revision.puede_iniciar', false)
+        ->where('revision.puede_observar', false)
+        ->where('revision.puede_decidir', false));
+    $this->post(route('tramites.revision.start', $tramite))->assertForbidden();
+    $this->actingAs($otherReviewer)->get(route('search.index', ['q' => 'HISTORICO']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.expedientes', 0));
+    $this->get(route('asignaciones.docente.show', $tramite))->assertForbidden();
+
+    $assignment->forceFill(['estado' => 'cancelada'])->save();
+    $this->actingAs($reviewer)->get(route('search.index', ['q' => 'HISTORICO']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('results.expedientes', 0));
+    $this->get(route('asignaciones.docente.show', $tramite))->assertForbidden();
 });
 
 test('global search limits results, treats wildcard characters literally, and finds issued documents', function () {
@@ -1897,4 +2137,437 @@ test('public document verification distinguishes annulled and superseded documen
     $this->get(route('documentos.verificar', ['codigo' => $inactivo->codigo_verificacion]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('resultado.estado', 'sustituido'));
+});
+
+test('assistant adds independent files and replaces a current file while keeping the private history', function () {
+    Storage::fake('local');
+    config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $otherStudent = User::factory()->create(['rol' => 'estudiante']);
+    $teacher = User::factory()->create(['rol' => 'docente']);
+    $otherTeacher = User::factory()->create(['rol' => 'docente']);
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $tramite = Tramite::factory()->create(['estado' => 'recibido_oficina', 'propietario_id' => $student->id]);
+    $pdf = "%PDF-1.4\n% Archivo artificial de prueba\n1 0 obj <<>> endobj\n%%EOF";
+
+    $this->actingAs($assistant)->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('original.pdf', $pdf),
+        'categoria' => 'documento_original',
+    ])->assertRedirect(route('tramites.show', $tramite));
+    $this->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('sustento.pdf', $pdf),
+        'categoria' => 'documento_escaneado',
+    ])->assertRedirect(route('tramites.show', $tramite));
+    $first = DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->orderBy('id')->first();
+    $second = DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->orderByDesc('id')->first();
+
+    expect($tramite->fresh()->estado)->toBe('digitalizado')
+        ->and(DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->where('vigente', true)->count())->toBe(2)
+        ->and($first->categoria)->toBe('documento_original')
+        ->and($second->categoria)->toBe('documento_escaneado');
+
+    $this->post(route('tramites.documentos.replace', [$tramite, $second->id]), [
+        'documento' => UploadedFile::fake()->createWithContent('sustento-v2.pdf', $pdf),
+    ])->assertRedirect(route('tramites.show', $tramite));
+    $replacement = DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->orderByDesc('id')->first();
+    expect(DB::table('tramite_documentos')->where('id', $second->id)->value('vigente'))->toBe(0)
+        ->and($replacement->documento_anterior_id)->toBe($second->id)
+        ->and($replacement->version)->toBe(2)
+        ->and($replacement->vigente)->toBe(1);
+    Storage::disk('local')->assertExists([$second->ruta, $replacement->ruta]);
+    $this->post(route('tramites.documentos.replace', [$tramite, $second->id]), [
+        'documento' => UploadedFile::fake()->createWithContent('repetido.pdf', $pdf),
+    ])->assertStatus(409);
+    expect(DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->count())->toBe(3);
+    $otroTramite = Tramite::factory()->create(['estado' => 'digitalizado']);
+    $this->post(route('tramites.documentos.replace', [$otroTramite, $replacement->id]), [
+        'documento' => UploadedFile::fake()->createWithContent('ajeno.pdf', $pdf),
+    ])->assertNotFound();
+
+    $this->get(route('tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('tramites/show')
+            ->where('tramite.puede_gestionar_documentos_recepcion', true)
+            ->has('tramite.documentos', 3)
+            ->where('tramite.documentos.2.documento_anterior_id', $second->id)
+            ->missing('tramite.documentos.2.ruta'));
+    $this->actingAs($student)->get(route('estudiante.tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('tramites/estudiante-show')
+            ->has('documentos_recepcion', 3)
+            ->missing('documentos_recepcion.0.ruta'));
+    $this->get(route('tramites.documentos.descargar', [$tramite, $second->id]))->assertDownload('sustento.pdf');
+    $this->actingAs($otherStudent)->get(route('tramites.documentos.descargar', [$tramite, $second->id]))->assertForbidden();
+
+    TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $teacher->id,
+        'asignado_por' => $assistant->id,
+        'activa' => false,
+        'estado' => 'finalizada',
+    ]);
+    $this->actingAs($teacher)->get(route('tramites.documentos.descargar', [$tramite, $replacement->id]))->assertDownload('sustento-v2.pdf');
+    $this->actingAs($otherTeacher)->get(route('tramites.documentos.descargar', [$tramite, $replacement->id]))->assertForbidden();
+    $this->actingAs($administrator)->get(route('tramites.documentos.descargar', [$tramite, $replacement->id]))->assertOk();
+    $this->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('admin.pdf', $pdf),
+    ])->assertForbidden();
+
+    $tramite->update(['estado' => 'borrador_preparado']);
+    $this->actingAs($assistant)->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('tardio.pdf', $pdf),
+    ])->assertStatus(409);
+    $this->post(route('tramites.documentos.replace', [$tramite, $replacement->id]), [
+        'documento' => UploadedFile::fake()->createWithContent('tardio-v2.pdf', $pdf),
+    ])->assertStatus(409);
+
+    Storage::disk('local')->put($replacement->ruta, 'archivo alterado');
+    $this->get(route('tramites.documentos.descargar', [$tramite, $replacement->id]))->assertNotFound();
+});
+
+test('physical correction requires an observed expediente and preserves its state and earlier files', function () {
+    Storage::fake('local');
+    config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $tramite = Tramite::factory()->create(['estado' => 'observado', 'propietario_id' => $student->id]);
+    $pdf = "%PDF-1.4\n% Subsanación artificial\n1 0 obj <<>> endobj\n%%EOF";
+
+    $this->actingAs($student)->post(route('tramites.subsanaciones.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('indebido.pdf', $pdf),
+        'observacion' => 'Intento de estudiante.',
+    ])->assertForbidden();
+    $this->actingAs($assistant)->post(route('tramites.subsanaciones.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('corregido.pdf', $pdf),
+        'observacion' => '  ',
+    ])->assertSessionHasErrors('observacion');
+    expect(DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->count())->toBe(0);
+
+    $this->post(route('tramites.subsanaciones.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('corregido.pdf', $pdf),
+        'observacion' => 'Documento corregido recibido presencialmente.',
+    ])->assertRedirect(route('tramites.show', $tramite));
+    $correction = DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->first();
+    expect($tramite->fresh()->estado)->toBe('observado')
+        ->and($correction->categoria)->toBe('documento_corregido')
+        ->and(DB::table('tramite_eventos')->where('tramite_id', $tramite->id)->where('accion', 'subsanacion_fisica')->count())->toBe(1);
+    Storage::disk('local')->assertExists($correction->ruta);
+
+    $this->get(route('tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('tramites/show')
+            ->where('tramite.puede_registrar_subsanacion', true)
+            ->where('tramite.estado', 'observado'));
+    /** Each real HTTP request has a fresh scoped Inertia SSR state; the test client reuses one container. */
+    app()->forgetScopedInstances();
+    $studentResponse = $this->actingAs($student)->get(route('estudiante.tramites.show', $tramite));
+    $studentResponse->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('tramites/estudiante-show')
+            ->has('documentos_recepcion', 1)
+            ->missing('eventos'));
+    expect(str_contains($studentResponse->getContent(), 'Seguimiento de trámite'))->toBeTrue()
+        ->and(str_contains($studentResponse->getContent(), 'Documento corregido recibido presencialmente.'))->toBeFalse();
+    $this->actingAs($student)->get(route('tramites.documentos.descargar', [$tramite, $correction->id]))->assertDownload('corregido.pdf');
+    $tramite->update(['estado' => 'cerrado']);
+    $this->actingAs($assistant)->post(route('tramites.subsanaciones.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('tardio.pdf', $pdf),
+        'observacion' => 'Intento tras el cierre.',
+    ])->assertStatus(409);
+    expect(DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->count())->toBe(1);
+});
+
+test('reception file validation rejects disguised names and mismatched content before storing', function () {
+    Storage::fake('local');
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $tramite = Tramite::factory()->create(['estado' => 'digitalizado']);
+    $pdf = "%PDF-1.4\n% Archivo artificial\n1 0 obj <<>> endobj\n%%EOF";
+
+    $this->actingAs($assistant)->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('informe.php.pdf', $pdf),
+    ])->assertSessionHasErrors('documento');
+    $this->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('informe.pdf.exe', $pdf),
+    ])->assertSessionHasErrors('documento');
+    $this->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('informe.pdf', '<?php echo 1;'),
+    ])->assertSessionHasErrors('documento');
+    $this->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('informe.pdf', $pdf),
+        'categoria' => 'documento_corregido',
+    ])->assertSessionHasErrors('categoria');
+    $this->post(route('tramites.documentos.store', $tramite), [
+        'documento' => UploadedFile::fake()->createWithContent('vacio.pdf', ''),
+    ])->assertSessionHasErrors('documento');
+
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $this->post(route('tramites.store'), [
+        'clasificacion' => 'estudiantil',
+        'tipo_documento' => 'FUT',
+        'persona_nombre' => 'Persona de prueba',
+        'propietario_id' => $student->id,
+        'destino_tipo' => 'oficina',
+        'destino_nombre' => 'Secretaría',
+        'asunto' => 'Documento recibido',
+        'descripcion' => 'Documento recibido físicamente.',
+        'prioridad' => 'normal',
+        'fecha_llegada_oficina' => now()->format('Y-m-d\TH:i'),
+        'confirmar_recepcion' => '1',
+        'documentos' => [['categoria' => 'documento_original', 'archivo' => UploadedFile::fake()->createWithContent('trampa.php.pdf', $pdf)]],
+    ])->assertSessionHasErrors('documentos.0.archivo');
+
+    expect(DB::table('tramite_documentos')->where('tramite_id', $tramite->id)->count())->toBe(0);
+    Storage::disk('local')->assertDirectoryEmpty('tramites');
+});
+
+test('assistant registers multiple independent documents in one physical reception', function () {
+    Storage::fake('local');
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $pdf = "%PDF-1.4\n% Archivo artificial de prueba\n1 0 obj <<>> endobj\n%%EOF";
+    $payload = [
+        'clasificacion' => 'estudiantil',
+        'tipo_documento' => 'FUT',
+        'persona_nombre' => 'Persona de prueba',
+        'propietario_id' => $student->id,
+        'destino_tipo' => 'oficina',
+        'destino_nombre' => 'Secretaría',
+        'asunto' => 'Ingreso físico con anexos',
+        'descripcion' => 'Ingreso físico con anexos recibidos.',
+        'prioridad' => 'normal',
+        'fecha_llegada_oficina' => now()->format('Y-m-d\TH:i'),
+        'confirmar_recepcion' => '1',
+    ];
+
+    $this->actingAs($student)->post(route('tramites.store'), $payload)->assertForbidden();
+    $this->actingAs($assistant)->post(route('tramites.store'), [
+        ...$payload,
+        'documentos' => [
+            ['categoria' => 'documento_original', 'archivo' => UploadedFile::fake()->createWithContent('solicitud.pdf', $pdf)],
+            ['categoria' => 'documento_escaneado', 'archivo' => UploadedFile::fake()->createWithContent('anexo.pdf', $pdf)],
+            ['categoria' => 'documento_original', 'archivo' => UploadedFile::fake()->createWithContent('constancia.pdf', $pdf)],
+        ],
+    ])->assertRedirect();
+
+    $tramite = Tramite::query()->where('asunto', 'Ingreso físico con anexos')->sole();
+    $documentos = $tramite->documentos()->orderBy('id')->get();
+    expect($tramite->estado)->toBe('digitalizado')
+        ->and($documentos)->toHaveCount(3)
+        ->and($documentos->pluck('categoria')->all())->toBe(['documento_original', 'documento_escaneado', 'documento_original'])
+        ->and($documentos->pluck('version')->all())->toBe([1, 1, 2])
+        ->and($documentos->pluck('sha256')->every(fn (string $hash): bool => strlen($hash) === 64))->toBeTrue();
+    Storage::disk('local')->assertExists($documentos->pluck('ruta')->all());
+    $evento = $tramite->eventos()->where('accion', 'digitalizacion')->sole();
+    expect($evento->metadatos['documentos_ids'])->toBe($documentos->pluck('id')->all())
+        ->and($evento->metadatos['cantidad'])->toBe(3);
+
+    $this->post(route('tramites.store'), $payload)->assertRedirect();
+    expect(Tramite::query()->where('asunto', 'Ingreso físico con anexos')->where('estado', 'recibido_oficina')->count())->toBe(1);
+});
+
+test('physical reception requires confirmation and preserves arrival and provenance details', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $payload = [
+        'clasificacion' => 'estudiantil',
+        'tipo_documento' => 'FUT',
+        'persona_nombre' => 'Persona de prueba',
+        'propietario_id' => $student->id,
+        'destino_tipo' => 'oficina',
+        'destino_nombre' => 'Secretaría',
+        'asunto' => 'Ingreso físico confirmado',
+        'descripcion' => 'Solicitud entregada en mesa de partes.',
+        'prioridad' => 'alta',
+        'fecha_llegada_oficina' => '2026-09-28T16:45',
+        'fecha_presentacion_original' => '2026-09-27',
+        'numero_expediente_externo' => 'EXT-2026/42 #B',
+        'area_procedencia' => 'Coordinación Académica',
+        'persona_entrega_documento' => 'Apoderada de prueba',
+        'observacion_recepcion' => 'Se cotejó el documento físico.',
+        'folios' => 8,
+    ];
+
+    $this->actingAs($assistant)->post(route('tramites.store'), $payload)->assertSessionHasErrors('confirmar_recepcion');
+    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '0'])->assertSessionHasErrors('confirmar_recepcion');
+    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'numero_expediente_externo' => 'EXT@42'])
+        ->assertSessionHasErrors('numero_expediente_externo');
+    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'fecha_llegada_oficina' => '2026-02-31T16:45'])
+        ->assertSessionHasErrors('fecha_llegada_oficina');
+    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'folios' => 5001])
+        ->assertSessionHasErrors('folios');
+    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'descripcion' => 'ab'])
+        ->assertSessionHasErrors('descripcion');
+    expect(Tramite::query()->where('asunto', $payload['asunto'])->count())->toBe(0);
+
+    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1'])->assertRedirect();
+    $tramite = Tramite::query()->where('asunto', $payload['asunto'])->sole();
+    expect($tramite->fecha_recepcion->toDateString())->toBe('2026-09-28')
+        ->and($tramite->fecha_llegada_oficina->format('Y-m-d H:i'))->toBe('2026-09-28 16:45')
+        ->and($tramite->fecha_presentacion_original->toDateString())->toBe('2026-09-27')
+        ->and($tramite->numero_expediente_externo)->toBe('EXT-2026/42 #B')
+        ->and($tramite->area_procedencia)->toBe('Coordinación Académica')
+        ->and($tramite->persona_entrega_documento)->toBe('Apoderada de prueba')
+        ->and($tramite->observacion_recepcion)->toBe('Se cotejó el documento físico.')
+        ->and($tramite->prioridad)->toBe('alta');
+    $this->get(route('tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('tramite.fecha_llegada_oficina', '2026-09-28 16:45')
+            ->where('tramite.numero_expediente_externo', 'EXT-2026/42 #B')
+            ->where('tramite.observacion_recepcion', 'Se cotejó el documento físico.')
+            ->etc());
+    $this->get(route('tramites.index', ['q' => 'EXT-2026/42']))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('tramites.data.0.id', $tramite->id)->etc());
+    $this->get(route('search.index', ['q' => 'EXT-2026/42']))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('results.expedientes.0.id', $tramite->id)->etc());
+});
+
+test('initial reception rejects an invalid file and removes stored files when its transaction fails', function () {
+    Storage::fake('local');
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $pdf = "%PDF-1.4\n% Archivo artificial de prueba\n1 0 obj <<>> endobj\n%%EOF";
+    $payload = [
+        'clasificacion' => 'estudiantil',
+        'tipo_documento' => 'FUT',
+        'persona_nombre' => 'Persona de prueba',
+        'propietario_id' => $student->id,
+        'destino_tipo' => 'oficina',
+        'destino_nombre' => 'Secretaría',
+        'asunto' => 'Ingreso que debe revertirse',
+        'descripcion' => 'Ingreso físico que debe revertirse.',
+        'prioridad' => 'normal',
+        'fecha_llegada_oficina' => now()->format('Y-m-d\TH:i'),
+        'confirmar_recepcion' => '1',
+    ];
+
+    $this->actingAs($assistant)->post(route('tramites.store'), [
+        ...$payload,
+        'documentos' => [
+            ['categoria' => 'documento_original', 'archivo' => UploadedFile::fake()->createWithContent('valido.pdf', $pdf)],
+            ['categoria' => 'documento_escaneado', 'archivo' => UploadedFile::fake()->createWithContent('falso.pdf', 'texto plano')],
+        ],
+    ])->assertSessionHasErrors('documentos.1.archivo');
+    $this->post(route('tramites.store'), [
+        ...$payload,
+        'documentos' => [['categoria' => 'documento_corregido', 'archivo' => UploadedFile::fake()->createWithContent('valido.pdf', $pdf)]],
+    ])->assertSessionHasErrors('documentos.0.categoria');
+    expect(Tramite::query()->where('asunto', $payload['asunto'])->count())->toBe(0);
+    Storage::disk('local')->assertDirectoryEmpty('tramites');
+
+    $insertedDocuments = 0;
+    Event::listen(QueryExecuted::class, function (QueryExecuted $query) use (&$insertedDocuments): void {
+        if (str_starts_with(strtolower(trim($query->sql)), 'insert') && str_contains($query->sql, 'tramite_documentos')) {
+            $insertedDocuments++;
+
+            if ($insertedDocuments === 2) {
+                throw new RuntimeException('Fallo simulado al guardar el segundo documento.');
+            }
+        }
+    });
+
+    $this->withoutExceptionHandling();
+    expect(fn () => $this->post(route('tramites.store'), [
+        ...$payload,
+        'documentos' => [
+            ['categoria' => 'documento_original', 'archivo' => UploadedFile::fake()->createWithContent('uno.pdf', $pdf)],
+            ['categoria' => 'documento_escaneado', 'archivo' => UploadedFile::fake()->createWithContent('dos.pdf', $pdf)],
+        ],
+    ]))->toThrow(RuntimeException::class, 'Fallo simulado');
+
+    expect($insertedDocuments)->toBe(2)
+        ->and(Tramite::query()->where('asunto', $payload['asunto'])->count())->toBe(0)
+        ->and(TramiteDocumento::query()->count())->toBe(0);
+    Storage::disk('local')->assertDirectoryEmpty('tramites');
+});
+
+test('assistant edits reception data before assignment with validation and audit', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $otherStudent = User::factory()->create(['rol' => 'estudiante']);
+    $tramite = Tramite::factory()->create([
+        'codigo' => 'TRM-EDITAR-000001',
+        'estado' => 'digitalizado',
+        'propietario_id' => $student->id,
+        'recibido_por' => $assistant->id,
+    ]);
+    $payload = [
+        'clasificacion' => 'estudiantil',
+        'tipo_documento' => 'FUT',
+        'persona_nombre' => 'Persona corregida',
+        'persona_identificador' => '87654321',
+        'propietario_id' => $otherStudent->id,
+        'destino_tipo' => 'oficina',
+        'destino_nombre' => 'Secretaría Académica',
+        'asunto' => 'Asunto corregido en recepción',
+        'descripcion' => 'Datos corregidos físicamente en mesa de partes.',
+        'prioridad' => 'urgente',
+        'fecha_llegada_oficina' => '2026-09-29T11:30',
+        'fecha_presentacion_original' => '2026-09-28',
+        'numero_expediente_externo' => 'EXP-2026/29 #A',
+        'area_procedencia' => 'Dirección Académica',
+        'persona_entrega_documento' => 'Representante autorizado',
+        'observacion_recepcion' => 'Documento original visto en oficina.',
+        'folios' => 4,
+    ];
+
+    $this->get(route('tramites.edit', $tramite))->assertRedirect(route('login'));
+    $this->actingAs($student)->get(route('tramites.edit', $tramite))->assertForbidden();
+    $this->actingAs($administrator)->put(route('tramites.update', $tramite), $payload)->assertForbidden();
+    $this->actingAs($assistant)->get(route('tramites.edit', $tramite))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('tramites/create')
+        ->where('tramite.codigo', 'TRM-EDITAR-000001')
+        ->where('tramite.fecha_llegada_oficina', $tramite->fecha_recepcion->format('Y-m-d\T00:00'))
+        ->missing('tramite.estado')->etc());
+    $this->get(route('tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('tramite.puede_editar_recepcion', true));
+
+    $this->from(route('tramites.edit', $tramite))->put(route('tramites.update', $tramite), [
+        ...$payload,
+        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO',
+    ])->assertSessionHasErrors('tipo_documento');
+    $this->from(route('tramites.edit', $tramite))->put(route('tramites.update', $tramite), [
+        ...$payload,
+        'documentos' => [['categoria' => 'documento_original', 'archivo' => 'no permitido']],
+    ])->assertSessionHasErrors('documentos');
+    $this->from(route('tramites.edit', $tramite))->put(route('tramites.update', $tramite), [
+        ...$payload,
+        'confirmar_recepcion' => '1',
+    ])->assertSessionHasErrors('confirmar_recepcion');
+    expect($tramite->fresh()->asunto)->not->toBe('Asunto corregido en recepción');
+
+    $this->put(route('tramites.update', $tramite), $payload)->assertRedirect(route('tramites.show', $tramite));
+    $actualizado = $tramite->fresh();
+    expect($actualizado->codigo)->toBe('TRM-EDITAR-000001')
+        ->and($actualizado->estado)->toBe('digitalizado')
+        ->and($actualizado->recibido_por)->toBe($assistant->id)
+        ->and($actualizado->asunto)->toBe('Asunto corregido en recepción')
+        ->and($actualizado->propietario_id)->toBe($otherStudent->id)
+        ->and($actualizado->folios)->toBe(4)
+        ->and($actualizado->fecha_recepcion->toDateString())->toBe('2026-09-29')
+        ->and($actualizado->fecha_llegada_oficina->format('Y-m-d H:i'))->toBe('2026-09-29 11:30')
+        ->and($actualizado->fecha_presentacion_original->toDateString())->toBe('2026-09-28')
+        ->and($actualizado->numero_expediente_externo)->toBe('EXP-2026/29 #A')
+        ->and($actualizado->area_procedencia)->toBe('Dirección Académica')
+        ->and($actualizado->persona_entrega_documento)->toBe('Representante autorizado')
+        ->and($actualizado->observacion_recepcion)->toBe('Documento original visto en oficina.');
+    $evento = $tramite->eventos()->where('accion', 'edicion_recepcion')->sole();
+    expect($evento->usuario_id)->toBe($assistant->id)
+        ->and($evento->metadatos['campos'])->toContain('asunto', 'propietario_id')
+        ->and(json_encode($evento->metadatos))->not->toContain('87654321');
+
+    TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => User::factory()->create(['rol' => 'docente'])->id,
+        'asignado_por' => $assistant->id,
+        'activa' => true,
+    ]);
+    $this->get(route('tramites.edit', $tramite))->assertStatus(409);
+    $this->put(route('tramites.update', $tramite), $payload)->assertStatus(409);
+    $this->get(route('tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('tramite.puede_editar_recepcion', false));
+    expect($tramite->eventos()->where('accion', 'edicion_recepcion')->count())->toBe(1);
+
+    $tramite->asignaciones()->update(['activa' => false]);
+    $tramite->update(['estado' => 'borrador_preparado']);
+    $this->get(route('tramites.edit', $tramite))->assertStatus(409);
+    $this->put(route('tramites.update', $tramite), $payload)->assertStatus(409);
 });

@@ -113,7 +113,7 @@ export default function TramitesIndex({ tramites, filters, estados, resumen }: P
                                     className="pl-9"
                                     value={query}
                                     onChange={(event) => setQuery(event.target.value)}
-                                    placeholder="Código, persona o asunto"
+                                    placeholder="Código, referencia física, persona o asunto"
                                 />
                             </div>
 

@@ -305,6 +305,98 @@ class ProcessTramiteDelivery
         });
     }
 
+    public function annulDelivery(Tramite $tramite, TramiteEntrega $entrega, User $actor, string $motivo): void
+    {
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
+        abort_unless((int) $entrega->tramite_id === (int) $tramite->id, 404);
+
+        DB::transaction(function () use ($tramite, $entrega, $actor, $motivo): void {
+            abort_unless(Tramite::query()->whereKey($tramite->id)->where('estado', 'listo_entrega')->exists(), 409);
+
+            $observaciones = trim((string) $entrega->observaciones);
+            $observaciones .= ($observaciones === '' ? '' : ' | ').'Anulación: '.$motivo;
+            $actualizado = DB::table('tramite_entregas')
+                ->where('id', $entrega->id)
+                ->where('tramite_id', $tramite->id)
+                ->where('activa', true)
+                ->where('confirmado', false)
+                ->update([
+                    'activa' => false,
+                    'estado' => 'anulada',
+                    'observaciones' => $observaciones,
+                    'updated_at' => now(),
+                ]);
+            abort_unless($actualizado === 1, 409);
+
+            DB::table('tramite_evidencias_entrega')
+                ->where('entrega_id', $entrega->id)
+                ->where('activa', true)
+                ->update(['activa' => false, 'updated_at' => now()]);
+
+            $this->registrarEvento(
+                $tramite->id,
+                $actor->id,
+                'entrega_anulada',
+                'Se anuló una entrega pendiente de confirmación.',
+                'listo_entrega',
+                'listo_entrega',
+                ['entrega_id' => $entrega->id, 'motivo' => $motivo],
+            );
+        });
+    }
+
+    public function reopen(Tramite $tramite, User $actor, string $motivo): void
+    {
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
+
+        DB::transaction(function () use ($tramite, $actor, $motivo): void {
+            abort_unless(Tramite::query()->whereKey($tramite->id)->where('estado', 'cerrado')->exists(), 409);
+
+            $cierre = TramiteCierre::query()
+                ->where('tramite_id', $tramite->id)
+                ->where('activo', true)
+                ->where('reabierto', false)
+                ->first();
+            abort_unless($cierre !== null, 409);
+
+            $actualizado = DB::table('tramite_cierres')
+                ->where('id', $cierre->id)
+                ->where('activo', true)
+                ->where('reabierto', false)
+                ->update([
+                    'activo' => false,
+                    'reabierto' => true,
+                    'motivo_reapertura' => $motivo,
+                    'reabierto_por' => $actor->id,
+                    'fecha_reapertura' => now(),
+                    'updated_at' => now(),
+                ]);
+            abort_unless($actualizado === 1, 409);
+
+            $informeActualizado = DB::table('tramite_informes_cierre')
+                ->where('cierre_id', $cierre->id)
+                ->where('activo', true)
+                ->update(['activo' => false, 'updated_at' => now()]);
+            abort_unless($informeActualizado === 1, 409);
+
+            $tramiteActualizado = DB::table('tramites')
+                ->where('id', $tramite->id)
+                ->where('estado', 'cerrado')
+                ->update(['estado' => 'entregado', 'updated_at' => now()]);
+            abort_unless($tramiteActualizado === 1, 409);
+
+            $this->registrarEvento(
+                $tramite->id,
+                $actor->id,
+                'expediente_reabierto',
+                'El expediente fue reabierto por decisión administrativa.',
+                'cerrado',
+                'entregado',
+                ['cierre_id' => $cierre->id, 'motivo' => $motivo],
+            );
+        });
+    }
+
     /**
      * @param  array<string, mixed>  $datos
      */

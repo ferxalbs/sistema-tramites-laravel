@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
+use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\RegistrationVerificationController;
 use App\Http\Controllers\TramiteAsignacionController;
 use App\Http\Controllers\TramiteBorradorController;
@@ -63,13 +65,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('tramites.borradores.store');
         Route::post('tramites/{tramite}/preparar-asignacion', [TramiteBorradorController::class, 'prepareAssignment'])
             ->name('tramites.asignacion.prepare');
-        Route::post('tramites/{tramite}/documentos', [TramiteController::class, 'upload'])
-            ->name('tramites.documentos.store');
-        Route::get('tramites/{tramite}/documentos/{documento}/descargar', [TramiteController::class, 'download'])
-            ->name('tramites.documentos.descargar');
     });
 
     Route::middleware('role:asistente')->group(function (): void {
+        Route::get('tramites/{tramite}/editar', [TramiteController::class, 'edit'])->name('tramites.edit');
+        Route::put('tramites/{tramite}', [TramiteController::class, 'update'])->name('tramites.update');
+        Route::post('tramites/{tramite}/documentos', [TramiteController::class, 'upload'])
+            ->name('tramites.documentos.store');
+        Route::post('tramites/{tramite}/documentos/{documento}/reemplazar', [TramiteController::class, 'replace'])
+            ->name('tramites.documentos.replace');
+        Route::post('tramites/{tramite}/subsanaciones', [TramiteController::class, 'correct'])
+            ->name('tramites.subsanaciones.store');
         Route::get('asignaciones', [TramiteAsignacionController::class, 'index'])->name('tramites.asignaciones.index');
         Route::get('tramites/{tramite}/asignar', [TramiteAsignacionController::class, 'create'])->name('tramites.asignaciones.create');
         Route::post('tramites/{tramite}/asignar', [TramiteAsignacionController::class, 'store'])->name('tramites.asignaciones.store');
@@ -92,6 +98,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:administrador')->group(function (): void {
+        Route::post('tramites/{tramite}/entrega/{entrega}/anular', [TramiteEntregaController::class, 'annul'])
+            ->name('tramites.entrega.anular');
+        Route::post('tramites/{tramite}/entrega/reabrir', [TramiteEntregaController::class, 'reopen'])
+            ->name('tramites.entrega.reabrir');
+        Route::get('admin/feriados', [HolidayController::class, 'index'])->name('admin.holidays.index');
+        Route::post('admin/feriados', [HolidayController::class, 'store'])->name('admin.holidays.store');
+        Route::patch('admin/feriados/{holiday}/desactivar', [HolidayController::class, 'deactivate'])->whereNumber('holiday')->name('admin.holidays.deactivate');
+        Route::get('admin/auditoria', AuditLogController::class)->name('admin.audit.index');
         Route::get('admin/usuarios', [UserAccountController::class, 'index'])->name('admin.users.index');
         Route::get('admin/usuarios/crear', [UserAccountController::class, 'create'])->name('admin.users.create');
         Route::post('admin/usuarios', [UserAccountController::class, 'store'])->name('admin.users.store');
@@ -138,6 +152,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('tramites/{tramite}/documentos-finales/{documento}/descargar', [TramiteDocumentoFinalController::class, 'download'])
         ->name('tramites.documento-final.descargar');
+    Route::get('tramites/{tramite}/documentos/{documento}/descargar', [TramiteController::class, 'download'])
+        ->name('tramites.documentos.descargar');
 });
 
 require __DIR__.'/settings.php';

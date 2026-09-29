@@ -16,6 +16,10 @@ class TramiteCierre extends Model
         'observacion',
         'fecha_cierre',
         'activo',
+        'reabierto',
+        'motivo_reapertura',
+        'reabierto_por',
+        'fecha_reapertura',
     ];
 
     protected function casts(): array
@@ -23,6 +27,8 @@ class TramiteCierre extends Model
         return [
             'fecha_cierre' => 'datetime',
             'activo' => 'boolean',
+            'reabierto' => 'boolean',
+            'fecha_reapertura' => 'datetime',
         ];
     }
 

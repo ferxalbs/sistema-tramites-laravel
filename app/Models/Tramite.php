@@ -23,6 +23,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'descripcion',
     'prioridad',
     'fecha_recepcion',
+    'fecha_llegada_oficina',
+    'fecha_presentacion_original',
+    'numero_expediente_externo',
+    'area_procedencia',
+    'persona_entrega_documento',
+    'observacion_recepcion',
     'folios',
     'estado',
     'recibido_por',
@@ -36,6 +42,8 @@ class Tramite extends Model
     {
         return [
             'fecha_recepcion' => 'date',
+            'fecha_llegada_oficina' => 'datetime',
+            'fecha_presentacion_original' => 'date',
         ];
     }
 

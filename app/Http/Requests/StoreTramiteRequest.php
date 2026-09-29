@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\SafeReceptionDocument;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Http\FormRequest;
@@ -41,12 +42,21 @@ class StoreTramiteRequest extends FormRequest
             ],
             'destino_tipo' => ['required', 'string', Rule::in(array_keys(config('tramites.destinos')))],
             'destino_nombre' => ['required', 'string', 'max:200'],
-            'asunto' => ['required', 'string', 'max:200'],
-            'descripcion' => ['nullable', 'string', 'max:10000'],
+            'asunto' => ['required', 'string', 'min:3', 'max:255'],
+            'descripcion' => ['required', 'string', 'min:3', 'max:5000'],
             'prioridad' => ['required', 'string', Rule::in(array_keys(config('tramites.prioridades')))],
-            'fecha_recepcion' => ['required', 'date'],
-            'folios' => ['nullable', 'integer', 'min:1', 'max:10000'],
-            'documento' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'fecha_llegada_oficina' => ['required', 'date_format:Y-m-d\\TH:i'],
+            'fecha_presentacion_original' => ['nullable', 'date_format:Y-m-d'],
+            'numero_expediente_externo' => ['nullable', 'string', 'max:80', 'regex:/^[\\p{L}\\p{N}\\s.\\-\\/#]+$/u'],
+            'area_procedencia' => ['nullable', 'string', 'max:160'],
+            'persona_entrega_documento' => ['nullable', 'string', 'max:180'],
+            'observacion_recepcion' => ['nullable', 'string', 'max:2000'],
+            'folios' => ['nullable', 'integer', 'min:1', 'max:5000'],
+            'confirmar_recepcion' => ['required', 'accepted'],
+            'documentos' => ['sometimes', 'array'],
+            'documentos.*' => ['required', 'array:categoria,archivo'],
+            'documentos.*.categoria' => ['required', 'string', Rule::in(['documento_original', 'documento_escaneado'])],
+            'documentos.*.archivo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:10240', new SafeReceptionDocument],
         ];
     }
 
@@ -66,9 +76,16 @@ class StoreTramiteRequest extends FormRequest
             'asunto' => 'asunto',
             'descripcion' => 'descripción',
             'prioridad' => 'prioridad',
-            'fecha_recepcion' => 'fecha de recepción',
+            'fecha_llegada_oficina' => 'fecha y hora de llegada a oficina',
+            'fecha_presentacion_original' => 'fecha de presentación original',
+            'numero_expediente_externo' => 'referencia física externa',
+            'area_procedencia' => 'área de procedencia',
+            'persona_entrega_documento' => 'persona que entrega el documento',
+            'observacion_recepcion' => 'observación de recepción',
             'folios' => 'número de folios',
-            'documento' => 'documento digitalizado',
+            'confirmar_recepcion' => 'confirmación de la recepción física',
+            'documentos.*.categoria' => 'categoría del documento',
+            'documentos.*.archivo' => 'archivo recibido',
         ];
     }
 }

@@ -1,6 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
-import { ArrowLeft, Check, Download, FileSignature, PackageCheck, Send } from 'lucide-react';
+import { ArrowLeft, Ban, Check, Download, FileSignature, PackageCheck, RotateCcw, Send } from 'lucide-react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEntregaController from '@/actions/App/Http/Controllers/TramiteEntregaController';
 import TramiteStatusBadge from '@/components/tramite-status-badge';
@@ -65,9 +65,11 @@ type Props = {
     puede_registrar_firma: boolean;
     puede_registrar_entrega: boolean;
     puede_cerrar: boolean;
+    puede_anular: boolean;
+    puede_reabrir: boolean;
 };
 
-export default function TramiteEntregaPage({ tramite, documento, firma, entrega, cierre, medios, fecha_actual, puede_preparar, puede_registrar_firma, puede_registrar_entrega, puede_cerrar }: Props) {
+export default function TramiteEntregaPage({ tramite, documento, firma, entrega, cierre, medios, fecha_actual, puede_preparar, puede_registrar_firma, puede_registrar_entrega, puede_cerrar, puede_anular, puede_reabrir }: Props) {
     return (
         <>
             <Head title={`Entrega y cierre · ${tramite.codigo}`} />
@@ -286,6 +288,21 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                             )}
                         </Form>
                     )}
+                    {puede_anular && entrega && (
+                        <Form {...TramiteEntregaController.annul.form({ tramite: tramite.id, entrega: entrega.id })}>
+                            {({ errors, processing }) => (
+                                <CardFooter className="flex flex-col items-start gap-3 border-t pt-4">
+                                    <Field id="motivo-anulacion" label="Motivo de anulación" error={errors.motivo}>
+                                        <Input id="motivo-anulacion" name="motivo" required minLength={10} maxLength={2000} />
+                                    </Field>
+                                    <Button type="submit" variant="destructive" disabled={processing}>
+                                        {processing ? <Spinner data-icon="inline-start" /> : <Ban data-icon="inline-start" />}
+                                        Anular entrega pendiente
+                                    </Button>
+                                </CardFooter>
+                            )}
+                        </Form>
+                    )}
                 </Card>
 
                 <Card>
@@ -332,6 +349,21 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                                     </div>
                                 )}
                             </div>
+                        )}
+                        {puede_reabrir && (
+                            <Form {...TramiteEntregaController.reopen.form({ tramite: tramite.id })}>
+                                {({ errors, processing }) => (
+                                    <div className="space-y-3 border-t pt-4">
+                                        <Field id="motivo-reapertura" label="Motivo de reapertura" error={errors.motivo}>
+                                            <Input id="motivo-reapertura" name="motivo" required minLength={12} maxLength={2000} />
+                                        </Field>
+                                        <Button type="submit" variant="outline" disabled={processing}>
+                                            {processing ? <Spinner data-icon="inline-start" /> : <RotateCcw data-icon="inline-start" />}
+                                            Reabrir expediente
+                                        </Button>
+                                    </div>
+                                )}
+                            </Form>
                         )}
                     </CardContent>
                 </Card>

@@ -1,9 +1,10 @@
 import { Form, Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, FileText, Plus, Send } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Plus, Send } from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteRevisionController from '@/actions/App/Http/Controllers/TramiteRevisionController';
+import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,7 +75,7 @@ type Props = {
         personas_mencionadas: MentionedPerson[];
         adjuntos: Array<{ id: number; nombre: string; categoria: string; version: number }>;
     };
-    archivos: Array<{ id: number; nombre: string; categoria: string; version: number }>;
+    archivos: Array<{ id: number; nombre: string; categoria: string; version: number; vigente: boolean }>;
     revision: {
         puede_iniciar: boolean;
         puede_observar: boolean;
@@ -173,7 +174,14 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                             <CardContent>
                                 {archivos.length === 0 ? <p className="text-sm text-muted-foreground">No hay archivos adjuntos.</p> : (
                                     <ul className="space-y-2 text-sm">
-                                        {archivos.map((archivo) => <li key={archivo.id}>{archivo.nombre} · versión {archivo.version}</li>)}
+                                        {archivos.map((archivo) => (
+                                            <li key={archivo.id} className="flex flex-wrap items-center justify-between gap-2">
+                                                <span>{archivo.nombre} · versión {archivo.version}{archivo.vigente ? '' : ' · reemplazado'}</span>
+                                                <a href={TramiteController.download.url({ tramite: tramite.id, documento: archivo.id })} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                                                    <Download data-icon="inline-start" /> Descargar
+                                                </a>
+                                            </li>
+                                        ))}
                                     </ul>
                                 )}
                             </CardContent>

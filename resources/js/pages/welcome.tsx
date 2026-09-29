@@ -1,11 +1,33 @@
 import { FormEvent, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowRight, CheckCircle2, FileSearch, HelpCircle, ShieldCheck } from 'lucide-react';
+import {
+    ArrowRight,
+    CheckCircle2,
+    Clock,
+    FileCheck2,
+    FileSearch,
+    FileText,
+    HelpCircle,
+    QrCode,
+    Search,
+    ShieldCheck,
+    Sparkles,
+} from 'lucide-react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import SupportWidget from '@/components/support-widget';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { dashboard, login, register } from '@/routes';
 
 export default function Welcome() {
@@ -24,214 +46,339 @@ export default function Welcome() {
         <>
             <Head title="Portal de Trámites y Gestión Documental" />
 
-            <div className="relative min-h-screen flex flex-col bg-background text-foreground">
-                {/* Subtle ambient lighting */}
-                <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                    <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-[380px] w-[700px] rounded-full bg-primary/5 blur-3xl" />
-                </div>
-
-                {/* Top Navigation */}
-                <header className="relative z-10 w-full border-b border-border/40 backdrop-blur-md bg-background/80">
-                    <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                        <Link href="/" className="flex items-center gap-3">
-                            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-                                <AppLogoIcon className="size-5" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-semibold tracking-tight leading-tight">
-                                    Sistema de Trámites
-                                </span>
-                                <span className="text-[11px] text-muted-foreground leading-tight">
-                                    Gestión Documental
-                                </span>
-                            </div>
-                        </Link>
-
-                        <nav className="flex items-center gap-2 sm:gap-4">
-                            <Link
-                                href="/verificar-documento"
-                                className="hidden sm:inline-flex text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                Verificar Documento
-                            </Link>
-                            <Link
-                                href="/ayuda"
-                                className="hidden sm:inline-flex text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                Centro de Ayuda
+            <ScrollArea className="h-screen w-full">
+                <div className="flex min-h-screen flex-col bg-background text-foreground">
+                    {/* Top Navigation Bar */}
+                    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-xs">
+                        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+                            <Link href="/" className="flex items-center gap-3">
+                                <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+                                    <AppLogoIcon className="size-5" />
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-sm font-semibold tracking-tight">
+                                        Sistema de Trámites
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Gestión Documental Institucional
+                                    </span>
+                                </div>
                             </Link>
 
-                            <div className="flex items-center gap-2 pl-2 border-l border-border/60">
-                                {auth.user ? (
-                                    <Button size="sm" render={<Link href={dashboard()} />}>
-                                        Ir al Panel
-                                        <ArrowRight className="size-3.5" />
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            render={<Link href={login()} />}
-                                        >
-                                            Iniciar Sesión
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            render={<Link href={register()} />}
-                                        >
-                                            Registrarse
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </nav>
-                    </div>
-                </header>
-
-                {/* Main Hero & Content */}
-                <main className="relative z-10 flex-1">
-                    {/* Hero Section */}
-                    <section className="mx-auto max-w-4xl px-4 pt-16 pb-12 sm:px-6 sm:pt-24 lg:px-8 text-center">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-medium text-primary mb-6">
-                            <ShieldCheck className="size-3.5" />
-                            <span>Portal Institucional de Atención y Trámites Digitales</span>
-                        </div>
-
-                        <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-balance">
-                            Gestión y seguimiento de tus trámites en un solo lugar
-                        </h1>
-
-                        <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto text-balance">
-                            Registra solicitudes académicas y administrativas, consulta el avance en tiempo real y valida la autenticidad de resoluciones y constancias oficiales.
-                        </p>
-
-                        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                            {auth.user ? (
-                                <Button
-                                    size="lg"
-                                    render={<Link href={dashboard()} />}
-                                >
-                                    Ingresar a mis Trámites
-                                    <ArrowRight className="size-4" />
-                                </Button>
-                            ) : (
-                                <>
-                                    <Button
-                                        size="lg"
-                                        render={<Link href={login()} />}
+                            <nav className="flex items-center gap-4">
+                                <div className="hidden md:flex items-center gap-6 text-sm">
+                                    <Link
+                                        href="/verificar-documento"
+                                        className="text-muted-foreground hover:text-foreground transition-colors"
                                     >
-                                        Iniciar Trámite
-                                        <ArrowRight className="size-4" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="lg"
-                                        render={<Link href="/verificar-documento" />}
-                                    >
-                                        <ShieldCheck className="size-4 mr-1" />
                                         Verificar Documento
-                                    </Button>
-                                </>
-                            )}
-                        </div>
+                                    </Link>
+                                    <Link
+                                        href="/ayuda"
+                                        className="text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        Centro de Ayuda
+                                    </Link>
+                                </div>
 
-                        {/* Quick Document Search Bar */}
-                        <div className="mt-12 mx-auto max-w-xl">
-                            <Card className="border-border/80 shadow-sm bg-card/60 backdrop-blur-sm">
-                                <CardHeader className="pb-3 text-left">
-                                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                        <FileSearch className="size-4 text-primary" />
-                                        Consulta rápida de autenticidad de documento
-                                    </CardTitle>
-                                    <CardDescription className="text-xs">
-                                        Ingresa el código de verificación alfanumérico que figura en tu documento oficial
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <form onSubmit={handleQuickVerify} className="flex gap-2">
-                                        <Input
-                                            type="text"
-                                            value={quickCode}
-                                            onChange={(e) => setQuickCode(e.target.value)}
-                                            placeholder="Ej. A1B2-C3D4-E5F6-7890"
-                                            className="font-mono uppercase text-xs sm:text-sm"
-                                        />
-                                        <Button type="submit" size="default">
-                                            Validar
+                                <Separator orientation="vertical" className="hidden md:block h-6" />
+
+                                <div className="flex items-center gap-2">
+                                    {auth.user ? (
+                                        <Button render={<Link href={dashboard()} />}>
+                                            Ir al Panel
+                                            <ArrowRight />
                                         </Button>
-                                    </form>
-                                </CardContent>
-                            </Card>
+                                    ) : (
+                                        <>
+                                            <Button
+                                                variant="ghost"
+                                                render={<Link href={login()} />}
+                                            >
+                                                Iniciar Sesión
+                                            </Button>
+                                            <Button
+                                                render={<Link href={register()} />}
+                                            >
+                                                Registrarse
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </nav>
                         </div>
-                    </section>
+                    </header>
 
-                    {/* Features / Benefits Grid */}
-                    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 border-t border-border/40">
-                        <div className="grid gap-6 sm:grid-cols-3">
-                            <Card className="border-border/60 bg-card/50 hover:border-primary/40 transition-colors">
-                                <CardHeader className="pb-2">
-                                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-3">
-                                        <CheckCircle2 className="size-5" />
+                    {/* Main Content Area */}
+                    <main className="flex-1">
+                        {/* Hero Section: Spacious 2-Column Desktop Layout */}
+                        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+                            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
+                                {/* Left Column: Headline, Description, Primary CTAs & Value Props */}
+                                <div className="flex flex-col items-start gap-6 lg:col-span-7">
+                                    <Badge variant="secondary" className="gap-2 py-1 px-3">
+                                        <ShieldCheck className="size-4 text-primary" />
+                                        <span>Portal Oficial de Trámites y Gestión Documental</span>
+                                    </Badge>
+
+                                    <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-foreground text-balance">
+                                        Gestión y seguimiento de tus trámites en un solo lugar
+                                    </h1>
+
+                                    <p className="max-w-2xl text-lg sm:text-xl text-muted-foreground text-balance leading-relaxed">
+                                        Registra tus solicitudes institucionales, supervisa el estado de tu expediente en tiempo real y valida la autenticidad de constancias y resoluciones oficiales.
+                                    </p>
+
+                                    <div className="flex flex-wrap items-center gap-4 pt-2">
+                                        {auth.user ? (
+                                            <Button
+                                                size="lg"
+                                                render={<Link href={dashboard()} />}
+                                            >
+                                                Acceder a mis Trámites
+                                                <ArrowRight />
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <Button
+                                                    size="lg"
+                                                    render={<Link href={login()} />}
+                                                >
+                                                    Iniciar Trámite
+                                                    <ArrowRight />
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="lg"
+                                                    render={<Link href="/ayuda" />}
+                                                >
+                                                    Centro de Ayuda
+                                                </Button>
+                                            </>
+                                        )}
                                     </div>
-                                    <CardTitle className="text-base font-semibold">
-                                        Seguimiento en Tiempo Real
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                                    Supervisa cada fase de tu expediente: registro, asignación de revisores, observaciones y aprobación final con total transparencia.
-                                </CardContent>
-                            </Card>
 
-                            <Card className="border-border/60 bg-card/50 hover:border-primary/40 transition-colors">
-                                <CardHeader className="pb-2">
-                                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-3">
-                                        <ShieldCheck className="size-5" />
+                                    {/* Highlights Row */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 border-t w-full text-left">
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <FileCheck2 className="size-4 text-primary" />
+                                                100% Digital
+                                            </span>
+                                            <span className="text-xs text-muted-foreground leading-normal">
+                                                Sin papeleos innecesarios ni filas presenciales.
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <Clock className="size-4 text-primary" />
+                                                En Tiempo Real
+                                            </span>
+                                            <span className="text-xs text-muted-foreground leading-normal">
+                                                Alertas y seguimiento del avance de tu trámite.
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <QrCode className="size-4 text-primary" />
+                                                Validación QR
+                                            </span>
+                                            <span className="text-xs text-muted-foreground leading-normal">
+                                                Comprobación pública de autenticidad documental.
+                                            </span>
+                                        </div>
                                     </div>
-                                    <CardTitle className="text-base font-semibold">
-                                        Verificación Pública con QR
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                                    Todos los documentos emitidos cuentan con código único de verificación accesible para cualquier entidad o ciudadano sin requerir cuenta.
-                                </CardContent>
-                            </Card>
+                                </div>
 
-                            <Card className="border-border/60 bg-card/50 hover:border-primary/40 transition-colors">
-                                <CardHeader className="pb-2">
-                                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-3">
-                                        <HelpCircle className="size-5" />
-                                    </div>
-                                    <CardTitle className="text-base font-semibold">
-                                        Mesa de Ayuda y Guías
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                                    Revisa requisitos, instructivos y preguntas frecuentes para completar tus gestiones de manera correcta y oportuna.
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </section>
-                </main>
+                                {/* Right Column: Prominent Quick Verification Card */}
+                                <div className="lg:col-span-5">
+                                    <Card className="w-full">
+                                        <CardHeader>
+                                            <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-2">
+                                                <FileSearch className="size-5" />
+                                            </div>
+                                            <CardTitle className="text-xl">Verificación de Documento</CardTitle>
+                                            <CardDescription className="text-sm leading-relaxed">
+                                                Comprueba de manera inmediata la autenticidad y validez oficial de resoluciones, constancias o certificados institucionales.
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <form onSubmit={handleQuickVerify} className="flex flex-col gap-4">
+                                                <div className="flex flex-col gap-2">
+                                                    <span className="text-xs font-medium text-foreground">
+                                                        Código de Verificación Alfanumérico
+                                                    </span>
+                                                    <div className="flex gap-2">
+                                                        <Input
+                                                            type="text"
+                                                            value={quickCode}
+                                                            onChange={(e) => setQuickCode(e.target.value)}
+                                                            placeholder="Ej. A1B2-C3D4-E5F6-7890"
+                                                            className="font-mono uppercase text-sm"
+                                                            required
+                                                        />
+                                                        <Button type="submit">
+                                                            <Search className="size-4" />
+                                                            Validar
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground leading-normal">
+                                                    El código figura en el pie de página o bajo el código QR de todo documento emitido oficialmente.
+                                                </p>
+                                            </form>
+                                        </CardContent>
+                                        <CardFooter className="justify-between text-xs text-muted-foreground border-t pt-4">
+                                            <span>Servicio de consulta ciudadana</span>
+                                            <Link
+                                                href="/verificar-documento"
+                                                className="text-primary hover:underline font-medium"
+                                            >
+                                                Módulo completo →
+                                            </Link>
+                                        </CardFooter>
+                                    </Card>
+                                </div>
+                            </div>
+                        </section>
 
-                {/* Footer */}
-                <footer className="relative z-10 border-t border-border/40 py-6 text-center text-xs text-muted-foreground">
-                    <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <AppLogoIcon className="size-4 text-primary" />
-                            <span>Sistema de Trámites y Gestión Documental</span>
+                        <Separator className="mx-auto max-w-7xl" />
+
+                        {/* Services Grid Section */}
+                        <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+                            <div className="mb-12 flex flex-col gap-2 text-left">
+                                <Badge variant="outline" className="w-fit gap-1.5">
+                                    <Sparkles className="size-3.5 text-primary" />
+                                    <span>Servicios Integrados</span>
+                                </Badge>
+                                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
+                                    Servicios del Sistema de Trámites
+                                </h2>
+                                <p className="max-w-3xl text-base text-muted-foreground leading-relaxed">
+                                    Herramientas diseñadas para agilizar la gestión de solicitudes académicas y administrativas con total trazabilidad.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                            <Clock className="size-5" />
+                                        </div>
+                                        <CardTitle className="text-lg">Seguimiento Continuo</CardTitle>
+                                        <CardDescription className="text-sm leading-relaxed">
+                                            Conoce la etapa exacta de tu expediente: derivación entre oficinas, dictámenes técnicos y emisión del documento final con plazos transparentes.
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                            <QrCode className="size-5" />
+                                        </div>
+                                        <CardTitle className="text-lg">Autenticación con QR</CardTitle>
+                                        <CardDescription className="text-sm leading-relaxed">
+                                            Cada documento generado cuenta con un identificador único y firma institucional accesible para verificación pública sin autenticación previa.
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                            <HelpCircle className="size-5" />
+                                        </div>
+                                        <CardTitle className="text-lg">Mesa de Ayuda y Guías</CardTitle>
+                                        <CardDescription className="text-sm leading-relaxed">
+                                            Accede a requisitos actualizados, preguntas frecuentes y canales de soporte directo ante cualquier duda o contingencia en tu trámite.
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+                            </div>
+                        </section>
+
+                        <Separator className="mx-auto max-w-7xl" />
+
+                        {/* Step-by-Step Workflow Section */}
+                        <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+                            <div className="mb-12 flex flex-col gap-2 text-left">
+                                <Badge variant="outline" className="w-fit">
+                                    Flujo de Trabajo
+                                </Badge>
+                                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
+                                    ¿Cómo funciona tu trámite en línea?
+                                </h2>
+                                <p className="max-w-2xl text-base text-muted-foreground leading-relaxed">
+                                    Gestionar tus documentos es un proceso simple, ordenado y 100% auditable.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
+                                            1
+                                        </div>
+                                        <CardTitle className="text-base">Inicia tu Solicitud</CardTitle>
+                                        <CardDescription className="text-sm leading-relaxed">
+                                            Selecciona el tipo de trámite, adjunta los requisitos requeridos y genera tu número de expediente único.
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
+                                            2
+                                        </div>
+                                        <CardTitle className="text-base">Revisión y Dictamen</CardTitle>
+                                        <CardDescription className="text-sm leading-relaxed">
+                                            Las unidades responsables revisan tu solicitud y emiten observaciones o aprobación conforme a plazos normativos.
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
+                                            3
+                                        </div>
+                                        <CardTitle className="text-base">Resolución y Descarga</CardTitle>
+                                        <CardDescription className="text-sm leading-relaxed">
+                                            Obtén tu documento digital con código de verificación QR y firma institucional, listo para su uso legal y oficial.
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+                            </div>
+                        </section>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t py-10 text-sm text-muted-foreground">
+                        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
+                            <div className="flex items-center gap-2">
+                                <AppLogoIcon className="size-4 text-primary" />
+                                <span>Sistema de Trámites y Gestión Documental</span>
+                            </div>
+                            <div className="flex items-center gap-6">
+                                <Link
+                                    href="/verificar-documento"
+                                    className="hover:text-foreground transition-colors"
+                                >
+                                    Verificación Pública
+                                </Link>
+                                <Link
+                                    href="/ayuda"
+                                    className="hover:text-foreground transition-colors"
+                                >
+                                    Centro de Ayuda
+                                </Link>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <Link href="/verificar-documento" className="hover:underline">
-                                Verificación Pública
-                            </Link>
-                            <Link href="/ayuda" className="hover:underline">
-                                Mesa de Ayuda
-                            </Link>
-                        </div>
-                    </div>
-                </footer>
-            </div>
+                    </footer>
+                </div>
+            </ScrollArea>
 
             <SupportWidget />
         </>

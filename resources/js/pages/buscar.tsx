@@ -6,6 +6,7 @@ import TramiteController from '@/actions/App/Http/Controllers/TramiteController'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { index as adminUsersIndex } from '@/routes/admin/users';
 import { index as searchIndex } from '@/routes/search';
 
 type Expediente = {
@@ -28,6 +29,7 @@ type Props = {
     query: string;
     status: 'empty' | 'short' | 'too_long' | 'ok';
     reviewer: boolean;
+    administrator: boolean;
     results: {
         expedientes: Expediente[];
         personas: Person[];
@@ -35,7 +37,7 @@ type Props = {
     };
 };
 
-export default function Buscar({ query, status, reviewer, results }: Props) {
+export default function Buscar({ query, status, reviewer, administrator, results }: Props) {
     const [text, setText] = useState(query);
 
     function submit(event: FormEvent<HTMLFormElement>) {
@@ -79,7 +81,7 @@ export default function Buscar({ query, status, reviewer, results }: Props) {
                                 onChange={(event) =>
                                     setText(event.target.value)
                                 }
-                                placeholder="Código, asunto, persona o documento"
+                                placeholder="Código, referencia física, asunto, persona o documento"
                                 className="flex-1"
                             />
                             <Button type="submit">
@@ -149,9 +151,9 @@ export default function Buscar({ query, status, reviewer, results }: Props) {
                                                     key={person.id}
                                                     className="py-3 first:pt-0"
                                                 >
-                                                    <p className="font-medium">
-                                                        {person.name}
-                                                    </p>
+                                                    {administrator ? (
+                                                        <Link className="font-medium text-primary hover:underline" href={adminUsersIndex({ query: { selected: person.id } })}>{person.name}</Link>
+                                                    ) : <p className="font-medium">{person.name}</p>}
                                                     <p className="text-sm text-muted-foreground">
                                                         {person.rol}
                                                     </p>

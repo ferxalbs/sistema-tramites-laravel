@@ -2,6 +2,7 @@ import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Download, MessageSquareText, MoveRight, PackageCheck } from 'lucide-react';
 import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
 import TramiteEntregaController from '@/actions/App/Http/Controllers/TramiteEntregaController';
+import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteStatusBadge from '@/components/tramite-status-badge';
 import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -30,6 +31,7 @@ type Props = {
         obligatoria: boolean;
     }>;
     documento_final: { numero: string; url_descarga: string } | null;
+    documentos_recepcion: Array<{ id: number; nombre: string; categoria: string; version: number; vigente: boolean }>;
     entrega: {
         medio: string;
         receptor_nombre: string;
@@ -43,7 +45,7 @@ type Props = {
     historial: Array<{ estado: string; label: string; descripcion: string; fecha: string | null }>;
 };
 
-export default function EstudianteTramiteShow({ tramite, comentario_publico, observaciones_visibles, documento_final, entrega, puede_confirmar_entrega, informe_cierre, historial }: Props) {
+export default function EstudianteTramiteShow({ tramite, comentario_publico, observaciones_visibles, documento_final, documentos_recepcion, entrega, puede_confirmar_entrega, informe_cierre, historial }: Props) {
     return (
         <>
             <Head title={`Seguimiento · ${tramite.codigo}`} />
@@ -76,6 +78,27 @@ export default function EstudianteTramiteShow({ tramite, comentario_publico, obs
                         )}
                     </CardContent>
                 </Card>
+
+                {documentos_recepcion.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Documentos recibidos</CardTitle>
+                            <CardDescription>Archivos entregados físicamente y sus versiones conservadas.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ul className="flex flex-col gap-3">
+                                {documentos_recepcion.map((documento) => (
+                                    <li key={documento.id} className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 last:border-0 last:pb-0">
+                                        <span className="text-sm">{documento.nombre} · {documento.categoria.replaceAll('_', ' ')} · versión {documento.version}{documento.vigente ? '' : ' · reemplazado'}</span>
+                                        <a href={TramiteController.download.url({ tramite: tramite.id, documento: documento.id })} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                                            <Download data-icon="inline-start" /> Descargar
+                                        </a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {documento_final && (
                     <Card>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTramiteRequest;
+use App\Http\Requests\UpdateTramiteRequest;
 use App\Http\Requests\UploadTramiteDocumentRequest;
 use App\Models\Tramite;
 use App\Models\TramiteDocumento;
@@ -42,6 +43,7 @@ class TramiteController extends Controller
 
             $query->where(function (Builder $query) use ($term): void {
                 $query->where('codigo', 'like', $term)
+                    ->orWhere('numero_expediente_externo', 'like', $term)
                     ->orWhere('persona_nombre', 'like', $term)
                     ->orWhere('persona_identificador', 'like', $term)
                     ->orWhere('asunto', 'like', $term);
@@ -83,36 +85,52 @@ class TramiteController extends Controller
     public function create(): InertiaResponse
     {
         return Inertia::render('tramites/create', [
-            'catalogos' => [
-                'clasificaciones' => config('tramites.clasificaciones'),
-                'tipos_documento' => config('tramites.tipos_documento'),
-                'destinos' => config('tramites.destinos'),
-                'prioridades' => config('tramites.prioridades'),
+            ...$this->receptionFormData(),
+            'ahora' => now()->format('Y-m-d\TH:i'),
+            'tramite' => null,
+        ]);
+    }
+
+    public function edit(Tramite $tramite): InertiaResponse
+    {
+        abort_unless($this->canEditReception($tramite), 409);
+
+        return Inertia::render('tramites/create', [
+            ...$this->receptionFormData(),
+            'ahora' => now()->format('Y-m-d\TH:i'),
+            'tramite' => $tramite->only([
+                'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador',
+                'propietario_id', 'destino_tipo', 'destino_nombre', 'asunto', 'descripcion', 'prioridad', 'folios',
+                'numero_expediente_externo', 'area_procedencia', 'persona_entrega_documento', 'observacion_recepcion',
+            ]) + [
+                'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d\TH:i')
+                    ?? $tramite->fecha_recepcion->format('Y-m-d\T00:00'),
+                'fecha_presentacion_original' => $tramite->fecha_presentacion_original?->toDateString(),
             ],
-            'hoy' => now()->toDateString(),
-            'estudiantes' => User::query()
-                ->where('rol', 'estudiante')
-                ->where('activo', true)
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])
-                ->all(),
         ]);
     }
 
     public function store(StoreTramiteRequest $request): RedirectResponse
     {
         $datos = $request->validated();
-        $documento = $datos['documento'] ?? null;
-        unset($datos['documento']);
+        $documentos = $datos['documentos'] ?? [];
+        unset($datos['documentos'], $datos['confirmar_recepcion']);
+        $datos['fecha_recepcion'] = substr($datos['fecha_llegada_oficina'], 0, 10);
+        $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
 
         $codigo = $this->siguienteCodigo();
-        $datosDocumento = $documento === null ? null : $this->guardarDocumento($documento);
-        $ruta = $datosDocumento['ruta'] ?? null;
+        $datosDocumentos = [];
 
         try {
-            $tramite = DB::transaction(function () use ($codigo, $datos, $datosDocumento, $request): Tramite {
-                $estado = $datosDocumento === null ? 'recibido_oficina' : 'digitalizado';
+            foreach ($documentos as $documento) {
+                $datosDocumentos[] = [
+                    ...$this->guardarDocumento($documento['archivo']),
+                    'categoria' => $documento['categoria'],
+                ];
+            }
+
+            $tramite = DB::transaction(function () use ($codigo, $datos, $datosDocumentos, $request): Tramite {
+                $estado = $datosDocumentos === [] ? 'recibido_oficina' : 'digitalizado';
                 $tramite = Tramite::create([
                     ...$datos,
                     'codigo' => $codigo,
@@ -130,13 +148,21 @@ class TramiteController extends Controller
                     'metadatos' => isset($datos['propietario_id']) ? ['propietario_id' => $datos['propietario_id']] : null,
                 ]);
 
-                if ($datosDocumento !== null) {
-                    $registroDocumento = $tramite->documentos()->create([
-                        ...$datosDocumento,
-                        'categoria' => 'documento_original',
-                        'disco' => 'local',
-                        'cargado_por' => $request->user()->id,
-                    ]);
+                if ($datosDocumentos !== []) {
+                    $versiones = [];
+                    $documentosIds = [];
+
+                    foreach ($datosDocumentos as $datosDocumento) {
+                        $categoria = $datosDocumento['categoria'];
+                        $versiones[$categoria] = ($versiones[$categoria] ?? 0) + 1;
+                        $registroDocumento = $tramite->documentos()->create([
+                            ...$datosDocumento,
+                            'disco' => 'local',
+                            'version' => $versiones[$categoria],
+                            'cargado_por' => $request->user()->id,
+                        ]);
+                        $documentosIds[] = $registroDocumento->id;
+                    }
 
                     TramiteEvento::create([
                         'tramite_id' => $tramite->id,
@@ -145,22 +171,20 @@ class TramiteController extends Controller
                         'descripcion' => 'Se cargó el documento digitalizado.',
                         'estado_anterior' => 'recibido_oficina',
                         'estado_nuevo' => 'digitalizado',
-                        'metadatos' => ['documento_id' => $registroDocumento->id],
+                        'metadatos' => ['documentos_ids' => $documentosIds, 'cantidad' => count($documentosIds)],
                     ]);
                 }
 
                 return $tramite;
             });
         } catch (Throwable $exception) {
-            if ($ruta !== null) {
+            if ($datosDocumentos !== []) {
                 try {
-                    $tramiteGuardado = Tramite::query()->where('codigo', $codigo)->exists();
-
-                    if (! $tramiteGuardado) {
-                        Storage::disk('local')->delete($ruta);
+                    if (! Tramite::query()->where('codigo', $codigo)->exists()) {
+                        Storage::disk('local')->delete(array_column($datosDocumentos, 'ruta'));
                     }
                 } catch (Throwable) {
-                    // Keep the file if Turso cannot confirm whether the transaction committed.
+                    // Keep files if the database cannot confirm whether the transaction committed.
                 }
             }
 
@@ -170,17 +194,46 @@ class TramiteController extends Controller
         return redirect()->route('tramites.show', $tramite)->with('success', 'El trámite fue registrado.');
     }
 
+    public function update(UpdateTramiteRequest $request, Tramite $tramite): RedirectResponse
+    {
+        $datos = $request->validated();
+        $datos['fecha_recepcion'] = substr($datos['fecha_llegada_oficina'], 0, 10);
+        $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
+
+        DB::transaction(function () use ($request, $tramite, $datos): void {
+            $actualizados = Tramite::query()
+                ->whereKey($tramite->id)
+                ->whereIn('estado', ['recibido_oficina', 'digitalizado'])
+                ->whereDoesntHave('asignaciones', fn (Builder $asignaciones): Builder => $asignaciones->where('activa', true))
+                ->update([...$datos, 'updated_at' => now()]);
+            abort_unless($actualizados === 1, 409);
+
+            TramiteEvento::create([
+                'tramite_id' => $tramite->id,
+                'usuario_id' => $request->user()->id,
+                'accion' => 'edicion_recepcion',
+                'descripcion' => 'Se corrigieron los datos de recepción antes de la asignación.',
+                'estado_anterior' => $tramite->estado,
+                'estado_nuevo' => $tramite->estado,
+                'metadatos' => ['campos' => array_keys($datos)],
+            ]);
+        });
+
+        return redirect()->route('tramites.show', $tramite)->with('success', 'Datos de recepción actualizados.');
+    }
+
     public function upload(UploadTramiteDocumentRequest $request, Tramite $tramite): RedirectResponse
     {
-        abort_unless($tramite->estado === 'recibido_oficina' && ! $tramite->documentos()->exists(), 409);
+        abort_unless(in_array($tramite->estado, ['recibido_oficina', 'digitalizado'], true), 409);
 
+        $categoria = $request->validated('categoria') ?? 'documento_original';
         $datosDocumento = $this->guardarDocumento($request->file('documento'));
 
         try {
-            DB::transaction(function () use ($request, $tramite, $datosDocumento): void {
+            DB::transaction(function () use ($request, $tramite, $datosDocumento, $categoria): void {
                 $updated = DB::table('tramites')
                     ->where('id', $tramite->id)
-                    ->where('estado', 'recibido_oficina')
+                    ->whereIn('estado', ['recibido_oficina', 'digitalizado'])
                     ->update([
                         'estado' => 'digitalizado',
                         'updated_at' => now(),
@@ -188,38 +241,120 @@ class TramiteController extends Controller
 
                 abort_unless($updated === 1, 409);
 
+                $version = (int) $tramite->documentos()->where('categoria', $categoria)->max('version') + 1;
                 $documento = $tramite->documentos()->create([
                     ...$datosDocumento,
-                    'categoria' => 'documento_original',
+                    'categoria' => $categoria,
                     'disco' => 'local',
+                    'version' => $version,
                     'cargado_por' => $request->user()->id,
                 ]);
 
                 TramiteEvento::create([
                     'tramite_id' => $tramite->id,
                     'usuario_id' => $request->user()->id,
-                    'accion' => 'digitalizacion',
-                    'descripcion' => 'Se cargó el documento digitalizado.',
-                    'estado_anterior' => 'recibido_oficina',
+                    'accion' => $tramite->estado === 'recibido_oficina' ? 'digitalizacion' : 'documento_adicional',
+                    'descripcion' => $tramite->estado === 'recibido_oficina'
+                        ? 'Se cargó el documento digitalizado.'
+                        : 'Se agregó un documento independiente sin reemplazar evidencia anterior.',
+                    'estado_anterior' => $tramite->estado,
                     'estado_nuevo' => 'digitalizado',
-                    'metadatos' => ['documento_id' => $documento->id],
+                    'metadatos' => ['documento_id' => $documento->id, 'categoria' => $categoria, 'version' => $version],
                 ]);
             });
         } catch (Throwable $exception) {
-            try {
-                $documentoGuardado = TramiteDocumento::query()->where('ruta', $datosDocumento['ruta'])->exists();
-
-                if (! $documentoGuardado) {
-                    Storage::disk('local')->delete($datosDocumento['ruta']);
-                }
-            } catch (Throwable) {
-                // Keep the file if Turso cannot confirm whether the transaction committed.
-            }
-
+            $this->eliminarDocumentoNoPersistido($datosDocumento['ruta']);
             throw $exception;
         }
 
-        return redirect()->route('tramites.show', $tramite)->with('success', 'El documento fue digitalizado.');
+        return redirect()->route('tramites.show', $tramite)->with('success', 'El documento recibido fue registrado.');
+    }
+
+    public function replace(UploadTramiteDocumentRequest $request, Tramite $tramite, TramiteDocumento $documento): RedirectResponse
+    {
+        abort_unless((int) $documento->tramite_id === (int) $tramite->id, 404);
+        abort_unless(in_array($tramite->estado, ['recibido_oficina', 'digitalizado'], true)
+            && $documento->vigente
+            && in_array($documento->categoria, ['documento_original', 'documento_escaneado'], true), 409);
+
+        $datosDocumento = $this->guardarDocumento($request->file('documento'));
+
+        try {
+            DB::transaction(function () use ($request, $tramite, $documento, $datosDocumento): void {
+                $updated = DB::table('tramites')->where('id', $tramite->id)
+                    ->whereIn('estado', ['recibido_oficina', 'digitalizado'])
+                    ->update(['estado' => 'digitalizado', 'updated_at' => now()]);
+                abort_unless($updated === 1, 409);
+
+                $replaced = DB::table('tramite_documentos')->where('id', $documento->id)
+                    ->where('tramite_id', $tramite->id)->where('vigente', true)
+                    ->update(['vigente' => false, 'updated_at' => now()]);
+                abort_unless($replaced === 1, 409);
+
+                $nuevaVersion = $tramite->documentos()->create([
+                    ...$datosDocumento,
+                    'categoria' => $documento->categoria,
+                    'disco' => 'local',
+                    'version' => $documento->version + 1,
+                    'documento_anterior_id' => $documento->id,
+                    'cargado_por' => $request->user()->id,
+                ]);
+
+                TramiteEvento::create([
+                    'tramite_id' => $tramite->id,
+                    'usuario_id' => $request->user()->id,
+                    'accion' => 'reemplazo_archivo',
+                    'descripcion' => 'Se registró una nueva versión; la evidencia anterior se conservó.',
+                    'estado_anterior' => $tramite->estado,
+                    'estado_nuevo' => 'digitalizado',
+                    'metadatos' => ['documento_id' => $nuevaVersion->id, 'documento_anterior_id' => $documento->id],
+                ]);
+            });
+        } catch (Throwable $exception) {
+            $this->eliminarDocumentoNoPersistido($datosDocumento['ruta']);
+            throw $exception;
+        }
+
+        return redirect()->route('tramites.show', $tramite)->with('success', 'La nueva versión fue registrada.');
+    }
+
+    public function correct(UploadTramiteDocumentRequest $request, Tramite $tramite): RedirectResponse
+    {
+        abort_unless($tramite->estado === 'observado', 409);
+        $validated = $request->validate(['observacion' => ['required', 'string', 'min:3', 'max:2000']]);
+        $datosDocumento = $this->guardarDocumento($request->file('documento'));
+
+        try {
+            DB::transaction(function () use ($request, $tramite, $validated, $datosDocumento): void {
+                $updated = DB::table('tramites')->where('id', $tramite->id)->where('estado', 'observado')
+                    ->update(['updated_at' => now()]);
+                abort_unless($updated === 1, 409);
+
+                $version = (int) $tramite->documentos()->where('categoria', 'documento_corregido')->max('version') + 1;
+                $documento = $tramite->documentos()->create([
+                    ...$datosDocumento,
+                    'categoria' => 'documento_corregido',
+                    'disco' => 'local',
+                    'version' => $version,
+                    'cargado_por' => $request->user()->id,
+                ]);
+
+                TramiteEvento::create([
+                    'tramite_id' => $tramite->id,
+                    'usuario_id' => $request->user()->id,
+                    'accion' => 'subsanacion_fisica',
+                    'descripcion' => 'Subsanación física recibida: '.trim($validated['observacion']),
+                    'estado_anterior' => 'observado',
+                    'estado_nuevo' => 'observado',
+                    'metadatos' => ['documento_id' => $documento->id, 'version' => $version],
+                ]);
+            });
+        } catch (Throwable $exception) {
+            $this->eliminarDocumentoNoPersistido($datosDocumento['ruta']);
+            throw $exception;
+        }
+
+        return redirect()->route('tramites.show', $tramite)->with('success', 'Subsanación física registrada; el expediente sigue observado.');
     }
 
     public function receipt(Tramite $tramite): InertiaResponse
@@ -277,6 +412,12 @@ class TramiteController extends Controller
                 'descripcion' => $tramite->descripcion,
                 'prioridad' => config('tramites.prioridades.'.$tramite->prioridad, $tramite->prioridad),
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
+                'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d H:i'),
+                'fecha_presentacion_original' => $tramite->fecha_presentacion_original?->toDateString(),
+                'numero_expediente_externo' => $tramite->numero_expediente_externo,
+                'area_procedencia' => $tramite->area_procedencia,
+                'persona_entrega_documento' => $tramite->persona_entrega_documento,
+                'observacion_recepcion' => $tramite->observacion_recepcion,
                 'folios' => $tramite->folios,
                 'estado' => $tramite->estado,
                 'estado_label' => config('tramites.estados.'.$tramite->estado, $tramite->estado),
@@ -284,6 +425,10 @@ class TramiteController extends Controller
                 'propietario' => $tramite->propietario?->name,
                 'puede_gestionar_asignacion' => $request->user()->rol === 'asistente',
                 'puede_corregir_revision' => $request->user()->rol === 'asistente' && $tramite->estado === 'observado',
+                'puede_gestionar_documentos_recepcion' => $request->user()->rol === 'asistente'
+                    && in_array($tramite->estado, ['recibido_oficina', 'digitalizado'], true),
+                'puede_registrar_subsanacion' => $request->user()->rol === 'asistente' && $tramite->estado === 'observado',
+                'puede_editar_recepcion' => $request->user()->rol === 'asistente' && $this->canEditReception($tramite),
                 'puede_emitir_documento_final' => $request->user()->rol === 'asistente'
                     && in_array($tramite->estado, ['aprobado', 'rechazado'], true)
                     && $documentoFinal === null,
@@ -371,6 +516,8 @@ class TramiteController extends Controller
                     'mime_type' => $documento->mime_type,
                     'tamano_bytes' => $documento->tamano_bytes,
                     'version' => $documento->version,
+                    'vigente' => $documento->vigente,
+                    'documento_anterior_id' => $documento->documento_anterior_id,
                     'created_at' => $documento->created_at?->toIso8601String(),
                 ])->all(),
                 'eventos' => $tramite->eventos->map(fn (TramiteEvento $evento): array => [
@@ -389,6 +536,11 @@ class TramiteController extends Controller
     public function download(Tramite $tramite, TramiteDocumento $documento): BinaryFileResponse
     {
         abort_unless((int) $documento->tramite_id === (int) $tramite->id, 404);
+        $user = request()->user();
+        $allowed = in_array($user->rol, ['asistente', 'administrador'], true)
+            || ($user->rol === 'estudiante' && (int) $tramite->propietario_id === (int) $user->id)
+            || ($user->rol === 'docente' && $tramite->asignaciones()->where('revisor_id', $user->id)->exists());
+        abort_unless($allowed, 403);
         abort_unless($documento->disco === 'local', 404);
 
         $disk = Storage::disk('local');
@@ -408,7 +560,7 @@ class TramiteController extends Controller
 
         TramiteEvento::create([
             'tramite_id' => $tramite->id,
-            'usuario_id' => request()->user()->id,
+            'usuario_id' => $user->id,
             'accion' => 'descarga',
             'descripcion' => 'Se descargó un documento del trámite.',
             'metadatos' => ['documento_id' => $documento->id],
@@ -442,6 +594,45 @@ class TramiteController extends Controller
         }
 
         return sprintf('TRM-%d-%06d', $anio, $secuencia->ultimo_numero);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function receptionFormData(): array
+    {
+        return [
+            'catalogos' => [
+                'clasificaciones' => config('tramites.clasificaciones'),
+                'tipos_documento' => config('tramites.tipos_documento'),
+                'destinos' => config('tramites.destinos'),
+                'prioridades' => config('tramites.prioridades'),
+            ],
+            'estudiantes' => User::query()
+                ->where('rol', 'estudiante')
+                ->where('activo', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])
+                ->all(),
+        ];
+    }
+
+    private function canEditReception(Tramite $tramite): bool
+    {
+        return in_array($tramite->estado, ['recibido_oficina', 'digitalizado'], true)
+            && ! $tramite->asignaciones()->where('activa', true)->exists();
+    }
+
+    private function eliminarDocumentoNoPersistido(string $ruta): void
+    {
+        try {
+            if (! TramiteDocumento::query()->where('ruta', $ruta)->exists()) {
+                Storage::disk('local')->delete($ruta);
+            }
+        } catch (Throwable) {
+            // Keep the file if the database cannot confirm whether the transaction committed.
+        }
     }
 
     /**

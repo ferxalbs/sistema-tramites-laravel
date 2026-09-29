@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'sha256',
     'version',
     'vigente',
+    'documento_anterior_id',
     'cargado_por',
 ])]
 class TramiteDocumento extends Model
@@ -27,6 +28,7 @@ class TramiteDocumento extends Model
             'tamano_bytes' => 'integer',
             'version' => 'integer',
             'vigente' => 'boolean',
+            'documento_anterior_id' => 'integer',
         ];
     }
 

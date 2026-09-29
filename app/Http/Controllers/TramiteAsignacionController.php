@@ -209,7 +209,9 @@ class TramiteAsignacionController extends Controller
             ->where('tramite_id', $tramite->id)
             ->where('revisor_id', $user->id)
             ->where('destino', $destino)
-            ->where('activa', true)
+            ->where(fn ($assignment) => $assignment->where('activa', true)
+                ->orWhereIn('estado', ['aprobado', 'rechazado']))
+            ->orderByDesc('id')
             ->first();
 
         if ($asignacion === null) {
@@ -224,15 +226,16 @@ class TramiteAsignacionController extends Controller
             abort(403);
         }
 
-        $tramite->load(['borradorActual.plantilla', 'documentos' => fn ($query) => $query->where('vigente', true)->orderBy('id')]);
-        $borrador = $tramite->borradorActual;
-        abort_unless($borrador !== null && $borrador->estado === 'preparado_asignacion', 409);
+        $tramite->load(['documentos' => fn ($query) => $query->where('vigente', true)->orderBy('id')]);
         $rondas = TramiteRondaRevision::query()
             ->with(['observaciones.respuesta', 'versionBorrador'])
             ->where('tramite_id', $tramite->id)
             ->where('asignacion_id', $asignacion->id)
             ->orderBy('numero_ronda')
             ->get();
+        $borrador = $asignacion->activa ? $tramite->borradorActual()->with('plantilla')->first() : $rondas->last()?->versionBorrador;
+        abort_unless($borrador !== null && (! $asignacion->activa || $borrador->estado === 'preparado_asignacion'), 409);
+        $borrador->loadMissing(['plantilla', 'remitente', 'firmante']);
         $rondaActual = $rondas->first(fn (TramiteRondaRevision $ronda): bool => $ronda->activa);
 
         TramiteEvento::query()->create([
@@ -290,11 +293,12 @@ class TramiteAsignacionController extends Controller
                 'nombre' => $documento->nombre_original,
                 'categoria' => $documento->categoria,
                 'version' => $documento->version,
+                'vigente' => $documento->vigente,
             ])->all(),
             'revision' => [
-                'puede_iniciar' => in_array($tramite->estado, ['asignado', 'corregido'], true),
-                'puede_observar' => $tramite->estado === 'en_revision' && $rondaActual !== null,
-                'puede_decidir' => $tramite->estado === 'en_revision' && $rondaActual !== null,
+                'puede_iniciar' => $asignacion->activa && in_array($tramite->estado, ['asignado', 'corregido'], true),
+                'puede_observar' => $asignacion->activa && $tramite->estado === 'en_revision' && $rondaActual !== null,
+                'puede_decidir' => $asignacion->activa && $tramite->estado === 'en_revision' && $rondaActual !== null,
                 'rondas' => $rondas->map(fn (TramiteRondaRevision $ronda): array => [
                     'numero' => $ronda->numero_ronda,
                     'estado' => $ronda->estado,

@@ -1,5 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, ClipboardCheck, Download, FileCheck2, FilePlus2, FileText, Printer, Send } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, FileCheck2, FilePlus2, FileText, Pencil, Printer, Send } from 'lucide-react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type TramiteDocument = {
     id: number;
@@ -20,6 +21,8 @@ type TramiteDocument = {
     mime_type: string;
     tamano_bytes: number;
     version: number;
+    vigente: boolean;
+    documento_anterior_id: number | null;
     created_at: string | null;
 };
 
@@ -56,12 +59,21 @@ type TramiteDetail = {
     descripcion: string | null;
     prioridad: string;
     fecha_recepcion: string;
+    fecha_llegada_oficina: string | null;
+    fecha_presentacion_original: string | null;
+    numero_expediente_externo: string | null;
+    area_procedencia: string | null;
+    persona_entrega_documento: string | null;
+    observacion_recepcion: string | null;
     folios: number | null;
     estado: string;
     estado_label: string;
     recibido_por: string | null;
     puede_gestionar_asignacion: boolean;
     puede_corregir_revision: boolean;
+    puede_gestionar_documentos_recepcion: boolean;
+    puede_registrar_subsanacion: boolean;
+    puede_editar_recepcion: boolean;
     puede_emitir_documento_final: boolean;
     url_gestion_entrega: string | null;
     documento_final: {
@@ -150,6 +162,11 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        {tramite.puede_editar_recepcion && (
+                            <Button variant="outline" render={<Link href={TramiteController.edit({ tramite: tramite.id })} />}>
+                                <Pencil data-icon="inline-start" /> Editar recepción
+                            </Button>
+                        )}
                         <Button variant="outline" render={<Link href={TramiteController.receipt({ tramite: tramite.id })} />}>
                             <Printer data-icon="inline-start" />
                             Comprobante
@@ -296,11 +313,17 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                 <Detail label="Tipo de documento" value={tramite.tipo_documento} />
                                 <Detail label="Destino" value={`${tramite.destino_tipo}: ${tramite.destino_nombre}`} />
                                 <Detail label="Fecha de recepción" value={formatDate(tramite.fecha_recepcion)} />
+                                <Detail label="Llegada a oficina" value={tramite.fecha_llegada_oficina ?? 'No registrada'} />
+                                <Detail label="Presentación original" value={tramite.fecha_presentacion_original ? formatDate(tramite.fecha_presentacion_original) : 'No registrada'} />
+                                <Detail label="Referencia física externa" value={tramite.numero_expediente_externo ?? 'No registrada'} />
+                                <Detail label="Área de procedencia" value={tramite.area_procedencia ?? 'No registrada'} />
+                                <Detail label="Persona que entregó" value={tramite.persona_entrega_documento ?? 'No registrada'} />
                                 <Detail label="Prioridad" value={tramite.prioridad} />
                                 <Detail label="Cantidad de folios" value={tramite.folios?.toString() ?? 'No registrado'} />
                                 <Detail label="Recibido por" value={tramite.recibido_por ?? 'Usuario desactivado'} />
                                 <div className="sm:col-span-2">
-                                    <Detail label="Descripción u observación" value={tramite.descripcion || 'Sin observaciones'} />
+                                    <Detail label="Descripción" value={tramite.descripcion || 'Sin descripción'} />
+                                    <Detail label="Observación de recepción" value={tramite.observacion_recepcion ?? 'Sin observaciones'} />
                                 </div>
                             </CardContent>
                         </Card>
@@ -381,23 +404,35 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                             </Card>
                         )}
 
-                        {tramite.estado === 'recibido_oficina' && tramite.documentos.length === 0 && (
+                        {tramite.puede_gestionar_documentos_recepcion && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Completar digitalización</CardTitle>
-                                    <CardDescription>Adjunta el escaneo para actualizar el estado del trámite.</CardDescription>
+                                    <CardTitle>{tramite.estado === 'recibido_oficina' ? 'Completar digitalización' : 'Agregar documento independiente'}</CardTitle>
+                                    <CardDescription>El archivo nuevo se conservará junto con los documentos existentes.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <Form
                                         action={TramiteController.upload.url({ tramite: tramite.id })}
                                         method="post"
                                         options={{ preserveScroll: true }}
-                                        className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
+                                        resetOnSuccess
+                                        className="grid gap-3 sm:grid-cols-[12rem_minmax(12rem,1fr)_auto] sm:items-end"
                                     >
                                         {({ errors, processing }) => (
                                             <>
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor="documento-digitalizado">Documento digitalizado</Label>
+                                                    <Label htmlFor="categoria-documento">Categoría</Label>
+                                                    <Select name="categoria" defaultValue={tramite.documentos.length === 0 ? 'documento_original' : 'documento_escaneado'}>
+                                                        <SelectTrigger id="categoria-documento" className="w-full"><SelectValue /></SelectTrigger>
+                                                        <SelectContent><SelectGroup>
+                                                            <SelectItem value="documento_original">Documento original</SelectItem>
+                                                            <SelectItem value="documento_escaneado">Documento escaneado</SelectItem>
+                                                        </SelectGroup></SelectContent>
+                                                    </Select>
+                                                    <InputError message={errors.categoria} />
+                                                </div>
+                                                <div className="grid gap-2">
+                                                    <Label htmlFor="documento-digitalizado">Documento recibido</Label>
                                                     <Input
                                                         id="documento-digitalizado"
                                                         name="documento"
@@ -410,8 +445,32 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                 </div>
                                                 <Button type="submit" disabled={processing}>
                                                     {processing ? <Spinner /> : <FileText />}
-                                                    Digitalizar
+                                                    {tramite.estado === 'recibido_oficina' ? 'Digitalizar' : 'Agregar'}
                                                 </Button>
+                                            </>
+                                        )}
+                                    </Form>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {tramite.puede_registrar_subsanacion && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Registrar subsanación física</CardTitle>
+                                    <CardDescription>Adjunta el documento corregido recibido en Mesa de Partes. El estado seguirá Observado.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Form action={TramiteController.correct.url({ tramite: tramite.id })} method="post" resetOnSuccess options={{ preserveScroll: true }} className="grid gap-3">
+                                        {({ errors, processing }) => (
+                                            <>
+                                                <Label htmlFor="documento-subsanacion">Documento corregido</Label>
+                                                <Input id="documento-subsanacion" name="documento" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
+                                                <InputError message={errors.documento} />
+                                                <Label htmlFor="observacion-subsanacion">Detalle de la subsanación recibida</Label>
+                                                <textarea id="observacion-subsanacion" name="observacion" required minLength={3} maxLength={2000} rows={3} className="w-full rounded-xl border border-input bg-background p-3 text-sm" />
+                                                <InputError message={errors.observacion} />
+                                                <Button type="submit" disabled={processing}>Registrar subsanación</Button>
                                             </>
                                         )}
                                     </Form>
@@ -439,6 +498,8 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                         <p className="truncate font-medium">{documento.nombre_original}</p>
                                                         <p className="text-xs text-muted-foreground">
                                                             {documento.categoria.replaceAll('_', ' ')} · {formatBytes(documento.tamano_bytes)} · versión {documento.version}
+                                                            {documento.vigente ? ' · vigente' : ` · reemplazado por una versión posterior`}
+                                                            {documento.documento_anterior_id ? ` · reemplaza #${documento.documento_anterior_id}` : ''}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -449,6 +510,20 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                     <Download className="size-4" />
                                                     Descargar
                                                 </a>
+                                                {tramite.puede_gestionar_documentos_recepcion && documento.vigente && ['documento_original', 'documento_escaneado'].includes(documento.categoria) && (
+                                                    <Form action={TramiteController.replace.url({ tramite: tramite.id, documento: documento.id })} method="post" resetOnSuccess options={{ preserveScroll: true }} className="flex flex-wrap items-end gap-2">
+                                                        {({ errors, processing }) => (
+                                                            <>
+                                                                <div className="grid gap-1">
+                                                                    <Label htmlFor={`reemplazo-${documento.id}`}>Nueva versión</Label>
+                                                                    <Input id={`reemplazo-${documento.id}`} name="documento" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
+                                                                    <InputError message={errors.documento} />
+                                                                </div>
+                                                                <Button type="submit" variant="outline" disabled={processing}>Reemplazar</Button>
+                                                            </>
+                                                        )}
+                                                    </Form>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>

@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    CalendarDays,
     CircleHelp,
     ClipboardCheck,
     ClipboardList,
@@ -8,6 +9,7 @@ import {
     LayoutGrid,
     Plus,
     Search,
+    ShieldCheck,
     Users,
 } from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
@@ -28,6 +30,8 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as usersIndex } from '@/routes/admin/users';
+import { index as holidaysIndex } from '@/routes/admin/holidays';
+import { index as auditIndex } from '@/routes/admin/audit';
 import { index as searchIndex } from '@/routes/search';
 import { index as supportIndex } from '@/routes/support';
 import type { Auth, NavItem } from '@/types';
@@ -100,6 +104,16 @@ export function AppSidebar() {
             title: 'Usuarios',
             href: usersIndex(),
             icon: Users,
+        });
+        mainNavItems.push({
+            title: 'Feriados',
+            href: holidaysIndex(),
+            icon: CalendarDays,
+        });
+        mainNavItems.push({
+            title: 'Auditoría',
+            href: auditIndex(),
+            icon: ShieldCheck,
         });
     }
 

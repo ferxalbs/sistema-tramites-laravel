@@ -8,6 +8,7 @@ use App\Http\Requests\StoreTramiteEntregaRequest;
 use App\Http\Requests\StoreTramiteFirmaRequest;
 use App\Models\Tramite;
 use App\Models\TramiteDocumentoFinal;
+use App\Models\TramiteEntrega;
 use App\Models\TramiteEvento;
 use App\Models\TramiteEvidenciaEntrega;
 use App\Models\TramiteFirma;
@@ -26,7 +27,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class TramiteEntregaController extends Controller
 {
-    public function show(Tramite $tramite): InertiaResponse
+    public function show(Request $request, Tramite $tramite): InertiaResponse
     {
         $documento = $tramite->documentoFinalActual()
             ->where('estado', 'emitido')
@@ -111,6 +112,8 @@ class TramiteEntregaController extends Controller
             'puede_registrar_firma' => $tramite->estado === 'pendiente_firma',
             'puede_registrar_entrega' => $tramite->estado === 'listo_entrega' && $entrega === null,
             'puede_cerrar' => $tramite->estado === 'entregado' && $entrega?->confirmado,
+            'puede_anular' => $request->user()->rol === 'administrador' && $tramite->estado === 'listo_entrega' && $entrega !== null && ! $entrega->confirmado,
+            'puede_reabrir' => $request->user()->rol === 'administrador' && $tramite->estado === 'cerrado' && $cierre !== null,
         ]);
     }
 
@@ -154,6 +157,22 @@ class TramiteEntregaController extends Controller
 
         return redirect()->route('tramites.entrega.show', $tramite)
             ->with('success', 'El expediente fue cerrado y se generó su informe.');
+    }
+
+    public function annul(Request $request, Tramite $tramite, TramiteEntrega $entrega, ProcessTramiteDelivery $workflow): RedirectResponse
+    {
+        $datos = $request->validate(['motivo' => ['required', 'string', 'min:10', 'max:2000']]);
+        $workflow->annulDelivery($tramite, $entrega, $this->actor($request), trim($datos['motivo']));
+
+        return redirect()->route('tramites.entrega.show', $tramite)->with('success', 'La entrega pendiente fue anulada.');
+    }
+
+    public function reopen(Request $request, Tramite $tramite, ProcessTramiteDelivery $workflow): RedirectResponse
+    {
+        $datos = $request->validate(['motivo' => ['required', 'string', 'min:12', 'max:2000']]);
+        $workflow->reopen($tramite, $this->actor($request), trim($datos['motivo']));
+
+        return redirect()->route('tramites.entrega.show', $tramite)->with('success', 'El expediente fue reabierto.');
     }
 
     public function downloadReport(Request $request, Tramite $tramite, TramiteInformeCierre $informe, ProcessTramiteDelivery $workflow): BinaryFileResponse
