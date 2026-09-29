@@ -24,14 +24,21 @@ class AuditLogController extends Controller
 
         $deliveryConfigEvents = DB::table('tramite_config_events as events')
             ->leftJoin('users as actors', 'actors.id', '=', 'events.actor_id')
-            ->selectRaw("events.id as id, 3 as origen_orden, events.created_at as fecha, COALESCE(actors.name, 'Sistema') as actor, events.accion, 'entregas' as modulo, events.entidad, events.entidad_id, 'exitoso' as resultado");
+            ->selectRaw("events.id as id, 3 as origen_orden, events.created_at as fecha, COALESCE(actors.name, 'Sistema') as actor, events.accion, CASE WHEN events.entidad IN ('cargo_institucional', 'tipo_tramite', 'clasificacion_expediente', 'tipo_documento_salida') THEN 'catalogos' WHEN events.entidad = 'configuracion_plazo' THEN 'plazos' ELSE 'entregas' END as modulo, events.entidad, events.entidad_id, 'exitoso' as resultado");
 
         $reportExportEvents = DB::table('tramite_report_export_events as events')
             ->leftJoin('users as actors', 'actors.id', '=', 'events.actor_id')
             ->selectRaw("events.id as id, 4 as origen_orden, events.created_at as fecha, COALESCE(actors.name, 'Sistema') as actor, 'exportar_reporte_csv' as accion, 'reportes' as modulo, 'exportacion' as entidad, events.id as entidad_id, 'exitoso' as resultado");
 
+        $notificationEvents = DB::table('tramite_notificacion_eventos as events')
+            ->leftJoin('users as actors', 'actors.id', '=', 'events.actor_id')
+            ->selectRaw("events.id as id, 5 as origen_orden, events.created_at as fecha, COALESCE(actors.name, 'Sistema') as actor, events.accion, 'notificaciones' as modulo, 'notificacion' as entidad, events.notificacion_id as entidad_id, 'exitoso' as resultado");
+
+        $teacherRequests = DB::table('teacher_access_requests as requests')
+            ->selectRaw("requests.id as id, 6 as origen_orden, requests.created_at as fecha, 'Sistema' as actor, 'solicitud_acceso_docente' as accion, 'cuentas' as modulo, 'usuario' as entidad, requests.user_id as entidad_id, 'exitoso' as resultado");
+
         $events = DB::query()
-            ->fromSub($tramiteEvents->unionAll($accountEvents)->unionAll($holidayEvents)->unionAll($deliveryConfigEvents)->unionAll($reportExportEvents), 'auditoria')
+            ->fromSub($tramiteEvents->unionAll($accountEvents)->unionAll($holidayEvents)->unionAll($deliveryConfigEvents)->unionAll($reportExportEvents)->unionAll($notificationEvents)->unionAll($teacherRequests), 'auditoria')
             ->select(['id', 'fecha', 'actor', 'accion', 'modulo', 'entidad', 'entidad_id', 'resultado'])
             ->orderByDesc('fecha')
             ->orderByDesc('origen_orden')

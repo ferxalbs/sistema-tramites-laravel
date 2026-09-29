@@ -18,6 +18,7 @@ class TramiteDocumentoFinal extends Model
     protected $fillable = [
         'tramite_id',
         'numeracion_id',
+        'documento_anterior_id',
         'borrador_id',
         'ronda_revision_id',
         'version',
@@ -37,6 +38,9 @@ class TramiteDocumentoFinal extends Model
         'generado_por',
         'fecha_emision',
         'error_generacion',
+        'motivo_anulacion',
+        'fecha_anulacion',
+        'anulado_por',
     ];
 
     protected function casts(): array
@@ -48,6 +52,7 @@ class TramiteDocumentoFinal extends Model
             'numero_paginas' => 'integer',
             'contenido_snapshot' => 'array',
             'fecha_emision' => 'datetime',
+            'fecha_anulacion' => 'datetime',
         ];
     }
 
@@ -59,6 +64,12 @@ class TramiteDocumentoFinal extends Model
     public function numeracion(): BelongsTo
     {
         return $this->belongsTo(TramiteNumeracionDocumental::class, 'numeracion_id');
+    }
+
+    /** @return BelongsTo<self, $this> */
+    public function documentoAnterior(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'documento_anterior_id');
     }
 
     public function borrador(): BelongsTo

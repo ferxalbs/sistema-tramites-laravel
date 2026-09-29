@@ -59,6 +59,19 @@ class AdminUserRequest extends FormRequest
             ],
         ];
 
+        if ($role !== 'estudiante') {
+            $positionRule = Rule::exists('cargos_institucionales', 'id');
+
+            if ($target instanceof User && $target->cargo_institucional_id !== null) {
+                $positionRule->where(fn ($query) => $query->where('activo', true)
+                    ->orWhere('id', $target->cargo_institucional_id));
+            } else {
+                $positionRule->where('activo', true);
+            }
+
+            $rules['cargo_institucional_id'] = ['nullable', 'integer', $positionRule];
+        }
+
         if ($isCreate) {
             $rules['password'] = $this->passwordRules();
             $rules['activar_inmediatamente'] = ['sometimes', 'boolean'];
@@ -115,6 +128,10 @@ class AdminUserRequest extends FormRequest
 
         if (is_string($this->input('dni'))) {
             $normalized['dni'] = preg_replace('/\s+/', '', $this->input('dni'));
+        }
+
+        if ($this->input('cargo_institucional_id') === 'sin_cargo') {
+            $normalized['cargo_institucional_id'] = null;
         }
 
         $this->merge($normalized);

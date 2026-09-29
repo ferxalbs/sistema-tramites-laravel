@@ -50,7 +50,13 @@ type Props = {
     viewerId: number;
     filters: { q: string; rol: string; estado: string };
     counts: Partial<Record<Status, number>>;
-    selected: (UserRow & { motivo: string | null; events: Event[] }) | null;
+    selected:
+        | (UserRow & {
+              motivo: string | null;
+              teacher_request: { cargo: string; motivo: string } | null;
+              events: Event[];
+          })
+        | null;
 };
 
 const statusLabels: Record<Status, string> = {
@@ -342,6 +348,23 @@ export default function Usuarios({
                                 <p className="text-sm">
                                     Motivo registrado: {selected.motivo}
                                 </p>
+                            )}
+                            {selected.teacher_request && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Solicitud docente</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p>
+                                            Cargo:{' '}
+                                            {selected.teacher_request.cargo}
+                                        </p>
+                                        <p>
+                                            Motivo:{' '}
+                                            {selected.teacher_request.motivo}
+                                        </p>
+                                    </CardContent>
+                                </Card>
                             )}
                             {selected.estado === 'activo' && (
                                 <div className="space-y-2">

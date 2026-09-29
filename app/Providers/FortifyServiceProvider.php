@@ -46,7 +46,7 @@ class FortifyServiceProvider extends ServiceProvider
         VerifyEmail::createUrlUsing(fn (User $user): string => URL::temporarySignedRoute(
             'registration.verify',
             now()->addHours(24),
-            ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
+            ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification()), 'version' => $user->verification_version],
         ));
         ResetPassword::createUrlUsing(fn (User $user, string $token): string => rtrim((string) config('app.url'), '/')
             .route('password.reset', ['token' => $token, 'email' => $user->email], false));

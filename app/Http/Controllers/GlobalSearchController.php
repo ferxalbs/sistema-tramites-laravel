@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Tramite;
 use App\Models\TramiteDocumentoFinal;
 use App\Models\User;
+use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -25,6 +26,7 @@ class GlobalSearchController extends Controller
         $results = ['expedientes' => [], 'personas' => [], 'documentos' => []];
 
         if ($status === 'ok') {
+            $typeLabels = TramiteTypeCatalog::labels();
             $actor = $request->user();
             $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $query).'%';
             $isReviewer = $actor->rol === 'docente';
@@ -61,7 +63,7 @@ class GlobalSearchController extends Controller
                     'codigo' => $tramite->codigo,
                     'asunto' => $tramite->asunto,
                     'estado' => config('tramites.estados.'.$tramite->estado, $tramite->estado),
-                    'tipo_documento' => config('tramites.tipos_documento.'.$tramite->clasificacion.'.'.$tramite->tipo_documento, $tramite->tipo_documento),
+                    'tipo_documento' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
                 ])->all();
 
             if (! $isReviewer) {

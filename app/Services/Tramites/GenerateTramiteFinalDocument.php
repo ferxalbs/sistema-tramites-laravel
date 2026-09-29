@@ -279,9 +279,14 @@ class GenerateTramiteFinalDocument
             ]);
 
             $version = ((int) TramiteDocumentoFinal::query()->where('tramite_id', $registro->id)->max('version')) + 1;
+            $documentoAnteriorId = TramiteDocumentoFinal::query()
+                ->where('tramite_id', $registro->id)
+                ->orderByDesc('version')
+                ->value('id');
             $documento = TramiteDocumentoFinal::query()->create([
                 'tramite_id' => $registro->id,
                 'numeracion_id' => $numeracion->id,
+                'documento_anterior_id' => $documentoAnteriorId,
                 'borrador_id' => $borrador->id,
                 'ronda_revision_id' => $ronda->id,
                 'version' => $version,
@@ -390,6 +395,8 @@ class GenerateTramiteFinalDocument
             'comentario_publico' => $ronda->comentario_publico,
             'codigo_verificacion' => $codigoVerificacion,
             'version_borrador' => (int) $borrador->version,
+            'borrador_renderizado_sha256' => $borrador->contenido_renderizado === null
+                ? null : hash('sha256', $borrador->contenido_renderizado),
             'requiere_firma_fisica' => $borrador->plantilla->requiere_firma_fisica,
             'plantilla' => $borrador->plantilla->nombre,
         ];

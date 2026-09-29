@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'codigo',
     'clasificacion',
     'tipo_documento',
+    'formato_salida',
+    'modalidad_documento',
     'persona_nombre',
     'persona_identificador',
     'propietario_id',

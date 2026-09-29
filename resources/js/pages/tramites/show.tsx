@@ -51,6 +51,8 @@ type TramiteDetail = {
     clasificacion: string;
     programa: string | null;
     tipo_documento: string;
+    formato_salida: string | null;
+    modalidad_documento: string | null;
     persona_nombre: string;
     persona_identificador: string | null;
     propietario: string | null;
@@ -60,6 +62,7 @@ type TramiteDetail = {
     descripcion: string | null;
     prioridad: string;
     fecha_recepcion: string;
+    plazo: { fecha_estimada: string; fecha_maxima: string; dias_restantes: number; alerta: string; etiqueta: string } | null;
     fecha_llegada_oficina: string | null;
     fecha_presentacion_original: string | null;
     numero_expediente_externo: string | null;
@@ -67,6 +70,9 @@ type TramiteDetail = {
     persona_entrega_documento: string | null;
     observacion_recepcion: string | null;
     folios: number | null;
+    personas_relacionadas: Array<{ id: number; nombres: string; apellidos: string | null; dni: string | null; cargo_funcion: string | null; tipo_relacion: string }>;
+    destinatarios: Array<{ id: number; nombres: string; apellidos: string | null; cargo_institucional_id: number | null; cargo_catalogo: string | null; cargo_texto: string | null; correo_institucional: string | null }>;
+    personas_mencionadas: Array<{ id: number; nombres: string; apellidos: string | null; dni: string | null; cargo_funcion: string | null; descripcion: string | null }>;
     estado: string;
     estado_label: string;
     recibido_por: string | null;
@@ -76,6 +82,7 @@ type TramiteDetail = {
     puede_registrar_subsanacion: boolean;
     puede_editar_recepcion: boolean;
     puede_emitir_documento_final: boolean;
+    puede_anular_documento_final: boolean;
     url_gestion_entrega: string | null;
     documento_final: {
         id: number;
@@ -89,6 +96,15 @@ type TramiteDetail = {
         fecha_emision: string | null;
         url_descarga: string | null;
     } | null;
+    documentos_finales_anteriores: Array<{
+        id: number;
+        version: number;
+        numero: string;
+        estado: string;
+        documento_anterior_id: number | null;
+        fecha_anulacion: string | null;
+        url_descarga: string | null;
+    }>;
     asignacion_actual: {
         id: number;
         destino: string;
@@ -231,6 +247,45 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                         </a>
                                     </CardFooter>
                                 )}
+                                {tramite.puede_anular_documento_final && (
+                                    <Form {...TramiteDocumentoFinalController.annul.form({ tramite: tramite.id, documento: tramite.documento_final.id })}>
+                                        {({ errors, processing }) => (
+                                            <CardFooter className="flex flex-col items-stretch gap-3 border-t pt-4">
+                                                <p className="text-sm text-muted-foreground">Anular o autorizar una sustitución conserva el PDF y consume definitivamente este número.</p>
+                                                <Label htmlFor="motivo-documento-final">Motivo administrativo</Label>
+                                                <Input id="motivo-documento-final" name="motivo" required minLength={10} maxLength={1000} aria-invalid={Boolean(errors.motivo)} />
+                                                <InputError message={errors.motivo} />
+                                                <InputError message={errors.accion} />
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Button type="submit" name="accion" value="anular" variant="destructive" disabled={processing}>Anular documento</Button>
+                                                    <Button type="submit" name="accion" value="sustituir" variant="outline" disabled={processing}>Autorizar sustitución</Button>
+                                                </div>
+                                            </CardFooter>
+                                        )}
+                                    </Form>
+                                )}
+                            </Card>
+                        )}
+
+                        {tramite.documentos_finales_anteriores.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Versiones oficiales anteriores</CardTitle>
+                                    <CardDescription>Los números y archivos históricos se conservan para la auditoría.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {tramite.documentos_finales_anteriores.map((documento) => (
+                                        <div key={documento.id} className="space-y-2">
+                                            <p className="font-medium">Versión {documento.version} · {documento.numero}</p>
+                                            <p className="text-sm text-muted-foreground">{documento.estado === 'sustituido' ? 'Sustituido' : documento.estado === 'anulado' ? 'Anulado' : 'Generación fallida'}{documento.fecha_anulacion ? ` · ${formatDateTime(documento.fecha_anulacion)}` : ''}</p>
+                                            {documento.url_descarga && (
+                                                <a href={documento.url_descarga} className={buttonVariants({ variant: 'outline' })}>
+                                                    <Download data-icon="inline-start" /> Descargar PDF histórico
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </CardContent>
                             </Card>
                         )}
 
@@ -312,9 +367,12 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                         <Detail label="Cuenta asociada" value={tramite.propietario ?? 'Sin cuenta vinculada'} />
                                 <Detail label="Clasificación" value={tramite.clasificacion} />
                                 <Detail label="Programa" value={tramite.programa ?? 'No registrado'} />
-                                <Detail label="Tipo de documento" value={tramite.tipo_documento} />
+                                <Detail label="Tipo de trámite" value={tramite.tipo_documento} />
+                                <Detail label="Formato previsto" value={tramite.formato_salida ?? 'Pendiente'} />
+                                {tramite.modalidad_documento && <Detail label="Modalidad" value={tramite.modalidad_documento} />}
                                 <Detail label="Destino" value={`${tramite.destino_tipo}: ${tramite.destino_nombre}`} />
                                 <Detail label="Fecha de recepción" value={formatDate(tramite.fecha_recepcion)} />
+                                {tramite.plazo && <Detail label={tramite.plazo.etiqueta} value={`${formatDate(tramite.plazo.fecha_maxima)} · ${tramite.plazo.alerta === 'completado' ? 'Completado' : tramite.plazo.alerta === 'vencido' ? 'Vencido' : `${tramite.plazo.dias_restantes} días restantes`}`} />}
                                 <Detail label="Llegada a oficina" value={tramite.fecha_llegada_oficina ?? 'No registrada'} />
                                 <Detail label="Presentación original" value={tramite.fecha_presentacion_original ? formatDate(tramite.fecha_presentacion_original) : 'No registrada'} />
                                 <Detail label="Referencia física externa" value={tramite.numero_expediente_externo ?? 'No registrada'} />
@@ -329,6 +387,35 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {(tramite.personas_relacionadas.length > 0 || tramite.destinatarios.length > 0 || tramite.personas_mencionadas.length > 0) && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Listas preliminares</CardTitle>
+                                    <CardDescription>Datos internos registrados en la recepción física.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-5">
+                                    {tramite.personas_relacionadas.length > 0 && <div className="grid gap-2">
+                                        <h3 className="font-medium">Personas relacionadas</h3>
+                                        {tramite.personas_relacionadas.map((persona) => (
+                                            <p key={persona.id} className="text-sm">{persona.nombres} {persona.apellidos} · {persona.tipo_relacion}{persona.dni ? ` · DNI ${persona.dni}` : ''}{persona.cargo_funcion ? ` · ${persona.cargo_funcion}` : ''}</p>
+                                        ))}
+                                    </div>}
+                                    {tramite.destinatarios.length > 0 && <div className="grid gap-2">
+                                        <h3 className="font-medium">Destinatarios preliminares</h3>
+                                        {tramite.destinatarios.map((persona, index) => (
+                                            <p key={persona.id} className="text-sm">{index === 0 ? 'Principal · ' : ''}{persona.nombres} {persona.apellidos}{persona.cargo_catalogo ? ` · ${persona.cargo_catalogo}` : ''}{persona.cargo_texto ? ` · ${persona.cargo_texto}` : ''}{persona.correo_institucional ? ` · ${persona.correo_institucional}` : ''}</p>
+                                        ))}
+                                    </div>}
+                                    {tramite.personas_mencionadas.length > 0 && <div className="grid gap-2">
+                                        <h3 className="font-medium">Personas mencionadas</h3>
+                                        {tramite.personas_mencionadas.map((persona) => (
+                                            <p key={persona.id} className="text-sm">{persona.nombres} {persona.apellidos}{persona.dni ? ` · DNI ${persona.dni}` : ''}{persona.cargo_funcion ? ` · ${persona.cargo_funcion}` : ''}{persona.descripcion ? ` · ${persona.descripcion}` : ''}</p>
+                                        ))}
+                                    </div>}
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {tramite.borradores.length > 0 && (
                             <Card>
@@ -347,6 +434,9 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                 <time className="text-xs text-muted-foreground">
                                                     {borrador.created_at ? formatDateTime(borrador.created_at) : ''}
                                                 </time>
+                                                <Link className={buttonVariants({ variant: 'outline', size: 'sm' })} href={TramiteBorradorController.show({ tramite: tramite.id, borrador: borrador.id })}>
+                                                    Vista previa
+                                                </Link>
                                             </li>
                                         ))}
                                     </ol>

@@ -23,6 +23,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { index, save, store } from '@/routes/admin/users';
+import {
+    index as studentsIndex,
+    save as saveStudent,
+    store as storeStudent,
+} from '@/routes/assistant/students';
 
 type Account = {
     id: number;
@@ -33,6 +38,7 @@ type Account = {
     celular: string | null;
     email: string;
     correo_alternativo: string | null;
+    cargo_institucional_id: number | null;
     codigo_estudiante: string | null;
     codigo_docente: string | null;
     programa_estudio_id: number | null;
@@ -45,8 +51,10 @@ type Account = {
 };
 
 type Props = {
+    mode?: 'admin' | 'assistant';
     user: Account | null;
     programas: Array<{ id: number; nombre: string }>;
+    cargos?: Array<{ id: number; nombre: string }>;
     passwordRules: string | null;
 };
 
@@ -58,8 +66,10 @@ const roles = [
 ];
 
 export default function UsuariosForm({
+    mode = 'admin',
     user,
     programas,
+    cargos = [],
     passwordRules,
 }: Props) {
     const [role, setRole] = useState(user?.rol ?? 'estudiante');
@@ -69,7 +79,14 @@ export default function UsuariosForm({
     const [program, setProgram] = useState<string | null>(
         user?.programa_estudio_id ? String(user.programa_estudio_id) : null,
     );
-    const title = user ? 'Editar usuario' : 'Crear usuario';
+    const assistant = mode === 'assistant';
+    const title = assistant
+        ? user
+            ? 'Editar estudiante/egresado'
+            : 'Crear cuenta de estudiante/egresado'
+        : user
+          ? 'Editar usuario'
+          : 'Crear usuario';
 
     return (
         <>
@@ -79,49 +96,60 @@ export default function UsuariosForm({
                     <CardHeader>
                         <CardTitle>{title}</CardTitle>
                         <CardDescription>
-                            El perfil requerido cambia según el rol. Las cuentas
-                            creadas aquí usan una contraseña temporal.
+                            {assistant
+                                ? 'El rol se asigna como estudiante/egresado en el servidor. No puede cambiar roles ni estados desde este formulario.'
+                                : 'El perfil requerido cambia según el rol. Las cuentas creadas aquí usan una contraseña temporal.'}
                         </CardDescription>
                     </CardHeader>
                     <Form
-                        {...(user
-                            ? save.form({ user: user.id })
-                            : store.form())}
+                        {...(assistant
+                            ? user
+                                ? saveStudent.form({ user: user.id })
+                                : storeStudent.form()
+                            : user
+                              ? save.form({ user: user.id })
+                              : store.form())}
                         disableWhileProcessing
                         resetOnSuccess={['password', 'password_confirmation']}
                     >
                         {({ errors, processing }) => (
                             <>
                                 <CardContent className="grid gap-5">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="rol">Rol</Label>
-                                        <Select
-                                            name="rol"
-                                            items={roles}
-                                            value={role}
-                                            onValueChange={(value) =>
-                                                setRole(value ?? 'estudiante')
-                                            }
-                                            required
-                                        >
-                                            <SelectTrigger id="rol">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectGroup>
-                                                    {roles.map((item) => (
-                                                        <SelectItem
-                                                            key={item.value}
-                                                            value={item.value}
-                                                        >
-                                                            {item.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectGroup>
-                                            </SelectContent>
-                                        </Select>
-                                        <InputError message={errors.rol} />
-                                    </div>
+                                    {!assistant && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="rol">Rol</Label>
+                                            <Select
+                                                name="rol"
+                                                items={roles}
+                                                value={role}
+                                                onValueChange={(value) =>
+                                                    setRole(
+                                                        value ?? 'estudiante',
+                                                    )
+                                                }
+                                                required
+                                            >
+                                                <SelectTrigger id="rol">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        {roles.map((item) => (
+                                                            <SelectItem
+                                                                key={item.value}
+                                                                value={
+                                                                    item.value
+                                                                }
+                                                            >
+                                                                {item.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError message={errors.rol} />
+                                        </div>
+                                    )}
 
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <div className="grid gap-2">
@@ -271,6 +299,60 @@ export default function UsuariosForm({
                                             <InputError
                                                 message={
                                                     errors.programa_estudio_id
+                                                }
+                                            />
+                                        </div>
+                                    )}
+
+                                    {!assistant && role !== 'estudiante' && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="cargo_institucional_id">
+                                                Cargo institucional
+                                            </Label>
+                                            <Select
+                                                name="cargo_institucional_id"
+                                                defaultValue={
+                                                    user?.cargo_institucional_id
+                                                        ? String(
+                                                              user.cargo_institucional_id,
+                                                          )
+                                                        : 'sin_cargo'
+                                                }
+                                                items={[
+                                                    {
+                                                        value: 'sin_cargo',
+                                                        label: 'Sin cargo asignado',
+                                                    },
+                                                    ...cargos.map((cargo) => ({
+                                                        value: String(cargo.id),
+                                                        label: cargo.nombre,
+                                                    })),
+                                                ]}
+                                            >
+                                                <SelectTrigger id="cargo_institucional_id">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        <SelectItem value="sin_cargo">
+                                                            Sin cargo asignado
+                                                        </SelectItem>
+                                                        {cargos.map((cargo) => (
+                                                            <SelectItem
+                                                                key={cargo.id}
+                                                                value={String(
+                                                                    cargo.id,
+                                                                )}
+                                                            >
+                                                                {cargo.nombre}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError
+                                                message={
+                                                    errors.cargo_institucional_id
                                                 }
                                             />
                                         </div>
@@ -513,18 +595,21 @@ export default function UsuariosForm({
                                                     }
                                                 />
                                             </div>
-                                            <div className="flex items-center gap-2 sm:col-span-2">
-                                                <Checkbox
-                                                    id="activar_inmediatamente"
-                                                    name="activar_inmediatamente"
-                                                    value="1"
-                                                    defaultChecked
-                                                />
-                                                <Label htmlFor="activar_inmediatamente">
-                                                    Crear activa y verificada
-                                                    administrativamente
-                                                </Label>
-                                            </div>
+                                            {!assistant && (
+                                                <div className="flex items-center gap-2 sm:col-span-2">
+                                                    <Checkbox
+                                                        id="activar_inmediatamente"
+                                                        name="activar_inmediatamente"
+                                                        value="1"
+                                                        defaultChecked
+                                                    />
+                                                    <Label htmlFor="activar_inmediatamente">
+                                                        Crear activa y
+                                                        verificada
+                                                        administrativamente
+                                                    </Label>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -555,12 +640,22 @@ export default function UsuariosForm({
                                     <Button type="submit" disabled={processing}>
                                         {user
                                             ? 'Guardar cambios'
-                                            : 'Crear usuario'}
+                                            : assistant
+                                              ? 'Crear cuenta provisional'
+                                              : 'Crear usuario'}
                                     </Button>
                                     <Button
                                         variant="outline"
                                         nativeButton={false}
-                                        render={<Link href={index()} />}
+                                        render={
+                                            <Link
+                                                href={
+                                                    assistant
+                                                        ? studentsIndex()
+                                                        : index()
+                                                }
+                                            />
+                                        }
                                     >
                                         Volver
                                     </Button>

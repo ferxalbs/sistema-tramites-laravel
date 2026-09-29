@@ -50,3 +50,29 @@ test('public resend has a neutral response and limits duplicate notifications', 
     $again->assertSessionHas('status');
     Notification::assertSentTo($pending, VerifyEmail::class, 1);
 });
+
+test('resending verification invalidates the previously signed public link', function () {
+    Notification::fake();
+    $pending = User::factory()->unverified()->create([
+        'email' => 'a.enlaces@seoane.edu.pe',
+        'activo' => false,
+        'estado_cuenta' => 'pendiente',
+    ]);
+
+    $pending->sendEmailVerificationNotification();
+    $oldVersion = $pending->fresh()->verification_version;
+    $oldUrl = Notification::sent($pending, VerifyEmail::class)->last()->toMail($pending->fresh())->actionUrl;
+
+    $this->post(route('registration.resend'), ['email' => $pending->email])->assertSessionHas('status');
+    $newVersion = $pending->fresh()->verification_version;
+    $newUrl = Notification::sent($pending, VerifyEmail::class)->last()->toMail($pending->fresh())->actionUrl;
+
+    expect($newVersion)->toBe($oldVersion + 1)
+        ->and($oldUrl)->toContain('version='.$oldVersion)
+        ->and($newUrl)->toContain('version='.$newVersion);
+    $this->get($oldUrl)->assertForbidden();
+    expect($pending->fresh()->hasVerifiedEmail())->toBeFalse();
+    $this->get($newUrl)->assertRedirect(route('login'));
+    expect($pending->fresh()->hasVerifiedEmail())->toBeTrue();
+    Notification::assertSentTo($pending, VerifyEmail::class, 2);
+});

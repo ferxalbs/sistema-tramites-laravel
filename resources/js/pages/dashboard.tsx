@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowRight, ClipboardList } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
@@ -37,6 +37,7 @@ type Props = {
         desde: string;
         hasta: string;
         clasificacion: string;
+        programa: string;
         tipo: string;
         estado: string;
         revisor: string;
@@ -44,12 +45,19 @@ type Props = {
     };
     catalogs: {
         clasificaciones: Record<string, string>;
+        programas: Array<{ id: number; nombre: string }>;
         tipos: Record<string, string>;
         estados: Record<string, string>;
         revisores: Array<{ id: number; name: string }>;
         medios: Array<{ id: number; nombre: string }>;
     };
-    summary: { total: number; cerrados: number };
+    summary: {
+        total: number;
+        cerrados: number;
+        proximos: number;
+        vencidos: number;
+        horas_promedio_atencion: number | null;
+    };
     states: StateCount[];
     activity: Activity[];
     adminCharts: {
@@ -81,12 +89,22 @@ export default function Dashboard({
     activity,
     adminCharts,
 }: Props) {
+    const { notificationUnreadCount } = usePage<{
+        notificationUnreadCount: number;
+    }>().props;
     const [current, setCurrent] = useState(filters);
     const classificationOptions = [
         { value: 'todos', label: 'Todas las clasificaciones' },
         ...Object.entries(catalogs.clasificaciones).map(([value, label]) => ({
             value,
             label,
+        })),
+    ];
+    const programOptions = [
+        { value: 'todos', label: 'Todos los programas' },
+        ...catalogs.programas.map((programa) => ({
+            value: String(programa.id),
+            label: programa.nombre,
         })),
     ];
     const stateOptions = [
@@ -132,6 +150,7 @@ export default function Dashboard({
                 desde: current.desde || undefined,
                 hasta: current.hasta || undefined,
                 clasificacion: current.clasificacion || undefined,
+                programa: current.programa || undefined,
                 tipo: current.tipo || undefined,
                 estado: current.estado || undefined,
                 revisor: current.revisor || undefined,
@@ -233,6 +252,14 @@ export default function Dashboard({
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <DashboardSelect
+                                label="Programa"
+                                value={current.programa}
+                                options={programOptions}
+                                onChange={(programa) =>
+                                    setCurrent({ ...current, programa })
+                                }
+                            />
                             <div className="grid gap-1 text-sm">
                                 <span>Estado</span>
                                 <Select
@@ -302,7 +329,7 @@ export default function Dashboard({
                 </Card>
 
                 <section
-                    className="grid gap-3 sm:grid-cols-3"
+                    className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
                     aria-label="Indicadores de expedientes"
                 >
                     <Metric label="Expedientes" value={summary.total} />
@@ -311,7 +338,25 @@ export default function Dashboard({
                         value={summary.total - summary.cerrados}
                     />
                     <Metric label="Cerrados" value={summary.cerrados} />
+                    <Metric label="Por vencer" value={summary.proximos} />
+                    <Metric label="Vencidos" value={summary.vencidos} />
+                    <Metric
+                        label="Tiempo medio de atención"
+                        value={
+                            summary.horas_promedio_atencion === null
+                                ? '—'
+                                : `${summary.horas_promedio_atencion} h`
+                        }
+                    />
+                    <Metric
+                        label="Notificaciones nuevas"
+                        value={notificationUnreadCount}
+                    />
                 </section>
+                <p className="text-sm text-muted-foreground">
+                    Los indicadores de vencimiento corresponden a plazos
+                    estimados referenciales.
+                </p>
 
                 <div className="grid gap-4 lg:grid-cols-2">
                     <BarList
@@ -435,7 +480,7 @@ function activityHref(role: Role, tramiteId: number) {
     return TramiteController.show({ tramite: tramiteId });
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
     return (
         <Card>
             <CardContent>

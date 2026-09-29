@@ -126,6 +126,107 @@ test('Turso HTTP client rejects incomplete pipeline responses', function () {
     Http::assertSentCount(1);
 });
 
+test('Turso HTTP client rejects a batch that did not confirm foreign keys', function () {
+    $result = ['affected_row_count' => 0, 'cols' => [], 'rows' => []];
+    Http::fake(fn () => Http::response([
+        'baton' => null,
+        'base_url' => null,
+        'results' => [
+            [
+                'type' => 'ok',
+                'response' => [
+                    'type' => 'batch',
+                    'result' => [
+                        'step_results' => [null, $result],
+                        'step_errors' => [null, null],
+                    ],
+                ],
+            ],
+            ['type' => 'ok', 'response' => ['type' => 'close']],
+        ],
+    ]));
+
+    $client = new TursoHttpClient('libsql://example.turso.io', 'test-token');
+
+    expect(fn () => $client->pipeline(null, [['sql' => 'SELECT 1']], closeStream: true))
+        ->toThrow(RuntimeException::class, 'Turso did not confirm foreign-key enforcement.');
+    Http::assertSentCount(1);
+});
+
+test('Turso connection rejects a successful HTTP response with incomplete SQL results', function () {
+    $result = ['affected_row_count' => 0, 'cols' => [], 'rows' => []];
+    Http::fake(fn () => Http::response([
+        'baton' => null,
+        'base_url' => null,
+        'results' => [
+            [
+                'type' => 'ok',
+                'response' => [
+                    'type' => 'batch',
+                    'result' => [
+                        'step_results' => [$result, ['affected_row_count' => 1]],
+                        'step_errors' => [null, null],
+                    ],
+                ],
+            ],
+            ['type' => 'ok', 'response' => ['type' => 'close']],
+        ],
+    ]));
+
+    $connection = new TursoConnection(new TursoHttpClient('libsql://example.turso.io', 'test-token'), 'turso');
+
+    expect(fn () => $connection->statement('UPDATE counters SET value = value + 1'))
+        ->toThrow(RuntimeException::class, 'Turso returned an incomplete SQL statement result.');
+    Http::assertSentCount(1);
+});
+
+test('Turso HTTP client starts a new stream at its primary endpoint after an incomplete response', function () {
+    $urls = [];
+    Http::fake(function (Request $request) use (&$urls) {
+        $urls[] = $request->url();
+
+        return Http::response([
+            'baton' => count($urls) === 1 ? 'lost-baton' : null,
+            'base_url' => count($urls) === 1 ? 'https://secondary.turso.io/v3/pipeline' : null,
+            'results' => count($urls) === 1 ? [[
+                'type' => 'ok',
+                'response' => [
+                    'type' => 'batch',
+                    'result' => [
+                        'step_results' => [['affected_row_count' => 0, 'cols' => [], 'rows' => []]],
+                        'step_errors' => [null],
+                    ],
+                ],
+            ]] : [
+                [
+                    'type' => 'ok',
+                    'response' => [
+                        'type' => 'batch',
+                        'result' => [
+                            'step_results' => [
+                                ['affected_row_count' => 0, 'cols' => [], 'rows' => []],
+                                ['affected_row_count' => 0, 'cols' => [], 'rows' => []],
+                            ],
+                            'step_errors' => [null, null],
+                        ],
+                    ],
+                ],
+                ['type' => 'ok', 'response' => ['type' => 'close']],
+            ],
+        ]);
+    });
+
+    $client = new TursoHttpClient('libsql://example.turso.io', 'test-token');
+
+    expect(fn () => $client->pipeline(null, [['sql' => 'SELECT 1']], closeStream: false))
+        ->toThrow(RuntimeException::class, 'Turso returned an incomplete batch result.');
+    expect($client->pipeline(null, [['sql' => 'SELECT 1']], closeStream: true)['results'])->toHaveCount(1);
+    expect($urls)->toBe([
+        'https://example.turso.io/v3/pipeline',
+        'https://example.turso.io/v3/pipeline',
+    ]);
+});
+
 test('Turso connection carries its baton across begin, write, and commit without retries', function () {
     $requests = [];
     $statementResult = ['affected_row_count' => 0, 'cols' => [], 'rows' => []];

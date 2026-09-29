@@ -41,6 +41,10 @@ final class TursoHttpClient
             throw new InvalidArgumentException('A Turso pipeline must contain at least one SQL statement.');
         }
 
+        if ($baton === null) {
+            $this->pipelineUrl = $this->primaryPipelineUrl;
+        }
+
         $initializesForeignKeys = $baton === null && $this->foreignKeyConstraints;
         $requests = $initializesForeignKeys
             ? [$this->foreignKeyBatch($statements)]
@@ -268,7 +272,18 @@ final class TursoHttpClient
             throw new RuntimeException('Turso returned an invalid batch result.');
         }
 
-        $setupError = $batch['step_errors'][0] ?? null;
+        if (! array_is_list($batch['step_results'])
+            || ! array_is_list($batch['step_errors'])
+            || count($batch['step_results']) !== $statementCount + 1
+            || count($batch['step_errors']) !== $statementCount + 1) {
+            throw new RuntimeException('Turso returned an incomplete batch result.');
+        }
+
+        $setupError = $batch['step_errors'][0];
+
+        if ($setupError === null && ! is_array($batch['step_results'][0])) {
+            throw new RuntimeException('Turso did not confirm foreign-key enforcement.');
+        }
         $results = [];
 
         for ($index = 0; $index < $statementCount; $index++) {

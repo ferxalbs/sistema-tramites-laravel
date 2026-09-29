@@ -1,12 +1,15 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    Bell,
+    BriefcaseBusiness,
     CalendarDays,
     CircleHelp,
     ClipboardCheck,
     ClipboardList,
     PackageCheck,
     FileSpreadsheet,
+    FileText,
     FolderGit2,
     LayoutGrid,
     Plus,
@@ -35,13 +38,22 @@ import { dashboard } from '@/routes';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as holidaysIndex } from '@/routes/admin/holidays';
 import { index as auditIndex } from '@/routes/admin/audit';
+import { index as positionsIndex } from '@/routes/admin/positions';
+import { index as typesIndex } from '@/routes/admin/types';
+import { index as classificationsIndex } from '@/routes/admin/classifications';
+import { index as outputFormatsIndex } from '@/routes/admin/output-formats';
+import { index as templatesIndex } from '@/routes/admin/templates';
+import { index as deadlinesIndex } from '@/routes/admin/deadlines';
 import { index as searchIndex } from '@/routes/search';
 import { index as reportsIndex } from '@/routes/admin/reports';
 import { index as supportIndex } from '@/routes/support';
+import { index as notificationsIndex } from '@/routes/notificaciones';
+import { index as studentsIndex } from '@/routes/assistant/students';
 import type { Auth, NavItem } from '@/types';
 
 type PageProps = {
     auth: Auth;
+    notificationUnreadCount: number;
 };
 
 const footerNavItems: NavItem[] = [
@@ -58,7 +70,7 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-    const { auth } = usePage<PageProps>().props;
+    const { auth, notificationUnreadCount } = usePage<PageProps>().props;
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
@@ -66,6 +78,15 @@ export function AppSidebar() {
             icon: LayoutGrid,
         },
     ];
+
+    mainNavItems.push({
+        title:
+            notificationUnreadCount > 0
+                ? `Notificaciones (${notificationUnreadCount})`
+                : 'Notificaciones',
+        href: notificationsIndex(),
+        icon: Bell,
+    });
 
     if (['asistente', 'administrador'].includes(auth.user.rol)) {
         mainNavItems.push(
@@ -88,6 +109,11 @@ export function AppSidebar() {
     }
 
     if (auth.user.rol === 'asistente') {
+        mainNavItems.push({
+            title: 'Estudiantes y egresados',
+            href: studentsIndex(),
+            icon: Users,
+        });
         mainNavItems.push({
             title: 'Asignaciones',
             href: TramiteAsignacionController.index(),
@@ -122,6 +148,36 @@ export function AppSidebar() {
         mainNavItems.push({
             title: 'Feriados',
             href: holidaysIndex(),
+            icon: CalendarDays,
+        });
+        mainNavItems.push({
+            title: 'Cargos institucionales',
+            href: positionsIndex(),
+            icon: BriefcaseBusiness,
+        });
+        mainNavItems.push({
+            title: 'Tipos de trámite',
+            href: typesIndex(),
+            icon: ClipboardList,
+        });
+        mainNavItems.push({
+            title: 'Clasificaciones',
+            href: classificationsIndex(),
+            icon: FolderGit2,
+        });
+        mainNavItems.push({
+            title: 'Formatos de salida',
+            href: outputFormatsIndex(),
+            icon: FileText,
+        });
+        mainNavItems.push({
+            title: 'Plantillas documentales',
+            href: templatesIndex(),
+            icon: FileText,
+        });
+        mainNavItems.push({
+            title: 'Plazos',
+            href: deadlinesIndex(),
             icon: CalendarDays,
         });
         mainNavItems.push({

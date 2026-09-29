@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Tramites\TramiteClassificationCatalog;
+use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,8 +19,10 @@ class TramiteReportController extends Controller
     public function index(Request $request): InertiaResponse
     {
         $filters = $this->filters($request);
+        $typeLabels = TramiteTypeCatalog::labels();
+        $classificationLabels = TramiteClassificationCatalog::labels();
         $rows = $this->query($filters)->orderByDesc('t.created_at')->orderByDesc('t.id')
-            ->paginate(25)->through(fn (stdClass $row): array => $this->reportRow($row))->withQueryString();
+            ->paginate(25)->through(fn (stdClass $row): array => $this->reportRow($row, $typeLabels, $classificationLabels))->withQueryString();
 
         return Inertia::render('reportes', [
             'rows' => $rows,
@@ -34,7 +38,7 @@ class TramiteReportController extends Controller
             ],
             'catalogs' => [
                 'programas' => DB::table('programas_estudio')->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
-                'clasificaciones' => config('tramites.clasificaciones'),
+                'clasificaciones' => $classificationLabels,
                 'tipos' => $this->documentTypes(),
                 'estados' => config('tramites.estados'),
                 'revisores' => DB::table('users')->whereIn('rol', ['docente', 'administrador'])->where('activo', true)->orderBy('name')->get(['id', 'name']),
@@ -47,8 +51,10 @@ class TramiteReportController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $filters = $this->filters($request);
+        $typeLabels = TramiteTypeCatalog::labels();
+        $classificationLabels = TramiteClassificationCatalog::labels();
         $rows = $this->query($filters)->orderByDesc('t.created_at')->orderByDesc('t.id')
-            ->limit(10000)->get()->map(fn (stdClass $row): array => $this->reportRow($row));
+            ->limit(10000)->get()->map(fn (stdClass $row): array => $this->reportRow($row, $typeLabels, $classificationLabels));
 
         DB::table('tramite_report_export_events')->insert([
             'actor_id' => $request->user()->id,
@@ -87,7 +93,7 @@ class TramiteReportController extends Controller
             'desde' => ['nullable', 'date_format:Y-m-d'],
             'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
             'programa' => ['nullable', 'integer', 'exists:programas_estudio,id'],
-            'clasificacion' => ['nullable', Rule::in(array_keys(config('tramites.clasificaciones')))],
+            'clasificacion' => ['nullable', Rule::in(array_keys(TramiteClassificationCatalog::labels()))],
             'tipo' => ['nullable', Rule::in(array_keys($this->documentTypes()))],
             'estado' => ['nullable', Rule::in(array_keys(config('tramites.estados')))],
             'revisor' => ['nullable', 'integer', 'exists:users,id'],
@@ -100,13 +106,7 @@ class TramiteReportController extends Controller
      */
     private function documentTypes(): array
     {
-        $types = [];
-
-        foreach (config('tramites.tipos_documento', []) as $classificationTypes) {
-            $types = array_merge($types, $classificationTypes);
-        }
-
-        return $types;
+        return TramiteTypeCatalog::labels();
     }
 
     /**
@@ -142,14 +142,14 @@ class TramiteReportController extends Controller
     /**
      * @return array<string, string>
      */
-    private function reportRow(stdClass $row): array
+    private function reportRow(stdClass $row, array $typeLabels, array $classificationLabels): array
     {
         return [
             'codigo' => (string) $row->codigo,
             'asunto' => (string) $row->asunto,
-            'tipo' => (string) config('tramites.tipos_documento.'.$row->clasificacion.'.'.$row->tipo_documento, $row->tipo_documento),
+            'tipo' => (string) ($typeLabels[$row->tipo_documento] ?? $row->tipo_documento),
             'programa' => (string) ($row->programa ?? ''),
-            'clasificacion' => (string) config('tramites.clasificaciones.'.$row->clasificacion, $row->clasificacion),
+            'clasificacion' => (string) ($classificationLabels[$row->clasificacion] ?? $row->clasificacion),
             'estado' => (string) config('tramites.estados.'.$row->estado, $row->estado),
             'revisor' => (string) ($row->revisor ?? ''),
             'recepcion' => (string) ($row->fecha_llegada_oficina ?? $row->fecha_recepcion),

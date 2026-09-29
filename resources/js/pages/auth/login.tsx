@@ -14,10 +14,10 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
+import { create as requestTeacherAccess } from '@/routes/teacher-access';
 
 type Props = {
     status?: string;
@@ -33,7 +33,8 @@ export default function Login({ status, canResetPassword }: Props) {
                 <CardHeader>
                     <CardTitle>Iniciar Sesión</CardTitle>
                     <CardDescription>
-                        Ingresa a tu cuenta para gestionar y consultar tus trámites
+                        Ingresa a tu cuenta para gestionar y consultar tus
+                        trámites
                     </CardDescription>
                     <CardAction>
                         <Button
@@ -50,10 +51,12 @@ export default function Login({ status, canResetPassword }: Props) {
                         {...store.form()}
                         resetOnSuccess={['password']}
                     >
-                        {({ processing, errors }) => (
+                        {({ errors }) => (
                             <div className="flex flex-col gap-6">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo electrónico</Label>
+                                    <Label htmlFor="email">
+                                        Correo electrónico
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
@@ -68,11 +71,13 @@ export default function Login({ status, canResetPassword }: Props) {
                                 </div>
                                 <div className="grid gap-2">
                                     <div className="flex items-center">
-                                        <Label htmlFor="password">Contraseña</Label>
+                                        <Label htmlFor="password">
+                                            Contraseña
+                                        </Label>
                                         {canResetPassword && (
                                             <Link
                                                 href={request()}
-                                                className="ml-auto inline-block text-sm text-muted-foreground underline-offset-4 hover:underline hover:text-foreground"
+                                                className="ml-auto inline-block text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                                                 tabIndex={5}
                                             >
                                                 ¿Olvidaste tu contraseña?
@@ -112,6 +117,12 @@ export default function Login({ status, canResetPassword }: Props) {
                         data-test="login-button"
                     >
                         Iniciar Sesión
+                    </Button>
+                    <Button
+                        variant="link"
+                        render={<Link href={requestTeacherAccess()} />}
+                    >
+                        Solicitar acceso docente
                     </Button>
                 </CardFooter>
             </Card>

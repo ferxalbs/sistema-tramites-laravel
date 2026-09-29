@@ -7,6 +7,7 @@ use App\Http\Requests\ReassignTramiteAsignacionRequest;
 use App\Http\Requests\StoreTramiteAsignacionRequest;
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
+use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEvento;
 use App\Models\TramiteObservacionRevision;
 use App\Models\TramiteRondaRevision;
@@ -24,14 +25,14 @@ class TramiteAsignacionController extends Controller
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'estado' => ['nullable', 'string', Rule::in(['pendiente_asignacion', 'asignado'])],
+            'estado' => ['nullable', 'string', Rule::in(['borrador_preparado', 'pendiente_asignacion', 'asignado'])],
             'destino' => ['nullable', 'string', Rule::in(['docente', 'oficina'])],
         ]);
 
         $query = Tramite::query()
             ->with(['borradorActual.plantilla', 'asignacionActual.revisor'])
             ->withCount('documentos')
-            ->whereIn('estado', ['pendiente_asignacion', 'asignado'])
+            ->whereIn('estado', ['borrador_preparado', 'pendiente_asignacion', 'asignado'])
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
 
@@ -80,9 +81,14 @@ class TramiteAsignacionController extends Controller
             ],
             'resumen' => [
                 'pendientes' => Tramite::query()->where('estado', 'pendiente_asignacion')->count(),
-                'asignados' => Tramite::query()->where('estado', 'asignado')->count(),
+                'asignados_hoy' => TramiteAsignacion::query()
+                    ->where('created_at', '>=', today())
+                    ->where('created_at', '<', today()->addDay())
+                    ->count(),
                 'docentes' => TramiteAsignacion::query()->where('activa', true)->where('destino', 'docente')->count(),
                 'oficina' => TramiteAsignacion::query()->where('activa', true)->where('destino', 'oficina')->count(),
+                'reasignados' => TramiteAsignacion::query()->where('estado', 'reasignada')->count(),
+                'sin_revisor' => Tramite::query()->where('estado', 'pendiente_asignacion')->whereDoesntHave('asignacionActual')->count(),
             ],
         ]);
     }
@@ -283,6 +289,7 @@ class TramiteAsignacionController extends Controller
                 'asunto' => $borrador->asunto,
                 'introduccion' => $borrador->introduccion,
                 'contenido_principal' => $borrador->contenido_principal,
+                'contenido_renderizado' => $borrador->contenido_renderizado,
                 'cierre' => $borrador->cierre,
                 'destinatarios' => $borrador->destinatarios ?? [],
                 'personas_mencionadas' => $borrador->personas_mencionadas ?? [],
@@ -295,6 +302,18 @@ class TramiteAsignacionController extends Controller
                 'version' => $documento->version,
                 'vigente' => $documento->vigente,
             ])->all(),
+            'documentos_finales' => TramiteDocumentoFinal::query()
+                ->where('tramite_id', $tramite->id)
+                ->whereIn('estado', ['emitido', 'anulado', 'sustituido'])
+                ->whereHas('rondaRevision', fn ($query) => $query->where('asignacion_id', $asignacion->id))
+                ->orderBy('version')
+                ->get(['id', 'numero_documento', 'estado', 'version'])
+                ->map(fn (TramiteDocumentoFinal $documento): array => [
+                    'id' => $documento->id,
+                    'numero' => $documento->numero_documento,
+                    'estado' => $documento->estado,
+                    'version' => $documento->version,
+                ])->all(),
             'revision' => [
                 'puede_iniciar' => $asignacion->activa && in_array($tramite->estado, ['asignado', 'corregido'], true),
                 'puede_observar' => $asignacion->activa && $tramite->estado === 'en_revision' && $rondaActual !== null,

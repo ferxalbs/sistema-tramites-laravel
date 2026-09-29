@@ -388,6 +388,27 @@ class TursoConnection extends SQLiteConnection
                 throw new RuntimeException('Turso returned an invalid SQL statement result.');
             }
 
+            if (! isset($statementResult['cols'], $statementResult['rows'], $statementResult['affected_row_count'])
+                || ! is_array($statementResult['cols'])
+                || ! array_is_list($statementResult['cols'])
+                || ! is_array($statementResult['rows'])
+                || ! array_is_list($statementResult['rows'])
+                || ! is_int($statementResult['affected_row_count'])) {
+                throw new RuntimeException('Turso returned an incomplete SQL statement result.');
+            }
+
+            foreach ($statementResult['rows'] as $row) {
+                if (! is_array($row) || ! array_is_list($row) || count($row) !== count($statementResult['cols'])) {
+                    throw new RuntimeException('Turso returned an incomplete SQL row.');
+                }
+
+                foreach ($row as $value) {
+                    if (! is_array($value)) {
+                        throw new RuntimeException('Turso returned an invalid SQL value.');
+                    }
+                }
+            }
+
             $results[] = $statementResult;
         }
 

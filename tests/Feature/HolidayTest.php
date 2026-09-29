@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Tramite;
 use App\Models\User;
+use App\Services\Tramites\CalculateTramiteDeadline;
+use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -102,4 +105,69 @@ test('demonstration dates remain visible to administrators and become confirmed 
         ->assertInertia(fn (Assert $page) => $page->component('feriados')->has('holidays', 1)
             ->where('holidays.0.nombre', 'Fecha confirmada')
             ->where('holidays.0.es_demostracion', 0));
+});
+
+test('deadline settings are administrative and business days exclude confirmed holidays', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $configuration = DB::table('configuracion_plazos as c')
+        ->join('tipos_tramite as t', 't.id', '=', 'c.tipo_tramite_id')
+        ->where('t.codigo', 'FUT')->first(['c.id']);
+    expect($configuration)->not->toBeNull();
+
+    $data = [
+        'dias_estimados' => 1,
+        'dias_maximos' => 2,
+        'tipo_dias' => 'habiles',
+        'dias_anticipacion_recordatorio' => 1,
+    ];
+    $this->get(route('admin.deadlines.index'))->assertRedirect(route('login'));
+    $this->actingAs($assistant)->get(route('admin.deadlines.index'))->assertForbidden();
+    $this->patch(route('admin.deadlines.update', $configuration->id), $data)->assertForbidden();
+    $this->actingAs($administrator)->get(route('admin.deadlines.index'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('plazos')->has('plazos', 8));
+    $this->patch(route('admin.deadlines.update', $configuration->id), [
+        ...$data, 'dias_estimados' => 3,
+    ])->assertSessionHasErrors('dias_estimados');
+    $this->patch(route('admin.deadlines.update', $configuration->id), [
+        ...$data, 'tipo_dias' => 'inventado',
+    ])->assertSessionHasErrors('tipo_dias');
+    $this->patch(route('admin.deadlines.update', $configuration->id), $data)
+        ->assertRedirect(route('admin.deadlines.index'));
+    expect(DB::table('configuracion_plazos')->where('id', $configuration->id)->value('es_plazo_oficial'))->toBe(0)
+        ->and(DB::table('tramite_config_events')->where('entidad', 'configuracion_plazo')->count())->toBe(1);
+    $this->get(route('admin.audit.index'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('events.data.0.modulo', 'plazos'));
+
+    $tramite = Tramite::factory()->create([
+        'clasificacion' => 'administrativo',
+        'tipo_documento' => 'FUT',
+        'fecha_recepcion' => '2026-07-17',
+        'fecha_llegada_oficina' => '2026-07-17 10:00:00',
+        'estado' => 'recibido_oficina',
+    ]);
+    DB::table('feriados')->insert([
+        'fecha' => '2026-07-20', 'nombre' => 'Fecha de demostración', 'es_demostracion' => true, 'activo' => true,
+    ]);
+    $calculator = app(CalculateTramiteDeadline::class);
+    $initial = $calculator->forTramite($tramite, new DateTimeImmutable('2026-07-20'));
+    expect($initial['fecha_estimada'])->toBe('2026-07-20')
+        ->and($initial['fecha_maxima'])->toBe('2026-07-21')
+        ->and($initial['dias_restantes'])->toBe(1)
+        ->and($initial['alerta'])->toBe('proximo')
+        ->and($initial['etiqueta'])->toBe('Plazo estimado referencial');
+
+    DB::table('feriados')->where('fecha', '2026-07-20')->update(['es_demostracion' => false]);
+    $confirmed = $calculator->forTramite($tramite, new DateTimeImmutable('2026-07-20'));
+    expect($confirmed['fecha_estimada'])->toBe('2026-07-21')
+        ->and($confirmed['fecha_maxima'])->toBe('2026-07-22')
+        ->and($confirmed['dias_restantes'])->toBe(2)
+        ->and($confirmed['alerta'])->toBe('normal');
+    $this->actingAs($assistant)->get(route('tramites.show', $tramite))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('tramite.plazo.fecha_maxima', '2026-07-22')
+            ->where('tramite.plazo.etiqueta', 'Plazo estimado referencial'));
+    expect($calculator->forTramite($tramite, new DateTimeImmutable('2026-07-23'))['alerta'])->toBe('vencido');
+    $tramite->update(['estado' => 'cerrado']);
+    expect($calculator->forTramite($tramite, new DateTimeImmutable('2026-07-23'))['alerta'])->toBe('completado');
 });

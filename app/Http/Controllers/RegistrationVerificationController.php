@@ -10,10 +10,11 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class RegistrationVerificationController extends Controller
 {
-    public function __invoke(int $id, string $hash): RedirectResponse
+    public function __invoke(Request $request, int $id, string $hash): RedirectResponse
     {
         $user = User::query()->findOrFail($id);
         abort_unless(hash_equals(sha1($user->getEmailForVerification()), $hash), 403);
+        abort_unless((string) $user->verification_version === (string) $request->query('version'), 403);
         abort_if($user->hasVerifiedEmail(), 410);
 
         if ($user->markEmailAsVerified()) {

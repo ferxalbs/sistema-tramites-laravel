@@ -1,19 +1,28 @@
 <?php
 
+use App\Http\Controllers\AssistantStudentAccountController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\HolidayController;
+use App\Http\Controllers\InstitutionalPositionController;
+use App\Http\Controllers\OutputDocumentTypeController;
 use App\Http\Controllers\RegistrationVerificationController;
+use App\Http\Controllers\TeacherAccessRequestController;
 use App\Http\Controllers\TramiteAsignacionController;
 use App\Http\Controllers\TramiteBorradorController;
+use App\Http\Controllers\TramiteClassificationController;
 use App\Http\Controllers\TramiteController;
+use App\Http\Controllers\TramiteDeadlineController;
 use App\Http\Controllers\TramiteDocumentoFinalController;
 use App\Http\Controllers\TramiteEntregaAdminController;
 use App\Http\Controllers\TramiteEntregaController;
 use App\Http\Controllers\TramiteEstudianteController;
+use App\Http\Controllers\TramiteNotificacionController;
+use App\Http\Controllers\TramitePlantillaController;
 use App\Http\Controllers\TramiteReportController;
 use App\Http\Controllers\TramiteRevisionController;
+use App\Http\Controllers\TramiteTypeController;
 use App\Http\Controllers\TramiteVerificacionPublicaController;
 use App\Http\Controllers\UserAccountController;
 use App\Services\SupportKnowledgeBase;
@@ -27,6 +36,8 @@ use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 Route::inertia('/', 'welcome')->name('home');
+Route::get('solicitud-docente', [TeacherAccessRequestController::class, 'create'])->middleware('guest')->name('teacher-access.create');
+Route::post('solicitud-docente', [TeacherAccessRequestController::class, 'store'])->middleware(['guest', 'throttle:6,1'])->name('teacher-access.store');
 Route::get('ayuda', fn (Request $request, SupportKnowledgeBase $support): InertiaResponse => Inertia::render('ayuda', $support->forRequest($request)))
     ->name('support.index');
 Route::get('verificar-documento', [TramiteVerificacionPublicaController::class, 'show'])
@@ -49,6 +60,17 @@ Route::get('cambiar-contrasena', fn (): InertiaResponse => Inertia::render('auth
 ]))->middleware('auth')->name('password.change-required');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('notificaciones', [TramiteNotificacionController::class, 'index'])
+        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->name('notificaciones.index');
+    Route::patch('notificaciones/{notification}/leer', [TramiteNotificacionController::class, 'read'])
+        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->whereNumber('notification')
+        ->name('notificaciones.read');
+    Route::patch('notificaciones/leer-todas', [TramiteNotificacionController::class, 'readAll'])
+        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->name('notificaciones.read-all');
+
     Route::get('dashboard', DashboardController::class)
         ->middleware('role:estudiante,asistente,docente,administrador')
         ->name('dashboard');
@@ -64,6 +86,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('tramites.receipt');
         Route::get('tramites/{tramite}/borradores/crear', [TramiteBorradorController::class, 'create'])
             ->name('tramites.borradores.create');
+        Route::get('tramites/{tramite}/borradores/{borrador}', [TramiteBorradorController::class, 'show'])
+            ->whereNumber('borrador')->name('tramites.borradores.show');
         Route::post('tramites/{tramite}/borradores', [TramiteBorradorController::class, 'store'])
             ->name('tramites.borradores.store');
         Route::post('tramites/{tramite}/preparar-asignacion', [TramiteBorradorController::class, 'prepareAssignment'])
@@ -71,6 +95,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:asistente')->group(function (): void {
+        Route::get('asistente/estudiantes', [AssistantStudentAccountController::class, 'index'])->name('assistant.students.index');
+        Route::get('asistente/estudiantes/crear', [AssistantStudentAccountController::class, 'create'])->name('assistant.students.create');
+        Route::post('asistente/estudiantes', [AssistantStudentAccountController::class, 'store'])->name('assistant.students.store');
+        Route::get('asistente/estudiantes/{user}/editar', [AssistantStudentAccountController::class, 'edit'])->name('assistant.students.edit');
+        Route::put('asistente/estudiantes/{user}', [AssistantStudentAccountController::class, 'save'])->name('assistant.students.save');
         Route::get('tramites/{tramite}/editar', [TramiteController::class, 'edit'])->name('tramites.edit');
         Route::put('tramites/{tramite}', [TramiteController::class, 'update'])->name('tramites.update');
         Route::post('tramites/{tramite}/documentos', [TramiteController::class, 'upload'])
@@ -107,9 +136,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('admin/entregas/plantillas/{plantilla}', [TramiteEntregaAdminController::class, 'updateTemplate'])->name('admin.deliveries.templates.update');
         Route::post('tramites/{tramite}/entrega/{entrega}/anular', [TramiteEntregaController::class, 'annul'])
             ->name('tramites.entrega.anular');
+        Route::post('tramites/{tramite}/documentos-finales/{documento}/anular', [TramiteDocumentoFinalController::class, 'annul'])
+            ->name('tramites.documento-final.anular');
         Route::post('tramites/{tramite}/entrega/reabrir', [TramiteEntregaController::class, 'reopen'])
             ->name('tramites.entrega.reabrir');
         Route::get('admin/feriados', [HolidayController::class, 'index'])->name('admin.holidays.index');
+        Route::get('admin/cargos', [InstitutionalPositionController::class, 'index'])->name('admin.positions.index');
+        Route::patch('admin/cargos/{position}', [InstitutionalPositionController::class, 'update'])
+            ->whereNumber('position')->name('admin.positions.update');
+        Route::get('admin/tipos-tramite', [TramiteTypeController::class, 'index'])->name('admin.types.index');
+        Route::patch('admin/tipos-tramite/{type}', [TramiteTypeController::class, 'update'])
+            ->whereNumber('type')->name('admin.types.update');
+        Route::get('admin/clasificaciones', [TramiteClassificationController::class, 'index'])->name('admin.classifications.index');
+        Route::patch('admin/clasificaciones/{classification}', [TramiteClassificationController::class, 'update'])
+            ->whereNumber('classification')->name('admin.classifications.update');
+        Route::get('admin/formatos-salida', [OutputDocumentTypeController::class, 'index'])->name('admin.output-formats.index');
+        Route::patch('admin/formatos-salida/{format}', [OutputDocumentTypeController::class, 'update'])
+            ->whereNumber('format')->name('admin.output-formats.update');
+        Route::get('admin/plantillas', [TramitePlantillaController::class, 'index'])->name('admin.templates.index');
+        Route::post('admin/plantillas', [TramitePlantillaController::class, 'store'])->name('admin.templates.store');
+        Route::post('admin/plantillas/{plantilla}/versiones', [TramitePlantillaController::class, 'version'])
+            ->name('admin.templates.version');
+        Route::patch('admin/plantillas/{plantilla}/estado', [TramitePlantillaController::class, 'state'])
+            ->name('admin.templates.state');
+        Route::get('admin/plantillas/{plantilla}/campos', [TramitePlantillaController::class, 'fields'])
+            ->name('admin.templates.fields');
+        Route::patch('admin/plantillas/{plantilla}/campos/{field}', [TramitePlantillaController::class, 'updateField'])
+            ->whereNumber('field')->name('admin.templates.fields.update');
+        Route::patch('admin/plantillas/{plantilla}/campos/{field}/mover', [TramitePlantillaController::class, 'moveField'])
+            ->whereNumber('field')->name('admin.templates.fields.move');
+        Route::get('admin/plazos', [TramiteDeadlineController::class, 'index'])->name('admin.deadlines.index');
+        Route::patch('admin/plazos/{deadline}', [TramiteDeadlineController::class, 'update'])
+            ->whereNumber('deadline')->name('admin.deadlines.update');
         Route::post('admin/feriados', [HolidayController::class, 'store'])->name('admin.holidays.store');
         Route::patch('admin/feriados/{holiday}/desactivar', [HolidayController::class, 'deactivate'])->whereNumber('holiday')->name('admin.holidays.deactivate');
         Route::get('admin/auditoria', AuditLogController::class)->name('admin.audit.index');

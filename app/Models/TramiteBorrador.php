@@ -19,6 +19,8 @@ class TramiteBorrador extends Model
         'tramite_id',
         'plantilla_id',
         'version_plantilla',
+        'contenido_plantilla_snapshot',
+        'contenido_renderizado',
         'version',
         'remitente_id',
         'firmante_id',

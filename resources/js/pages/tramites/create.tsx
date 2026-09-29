@@ -2,6 +2,7 @@ import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, FilePlus2, Plus, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
+import ReceptionPreliminaryLists from '@/components/reception-preliminary-lists';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,11 @@ import { Spinner } from '@/components/ui/spinner';
 type Catalogos = {
     clasificaciones: Record<string, string>;
     tipos_documento: Record<string, Record<string, string>>;
+    formatos_salida: Record<string, string>;
+    modalidades_documento: Record<string, string>;
+    formatos_sugeridos: Record<string, string>;
+    requisitos_tipo: Record<string, { personas_relacionadas: boolean; destinatarios_multiples: boolean; documento_original: boolean }>;
+    tipos_relacion: Record<string, string>;
     destinos: Record<string, string>;
     prioridades: Record<string, string>;
 };
@@ -30,11 +36,14 @@ type Props = {
     ahora: string;
     estudiantes: Array<{ id: number; name: string }>;
     programas: Array<{ id: number; nombre: string }>;
+    cargos_institucionales: Array<{ id: number; nombre: string }>;
     tramite: {
         id: number;
         codigo: string;
         clasificacion: string;
         tipo_documento: string;
+        formato_salida: string | null;
+        modalidad_documento: string | null;
         persona_nombre: string;
         persona_identificador: string | null;
         propietario_id: number | null;
@@ -51,25 +60,44 @@ type Props = {
         persona_entrega_documento: string | null;
         observacion_recepcion: string | null;
         folios: number | null;
+        personas_relacionadas: Array<{ nombres: string; apellidos: string | null; dni: string | null; cargo_funcion: string | null; tipo_relacion: string }>;
+        destinatarios: Array<{ nombres: string; apellidos: string | null; cargo_institucional_id: number | null; cargo_texto: string | null; correo_institucional: string | null }>;
+        personas_mencionadas: Array<{ nombres: string; apellidos: string | null; dni: string | null; cargo_funcion: string | null; descripcion: string | null }>;
     } | null;
 };
 
-export default function TramiteCreate({ catalogos, ahora, estudiantes, programas, tramite }: Props) {
+export default function TramiteCreate({ catalogos, ahora, estudiantes, programas, cargos_institucionales, tramite }: Props) {
     const primeraClasificacion = tramite?.clasificacion ?? Object.keys(catalogos.clasificaciones)[0] ?? 'estudiantil';
+    const tipoInicial = tramite?.tipo_documento ?? Object.keys(catalogos.tipos_documento[primeraClasificacion] ?? {})[0] ?? '';
     const [clasificacion, setClasificacion] = useState(primeraClasificacion);
-    const [tipoDocumento, setTipoDocumento] = useState(
-        tramite?.tipo_documento ?? Object.keys(catalogos.tipos_documento[primeraClasificacion] ?? {})[0] ?? '',
-    );
+    const [tipoDocumento, setTipoDocumento] = useState(tipoInicial);
+    const [formatoSalida, setFormatoSalida] = useState(tramite?.formato_salida ?? catalogos.formatos_sugeridos[tipoInicial] ?? 'pendiente');
+    const [modalidadDocumento, setModalidadDocumento] = useState(tramite?.modalidad_documento ?? '');
     const [destinoTipo, setDestinoTipo] = useState(tramite?.destino_tipo ?? 'oficina');
     const [prioridad, setPrioridad] = useState(tramite?.prioridad ?? 'normal');
     const [propietarioId, setPropietarioId] = useState<string | null>(tramite?.propietario_id ? String(tramite.propietario_id) : null);
     const [documentos, setDocumentos] = useState<Array<{ id: number; categoria: string }>>([]);
     const siguienteDocumentoId = useRef(0);
 
+    function changeTipoDocumento(nextType: string) {
+        setTipoDocumento(nextType);
+        const suggested = catalogos.formatos_sugeridos[nextType];
+        if (suggested) {
+            setFormatoSalida(suggested);
+            if (suggested !== 'memorando') setModalidadDocumento('');
+        }
+    }
+
     function changeClasificacion(value: string | null) {
         const nextClassification = value ?? primeraClasificacion;
         setClasificacion(nextClassification);
-        setTipoDocumento(Object.keys(catalogos.tipos_documento[nextClassification] ?? {})[0] ?? '');
+        changeTipoDocumento(Object.keys(catalogos.tipos_documento[nextClassification] ?? {})[0] ?? '');
+    }
+
+    function changeFormatoSalida(value: string | null) {
+        const nextFormat = value ?? 'pendiente';
+        setFormatoSalida(nextFormat);
+        if (nextFormat !== 'memorando') setModalidadDocumento('');
     }
 
     return (
@@ -155,13 +183,31 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                     )}
                                     <FormSelect
                                         id="tipo_documento"
-                                        label="Tipo de documento"
+                                        label="Tipo de trámite"
                                         name="tipo_documento"
                                         value={tipoDocumento}
                                         options={catalogos.tipos_documento[clasificacion] ?? {}}
                                         error={errors.tipo_documento}
-                                        onValueChange={(value) => setTipoDocumento(value ?? '')}
+                                        onValueChange={(value) => changeTipoDocumento(value ?? '')}
                                     />
+                                    <FormSelect
+                                        id="formato_salida"
+                                        label="Formato documental previsto"
+                                        name="formato_salida"
+                                        value={formatoSalida}
+                                        options={{ pendiente: 'Pendiente', ...catalogos.formatos_salida }}
+                                        error={errors.formato_salida}
+                                        onValueChange={changeFormatoSalida}
+                                    />
+                                    {formatoSalida === 'memorando' && <FormSelect
+                                        id="modalidad_documento"
+                                        label="Modalidad del Memorando"
+                                        name="modalidad_documento"
+                                        value={modalidadDocumento}
+                                        options={catalogos.modalidades_documento}
+                                        error={errors.modalidad_documento}
+                                        onValueChange={(value) => setModalidadDocumento(value ?? '')}
+                                    />}
                                     <FormSelect
                                         id="destino_tipo"
                                         label="Tipo de destino"
@@ -254,10 +300,22 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                 </CardContent>
                             </Card>
 
+                            <ReceptionPreliminaryLists
+                                initial={{
+                                    personas_relacionadas: tramite?.personas_relacionadas ?? [],
+                                    destinatarios: tramite?.destinatarios ?? [],
+                                    personas_mencionadas: tramite?.personas_mencionadas ?? [],
+                                }}
+                                errors={errors}
+                                tiposRelacion={catalogos.tipos_relacion}
+                                cargos={cargos_institucionales}
+                                requisitos={catalogos.requisitos_tipo[tipoDocumento] ?? { personas_relacionadas: false, destinatarios_multiples: false }}
+                            />
+
                             {!tramite && <Card>
                                 <CardHeader>
                                     <CardTitle>Documentos recibidos</CardTitle>
-                                    <CardDescription>Cada archivo es un documento independiente. Puede registrar varios en esta recepción o agregarlos después.</CardDescription>
+                                    <CardDescription>Cada archivo es un documento independiente. Puede registrar varios en esta recepción o agregarlos después.{catalogos.requisitos_tipo[tipoDocumento]?.documento_original ? ' Este tipo exige incluir un documento original.' : ''}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-4">
                                     {documentos.map((documento, index) => (

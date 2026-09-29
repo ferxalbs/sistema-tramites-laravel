@@ -1,32 +1,6 @@
 <?php
 
 return [
-    'clasificaciones' => [
-        'estudiantil' => 'Estudiantil',
-        'administrativo' => 'Administrativo',
-        'institucional' => 'Institucional',
-    ],
-
-    'tipos_documento' => [
-        'estudiantil' => [
-            'FUT' => 'Formulario Único de Trámite',
-            'JUSTIFICACION' => 'Justificación',
-            'CONSTANCIA_PRACTICA' => 'Constancia de prácticas',
-            'SOLICITUD_GENERAL' => 'Solicitud general',
-            'JUSTIFICACION_TARDANZA' => 'Justificación de tardanza',
-            'AUTORIZACION_INGRESO' => 'Autorización de ingreso',
-        ],
-        'administrativo' => [
-            'REQUERIMIENTO_EQUIPAMIENTO' => 'Requerimiento de equipamiento',
-            'COMUNICACION_ADMINISTRATIVA' => 'Comunicación administrativa',
-            'SOLICITUD_GENERAL' => 'Solicitud general',
-        ],
-        'institucional' => [
-            'COMUNICACION_ADMINISTRATIVA' => 'Comunicación administrativa',
-            'SOLICITUD_GENERAL' => 'Solicitud general',
-        ],
-    ],
-
     'destinos' => [
         'oficina' => 'Oficina',
         'docente' => 'Docente',

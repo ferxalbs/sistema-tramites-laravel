@@ -8,9 +8,13 @@ use App\Http\Requests\UploadTramiteDocumentRequest;
 use App\Models\ProgramaEstudio;
 use App\Models\Tramite;
 use App\Models\TramiteDocumento;
+use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEvento;
 use App\Models\TramiteRondaRevision;
 use App\Models\User;
+use App\Services\Tramites\CalculateTramiteDeadline;
+use App\Services\Tramites\TramiteClassificationCatalog;
+use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,6 +34,8 @@ class TramiteController extends Controller
 {
     public function index(Request $request): InertiaResponse
     {
+        $classificationLabels = TramiteClassificationCatalog::labels();
+        $typeLabels = TramiteTypeCatalog::labels();
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'estado' => ['nullable', 'string', Rule::in(array_keys(config('tramites.estados')))],
@@ -59,8 +65,8 @@ class TramiteController extends Controller
         $tramites = $query->paginate(15)->through(fn (Tramite $tramite): array => [
             'id' => $tramite->id,
             'codigo' => $tramite->codigo,
-            'clasificacion' => config('tramites.clasificaciones.'.$tramite->clasificacion, $tramite->clasificacion),
-            'tipo_documento' => config('tramites.tipos_documento.'.$tramite->clasificacion.'.'.$tramite->tipo_documento, $tramite->tipo_documento),
+            'clasificacion' => $classificationLabels[$tramite->clasificacion] ?? $tramite->clasificacion,
+            'tipo_documento' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
             'persona_nombre' => $tramite->persona_nombre,
             'asunto' => $tramite->asunto,
             'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
@@ -102,12 +108,14 @@ class TramiteController extends Controller
             'ahora' => now()->format('Y-m-d\TH:i'),
             'tramite' => $tramite->only([
                 'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador',
+                'formato_salida', 'modalidad_documento',
                 'propietario_id', 'programa_estudio_id', 'destino_tipo', 'destino_nombre', 'asunto', 'descripcion', 'prioridad', 'folios',
                 'numero_expediente_externo', 'area_procedencia', 'persona_entrega_documento', 'observacion_recepcion',
             ]) + [
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d\TH:i')
                     ?? $tramite->fecha_recepcion->format('Y-m-d\T00:00'),
                 'fecha_presentacion_original' => $tramite->fecha_presentacion_original?->toDateString(),
+                ...$this->receptionLists($tramite),
             ],
         ]);
     }
@@ -116,6 +124,7 @@ class TramiteController extends Controller
     {
         $datos = $request->validated();
         $documentos = $datos['documentos'] ?? [];
+        $listas = $this->extractReceptionLists($datos);
         unset($datos['documentos'], $datos['confirmar_recepcion']);
         $datos['fecha_recepcion'] = substr($datos['fecha_llegada_oficina'], 0, 10);
         $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
@@ -131,7 +140,7 @@ class TramiteController extends Controller
                 ];
             }
 
-            $tramite = DB::transaction(function () use ($codigo, $datos, $datosDocumentos, $request): Tramite {
+            $tramite = DB::transaction(function () use ($codigo, $datos, $listas, $datosDocumentos, $request): Tramite {
                 $datos['programa_estudio_id'] = $this->programaParaRecepcion($datos);
                 $estado = $datosDocumentos === [] ? 'recibido_oficina' : 'digitalizado';
                 $tramite = Tramite::create([
@@ -141,6 +150,7 @@ class TramiteController extends Controller
                     'recibido_por' => $request->user()->id,
                     'propietario_id' => $datos['propietario_id'] ?? null,
                 ]);
+                $this->saveReceptionLists($tramite, $listas, false);
 
                 TramiteEvento::create([
                     'tramite_id' => $tramite->id,
@@ -200,10 +210,11 @@ class TramiteController extends Controller
     public function update(UpdateTramiteRequest $request, Tramite $tramite): RedirectResponse
     {
         $datos = $request->validated();
+        $listas = $this->extractReceptionLists($datos);
         $datos['fecha_recepcion'] = substr($datos['fecha_llegada_oficina'], 0, 10);
         $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
 
-        DB::transaction(function () use ($request, $tramite, $datos): void {
+        DB::transaction(function () use ($request, $tramite, $datos, $listas): void {
             $datos['programa_estudio_id'] = $this->programaParaRecepcion($datos);
             $actualizados = Tramite::query()
                 ->whereKey($tramite->id)
@@ -211,6 +222,7 @@ class TramiteController extends Controller
                 ->whereDoesntHave('asignaciones', fn (Builder $asignaciones): Builder => $asignaciones->where('activa', true))
                 ->update([...$datos, 'updated_at' => now()]);
             abort_unless($actualizados === 1, 409);
+            $this->saveReceptionLists($tramite, $listas, true);
 
             TramiteEvento::create([
                 'tramite_id' => $tramite->id,
@@ -364,6 +376,7 @@ class TramiteController extends Controller
     public function receipt(Tramite $tramite): InertiaResponse
     {
         $recepcion = $tramite->eventos()->where('accion', 'recepcion')->orderBy('id')->first(['created_at']);
+        $typeLabels = TramiteTypeCatalog::labels();
 
         return Inertia::render('tramites/comprobante', [
             'institucion' => config('app.name'),
@@ -372,7 +385,7 @@ class TramiteController extends Controller
                 'codigo' => $tramite->codigo,
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
                 'fecha_registro' => ($recepcion?->created_at ?? $tramite->created_at)?->toIso8601String(),
-                'tipo_tramite' => config('tramites.tipos_documento.'.$tramite->clasificacion.'.'.$tramite->tipo_documento, $tramite->tipo_documento),
+                'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
                 'estado_inicial' => config('tramites.estados.recibido_oficina'),
                 'destino' => $tramite->destino_nombre ?: 'Pendiente',
                 'interesado' => $tramite->persona_nombre,
@@ -381,8 +394,10 @@ class TramiteController extends Controller
         ]);
     }
 
-    public function show(Request $request, Tramite $tramite): InertiaResponse
+    public function show(Request $request, Tramite $tramite, CalculateTramiteDeadline $deadlineCalculator): InertiaResponse
     {
+        $classificationLabels = TramiteClassificationCatalog::labels();
+        $typeLabels = TramiteTypeCatalog::labels();
         $tramite->load([
             'documentos' => fn ($query) => $query->orderBy('id'),
             'eventos' => fn ($query) => $query->with('usuario')->orderBy('id'),
@@ -397,18 +412,26 @@ class TramiteController extends Controller
             'rondasRevision.observaciones.respuesta',
             'rondasRevision.versionBorrador.plantilla',
             'documentoFinalActual',
+            'documentosFinales',
         ]);
 
         $borradorActual = $tramite->borradorActual;
         $asignacionActual = $tramite->asignacionActual;
         $documentoFinal = $tramite->documentoFinalActual;
+        $formatoNombre = $tramite->formato_salida === null ? null : DB::table('tipos_documento_salida')
+            ->where('codigo', $tramite->formato_salida)->value('nombre');
+        $modalidadNombre = $tramite->modalidad_documento === null ? null : DB::table('modalidades_documento')
+            ->where('tipo_documento_salida', $tramite->formato_salida)
+            ->where('codigo', $tramite->modalidad_documento)->value('nombre');
 
         return Inertia::render('tramites/show', [
             'tramite' => [
                 'id' => $tramite->id,
                 'codigo' => $tramite->codigo,
-                'clasificacion' => config('tramites.clasificaciones.'.$tramite->clasificacion, $tramite->clasificacion),
-                'tipo_documento' => config('tramites.tipos_documento.'.$tramite->clasificacion.'.'.$tramite->tipo_documento, $tramite->tipo_documento),
+                'clasificacion' => $classificationLabels[$tramite->clasificacion] ?? $tramite->clasificacion,
+                'tipo_documento' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
+                'formato_salida' => $formatoNombre ?? $tramite->formato_salida,
+                'modalidad_documento' => $modalidadNombre ?? $tramite->modalidad_documento,
                 'persona_nombre' => $tramite->persona_nombre,
                 'persona_identificador' => $tramite->persona_identificador,
                 'destino_tipo' => config('tramites.destinos.'.$tramite->destino_tipo, $tramite->destino_tipo),
@@ -417,6 +440,7 @@ class TramiteController extends Controller
                 'descripcion' => $tramite->descripcion,
                 'prioridad' => config('tramites.prioridades.'.$tramite->prioridad, $tramite->prioridad),
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
+                'plazo' => $deadlineCalculator->forTramite($tramite),
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d H:i'),
                 'fecha_presentacion_original' => $tramite->fecha_presentacion_original?->toDateString(),
                 'numero_expediente_externo' => $tramite->numero_expediente_externo,
@@ -424,6 +448,7 @@ class TramiteController extends Controller
                 'persona_entrega_documento' => $tramite->persona_entrega_documento,
                 'observacion_recepcion' => $tramite->observacion_recepcion,
                 'folios' => $tramite->folios,
+                ...$this->receptionLists($tramite),
                 'estado' => $tramite->estado,
                 'estado_label' => config('tramites.estados.'.$tramite->estado, $tramite->estado),
                 'recibido_por' => $tramite->recibidoPor?->name,
@@ -438,6 +463,9 @@ class TramiteController extends Controller
                 'puede_emitir_documento_final' => $request->user()->rol === 'asistente'
                     && in_array($tramite->estado, ['aprobado', 'rechazado'], true)
                     && $documentoFinal === null,
+                'puede_anular_documento_final' => $request->user()->rol === 'administrador'
+                    && $tramite->estado === 'documento_final_generado'
+                    && $documentoFinal?->estado === 'emitido',
                 'url_gestion_entrega' => in_array($request->user()->rol, ['asistente', 'administrador'], true)
                     && $documentoFinal !== null
                     ? route('tramites.entrega.show', $tramite)
@@ -456,6 +484,19 @@ class TramiteController extends Controller
                         ? route('tramites.documento-final.descargar', [$tramite->id, $documentoFinal->id])
                         : null,
                 ],
+                'documentos_finales_anteriores' => $tramite->documentosFinales
+                    ->filter(fn (TramiteDocumentoFinal $documento): bool => ! $documento->activo)
+                    ->map(fn (TramiteDocumentoFinal $documento): array => [
+                        'id' => $documento->id,
+                        'version' => $documento->version,
+                        'numero' => $documento->numero_documento,
+                        'estado' => $documento->estado,
+                        'documento_anterior_id' => $documento->documento_anterior_id,
+                        'fecha_anulacion' => $documento->fecha_anulacion?->toIso8601String(),
+                        'url_descarga' => in_array($documento->estado, ['anulado', 'sustituido'], true)
+                            ? route('tramites.documento-final.descargar', [$tramite->id, $documento->id])
+                            : null,
+                    ])->values()->all(),
                 'asignacion_actual' => $asignacionActual === null ? null : [
                     'id' => $asignacionActual->id,
                     'destino' => $asignacionActual->destino,
@@ -609,8 +650,31 @@ class TramiteController extends Controller
     {
         return [
             'catalogos' => [
-                'clasificaciones' => config('tramites.clasificaciones'),
-                'tipos_documento' => config('tramites.tipos_documento'),
+                'clasificaciones' => TramiteClassificationCatalog::activeLabels(),
+                'tipos_documento' => TramiteTypeCatalog::activeByClassification(),
+                'formatos_salida' => DB::table('tipos_documento_salida')->where('activo', true)
+                    ->orderBy('orden')->pluck('nombre', 'codigo')->all(),
+                'modalidades_documento' => DB::table('modalidades_documento')->where('activo', true)
+                    ->where('tipo_documento_salida', 'memorando')->orderBy('orden')->pluck('nombre', 'codigo')->all(),
+                'formatos_sugeridos' => DB::table('tipos_tramite')->where('activo', true)
+                    ->whereNotNull('tipo_documento_salida_sugerido')
+                    ->pluck('tipo_documento_salida_sugerido', 'codigo')->all(),
+                'requisitos_tipo' => DB::table('tipos_tramite')->where('activo', true)
+                    ->get(['codigo', 'requiere_personas_relacionadas', 'requiere_destinatarios_multiples', 'requiere_documento_original'])
+                    ->mapWithKeys(fn (object $tipo): array => [$tipo->codigo => [
+                        'personas_relacionadas' => (bool) $tipo->requiere_personas_relacionadas,
+                        'destinatarios_multiples' => (bool) $tipo->requiere_destinatarios_multiples,
+                        'documento_original' => (bool) $tipo->requiere_documento_original,
+                    ]])->all(),
+                'tipos_relacion' => [
+                    'interesado' => 'Interesado',
+                    'solicitante' => 'Solicitante',
+                    'personal_autorizado' => 'Personal autorizado',
+                    'participante' => 'Participante',
+                    'personal_externo' => 'Personal externo',
+                    'persona_mencionada' => 'Persona mencionada',
+                    'otro' => 'Otro',
+                ],
                 'destinos' => config('tramites.destinos'),
                 'prioridades' => config('tramites.prioridades'),
             ],
@@ -627,6 +691,67 @@ class TramiteController extends Controller
                 ->get(['id', 'nombre'])
                 ->map(fn (ProgramaEstudio $programa): array => ['id' => $programa->id, 'nombre' => $programa->nombre])
                 ->all(),
+            'cargos_institucionales' => DB::table('cargos_institucionales')->where('activo', true)
+                ->orderBy('nombre')->get(['id', 'nombre'])->all(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $datos
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function extractReceptionLists(array &$datos): array
+    {
+        $listas = [];
+        foreach (['personas_relacionadas', 'destinatarios', 'personas_mencionadas'] as $nombre) {
+            $listas[$nombre] = $datos[$nombre] ?? [];
+            unset($datos[$nombre]);
+        }
+
+        return $listas;
+    }
+
+    /**
+     * @param  array<string, array<int, array<string, mixed>>>  $listas
+     */
+    private function saveReceptionLists(Tramite $tramite, array $listas, bool $replace): void
+    {
+        foreach ([
+            'personas_relacionadas' => 'personas_relacionadas_expediente',
+            'destinatarios' => 'documento_destinatarios',
+            'personas_mencionadas' => 'documento_personas_mencionadas',
+        ] as $nombre => $tabla) {
+            if ($replace) {
+                DB::table($tabla)->where('tramite_id', $tramite->id)->where('activo', true)
+                    ->update(['activo' => false]);
+            }
+            foreach ($listas[$nombre] as $index => $fila) {
+                DB::table($tabla)->insert([
+                    ...$fila,
+                    'tramite_id' => $tramite->id,
+                    'orden' => $index + 1,
+                    'activo' => true,
+                    'created_at' => now(),
+                    ...($nombre === 'destinatarios' ? ['es_destinatario_principal' => $index === 0] : []),
+                ]);
+            }
+        }
+    }
+
+    /** @return array<string, array<int, object>> */
+    private function receptionLists(Tramite $tramite): array
+    {
+        return [
+            'personas_relacionadas' => DB::table('personas_relacionadas_expediente')->where('tramite_id', $tramite->id)
+                ->where('activo', true)->orderBy('orden')->get(['id', 'nombres', 'apellidos', 'dni', 'cargo_funcion', 'tipo_relacion'])->all(),
+            'destinatarios' => DB::table('documento_destinatarios as destinatario')
+                ->leftJoin('cargos_institucionales as cargo', 'cargo.id', '=', 'destinatario.cargo_institucional_id')
+                ->where('destinatario.tramite_id', $tramite->id)
+                ->where('destinatario.activo', true)->orderBy('destinatario.orden')
+                ->get(['destinatario.id', 'destinatario.nombres', 'destinatario.apellidos', 'destinatario.cargo_institucional_id',
+                    'destinatario.cargo_texto', 'destinatario.correo_institucional', 'cargo.nombre as cargo_catalogo'])->all(),
+            'personas_mencionadas' => DB::table('documento_personas_mencionadas')->where('tramite_id', $tramite->id)
+                ->where('activo', true)->orderBy('orden')->get(['id', 'nombres', 'apellidos', 'dni', 'cargo_funcion', 'descripcion'])->all(),
         ];
     }
 

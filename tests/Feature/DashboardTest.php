@@ -3,11 +3,13 @@
 use App\Models\ProgramaEstudio;
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
+use App\Models\TramiteCierre;
 use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEntrega;
 use App\Models\TramiteEvento;
 use App\Models\TramiteMedioEntrega;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -50,6 +52,7 @@ test('dashboard scopes student metrics and activity to owned expedientes without
         ->where('role', 'estudiante')
         ->where('summary.total', 1)
         ->where('summary.cerrados', 0)
+        ->where('notificationUnreadCount', 1)
         ->where('states.0.codigo', 'observado')
         ->has('activity', 1)
         ->where('activity.0.codigo', 'TRM-OWN-001')
@@ -58,6 +61,11 @@ test('dashboard scopes student metrics and activity to owned expedientes without
         ->missing('activity.0.usuario_id')
         ->missing('activity.0.descripcion'));
     expect($response->getContent())->not->toContain('TRM-FOREIGN-001', 'Comentario interno que no debe publicarse.', 'Actividad ajena.');
+
+    $this->actingAs($other)->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('notificationUnreadCount', 1)
+            ->where('summary.total', 1));
 
     $student->forceFill(['activo' => false])->save();
     $this->actingAs($student)->get(route('dashboard'))->assertForbidden();
@@ -126,6 +134,110 @@ test('dashboard filters metrics and rejects unknown states', function () {
         ->assertOk()->assertInertia(fn (Assert $page) => $page->where('summary.total', 2));
     $this->get(route('dashboard', ['desde' => now()->toDateString(), 'hasta' => now()->subDay()->toDateString()]))
         ->assertSessionHasErrors('hasta');
+});
+
+test('dashboard filters by saved program and calculates referential deadlines and attended hours within role scope', function () {
+    Carbon::setTestNow('2026-09-29 12:00:00');
+
+    try {
+        $administrator = User::factory()->create(['rol' => 'administrador']);
+        $student = User::factory()->create(['rol' => 'estudiante']);
+        $program = ProgramaEstudio::factory()->create(['nombre' => 'Programa visible']);
+        $otherProgram = ProgramaEstudio::factory()->create(['nombre' => 'Programa ajeno']);
+        Tramite::factory()->create([
+            'programa_estudio_id' => $program->id,
+            'estado' => 'digitalizado',
+            'fecha_llegada_oficina' => '2026-09-01 09:00:00',
+            'fecha_recepcion' => '2026-09-01',
+        ]);
+        Tramite::factory()->create([
+            'programa_estudio_id' => $program->id,
+            'propietario_id' => $student->id,
+            'estado' => 'digitalizado',
+            'fecha_llegada_oficina' => '2026-09-15 09:00:00',
+            'fecha_recepcion' => '2026-09-15',
+        ]);
+        $attended = Tramite::factory()->create([
+            'programa_estudio_id' => $program->id,
+            'estado' => 'entregado',
+            'fecha_llegada_oficina' => '2026-09-01 09:00:00',
+            'fecha_recepcion' => '2026-09-01',
+        ]);
+        $closed = Tramite::factory()->create([
+            'programa_estudio_id' => $program->id,
+            'estado' => 'cerrado',
+            'fecha_llegada_oficina' => '2026-09-01 09:00:00',
+            'fecha_recepcion' => '2026-09-01',
+        ]);
+        Tramite::factory()->create([
+            'programa_estudio_id' => $otherProgram->id,
+            'estado' => 'digitalizado',
+            'fecha_llegada_oficina' => '2026-09-01 09:00:00',
+            'fecha_recepcion' => '2026-09-01',
+        ]);
+        $document = TramiteDocumentoFinal::factory()->create(['tramite_id' => $attended->id, 'estado' => 'emitido']);
+        $medium = TramiteMedioEntrega::query()->create([
+            'codigo' => 'presencial-indicador', 'nombre' => 'Presencial', 'tipo' => 'presencial', 'activo' => true,
+        ]);
+        TramiteEntrega::query()->create([
+            'tramite_id' => $attended->id,
+            'documento_final_id' => $document->id,
+            'medio_entrega_id' => $medium->id,
+            'receptor_nombre' => 'Persona de prueba',
+            'receptor_tipo' => 'estudiante',
+            'fecha_entrega' => '2026-09-03 09:00:00',
+            'codigo_confirmacion' => 'DASH-PLAZO-001',
+            'activa' => true,
+        ]);
+        $closedDocument = TramiteDocumentoFinal::factory()->create(['tramite_id' => $closed->id, 'estado' => 'emitido']);
+        $inactiveDelivery = TramiteEntrega::query()->create([
+            'tramite_id' => $closed->id,
+            'documento_final_id' => $closedDocument->id,
+            'medio_entrega_id' => $medium->id,
+            'receptor_nombre' => 'Persona de prueba',
+            'receptor_tipo' => 'estudiante',
+            'fecha_entrega' => '2026-09-03 09:00:00',
+            'codigo_confirmacion' => 'DASH-PLAZO-002',
+            'activa' => false,
+        ]);
+        TramiteCierre::query()->create([
+            'tramite_id' => $closed->id,
+            'entrega_id' => $inactiveDelivery->id,
+            'resumen' => 'Atención completada',
+            'fecha_cierre' => '2026-09-04 09:00:00',
+            'activo' => true,
+        ]);
+
+        $this->actingAs($administrator)->get(route('dashboard', ['programa' => $program->id]))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('filters.programa', (string) $program->id)
+            ->where('summary.total', 4)
+            ->where('summary.proximos', 1)
+            ->where('summary.vencidos', 1)
+            ->where('summary.horas_promedio_atencion', fn (float|int $value): bool => (float) $value === 60.0)
+            ->has('catalogs.programas', 2));
+        $this->get(route('dashboard', ['programa' => $program->id, 'estado' => 'entregado']))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('summary.total', 1)
+            ->where('summary.proximos', 0)
+            ->where('summary.vencidos', 0));
+        $this->get(route('dashboard', ['programa' => 999999]))->assertSessionHasErrors('programa');
+        $this->actingAs($student)->get(route('dashboard', ['programa' => $program->id]))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('summary.total', 1)
+            ->where('summary.proximos', 1)
+            ->where('summary.vencidos', 0)
+            ->where('summary.horas_promedio_atencion', null));
+        $this->get(route('dashboard', ['programa' => $otherProgram->id]))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('summary.total', 0)
+            ->where('summary.vencidos', 0));
+        $otherProgram->update(['activo' => false]);
+        $this->get(route('dashboard', ['programa' => $otherProgram->id]))
+            ->assertSessionHasErrors('programa');
+    } finally {
+        Carbon::setTestNow();
+    }
 });
 
 test('dashboard filters active reviewer and delivery medium without widening role scope', function () {

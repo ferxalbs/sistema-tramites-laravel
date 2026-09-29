@@ -1,6 +1,7 @@
 import { Form, Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Download, FileText, Plus, Send } from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
+import TramiteDocumentoFinalController from '@/actions/App/Http/Controllers/TramiteDocumentoFinalController';
 import TramiteRevisionController from '@/actions/App/Http/Controllers/TramiteRevisionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import InputError from '@/components/input-error';
@@ -70,12 +71,14 @@ type Props = {
         asunto: string;
         introduccion: string | null;
         contenido_principal: string | null;
+        contenido_renderizado: string | null;
         cierre: string | null;
         destinatarios: Recipient[];
         personas_mencionadas: MentionedPerson[];
         adjuntos: Array<{ id: number; nombre: string; categoria: string; version: number }>;
     };
     archivos: Array<{ id: number; nombre: string; categoria: string; version: number; vigente: boolean }>;
+    documentos_finales: Array<{ id: number; numero: string; estado: string; version: number }>;
     revision: {
         puede_iniciar: boolean;
         puede_observar: boolean;
@@ -84,7 +87,7 @@ type Props = {
     };
 };
 
-export default function ReviewerShow({ destino, categorias_observacion, tramite, asignacion, borrador, archivos, revision }: Props) {
+export default function ReviewerShow({ destino, categorias_observacion, tramite, asignacion, borrador, archivos, documentos_finales, revision }: Props) {
     const back = destino === 'docente'
         ? TramiteAsignacionController.docenteIndex()
         : TramiteAsignacionController.oficinaIndex();
@@ -147,6 +150,12 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                 <CardDescription>La ronda conserva la versión revisada. El borrador todavía no tiene numeración oficial.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-5">
+                                {borrador.contenido_renderizado && (
+                                    <section>
+                                        <h3>Vista del borrador revisado</h3>
+                                        <p className="whitespace-pre-wrap">{borrador.contenido_renderizado}</p>
+                                    </section>
+                                )}
                                 <Detail label="Destinatario(s)" value={borrador.destinatarios.map((recipient) => `${recipient.nombres} ${recipient.apellidos ?? ''}${recipient.cargo ? ` · ${recipient.cargo}` : ''}`).join('; ') || 'No registrado'} />
                                 <Detail label="Remitente" value={borrador.remitente ?? 'No registrado'} />
                                 <Detail label="Asunto" value={borrador.asunto} />
@@ -186,6 +195,27 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                 )}
                             </CardContent>
                         </Card>
+
+                        {documentos_finales.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Documentos oficiales revisados</CardTitle>
+                                    <CardDescription>Las versiones anteriores permanecen privadas y conservan su número.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ul className="space-y-2 text-sm">
+                                        {documentos_finales.map((documento) => (
+                                            <li key={documento.id} className="flex flex-wrap items-center justify-between gap-2">
+                                                <span>{documento.numero} · versión {documento.version} · {documento.estado}</span>
+                                                <a href={TramiteDocumentoFinalController.download.url({ tramite: tramite.id, documento: documento.id })} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                                                    <Download data-icon="inline-start" /> Descargar PDF
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {revision.rondas.length > 0 && (
                             <Card>

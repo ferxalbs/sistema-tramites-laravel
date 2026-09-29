@@ -6,7 +6,9 @@ use App\Models\Tramite;
 use App\Models\TramiteEvento;
 use App\Models\TramiteObservacionRevision;
 use App\Models\TramiteRondaRevision;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -70,19 +72,26 @@ class TramiteEstudianteController extends Controller
         $estadosPublicos = config('tramites.estados', []);
         $historial = [];
         $hayRecepcion = false;
+        $firmasSinFirma = DB::table('tramite_firmas')->where('tramite_id', $tramite->id)
+            ->where('no_requiere_firma', true)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
 
-        foreach ($tramite->eventos()->orderBy('created_at')->orderBy('id')->get(['id', 'accion', 'estado_anterior', 'estado_nuevo', 'created_at']) as $evento) {
-            $hito = $hitosPublicos[$evento->accion] ?? null;
+        foreach ($tramite->eventos()->orderBy('created_at')->orderBy('id')->get(['id', 'accion', 'estado_anterior', 'estado_nuevo', 'metadatos', 'created_at']) as $evento) {
+            $accion = (string) $evento->getAttribute('accion');
+            $hito = $hitosPublicos[$accion] ?? null;
+            if ($accion === 'firma_registrada'
+                && in_array((int) ($evento->metadatos['firma_id'] ?? 0), $firmasSinFirma, true)) {
+                $hito = ['Firma no requerida', 'El documento quedó habilitado sin firma física.'];
+            }
             $estado = $evento->estado_nuevo;
 
             if ($hito === null && (! is_string($estado) || ! isset($estadosPublicos[$estado]) || $estado === $evento->estado_anterior)) {
                 continue;
             }
 
-            $hayRecepcion = $hayRecepcion || $evento->accion === 'recepcion';
+            $hayRecepcion = $hayRecepcion || $accion === 'recepcion';
             $titulo = $hito[0] ?? $estadosPublicos[$estado];
             $historial[] = [
-                'estado' => $estado ?? $evento->accion,
+                'estado' => $estado ?? $accion,
                 'label' => $titulo,
                 'descripcion' => $hito[1] ?? 'El expediente pasó a '.$titulo.'.',
                 'fecha' => $evento->created_at?->toIso8601String(),
@@ -92,11 +101,14 @@ class TramiteEstudianteController extends Controller
         }
 
         if (! $hayRecepcion) {
+            $fechaLlegada = $tramite->getRawOriginal('fecha_llegada_oficina');
             $historial[] = [
                 'estado' => 'recibido_oficina',
                 'label' => 'Expediente recibido',
                 'descripcion' => 'La solicitud fue recibida en la oficina.',
-                'fecha' => $tramite->fecha_recepcion->startOfDay()->toIso8601String(),
+                'fecha' => is_string($fechaLlegada)
+                    ? Carbon::parse($fechaLlegada)->toIso8601String()
+                    : $tramite->fecha_recepcion->startOfDay()->toIso8601String(),
                 'orden' => 1,
                 'id' => 0,
             ];
@@ -133,7 +145,6 @@ class TramiteEstudianteController extends Controller
             ],
             'documento_final' => $documentoFinal === null ? null : [
                 'numero' => $documentoFinal->numero_documento,
-                'url_descarga' => route('tramites.documento-final.descargar', [$tramite->id, $documentoFinal->id]),
             ],
             'documentos_recepcion' => $tramite->documentos()->orderBy('id')->get(['id', 'nombre_original', 'categoria', 'version', 'vigente'])
                 ->map(fn ($documento): array => [

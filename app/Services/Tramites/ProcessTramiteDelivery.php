@@ -554,6 +554,8 @@ class ProcessTramiteDelivery
     /** @return array<string, mixed> */
     private function datosInforme(Tramite $tramite, TramiteEntrega $entrega, TramiteCierre $cierre, User $actor): array
     {
+        $classificationLabels = TramiteClassificationCatalog::labels();
+        $typeLabels = TramiteTypeCatalog::labels();
         $documento = TramiteDocumentoFinal::query()->with('rondaRevision.revisor')->findOrFail($entrega->documento_final_id);
         $ronda = $documento->rondaRevision;
         $eventos = TramiteEvento::query()
@@ -566,8 +568,8 @@ class ProcessTramiteDelivery
             'institucion' => (string) config('app.name', 'Sistema de Gestión Documentaria'),
             'codigo_expediente' => $tramite->codigo,
             'documento_oficial' => $documento->numero_documento,
-            'clasificacion' => config('tramites.clasificaciones.'.$tramite->clasificacion, $tramite->clasificacion),
-            'tipo_tramite' => config('tramites.tipos_documento.'.$tramite->clasificacion.'.'.$tramite->tipo_documento, $tramite->tipo_documento),
+            'clasificacion' => $classificationLabels[$tramite->clasificacion] ?? $tramite->clasificacion,
+            'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
             'interesado' => $tramite->propietario?->name ?? $tramite->persona_nombre,
             'recibido_en' => $tramite->fecha_recepcion->toDateString(),
             'revisor' => $ronda?->revisor?->name ?? 'No registrado',

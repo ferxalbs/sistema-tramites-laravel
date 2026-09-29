@@ -3,7 +3,7 @@ import { ArrowLeft, Eye, FilePlus2, Save, Send } from 'lucide-react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,12 +32,24 @@ type Plantilla = {
     modalidad: string | null;
     requiere_firma_fisica: boolean;
     permite_no_firma: boolean;
+    campos: CampoPlantilla[];
+};
+
+type CampoPlantilla = {
+    clave: string;
+    etiqueta: string;
+    tipo: string;
+    obligatorio: boolean;
+    maximo: number;
+    predeterminado: string;
+    ayuda: string | null;
 };
 
 type StaffUser = {
     id: number;
     name: string;
     rol: string;
+    cargo: string;
 };
 
 type Recipient = {
@@ -69,6 +81,7 @@ type ExistingDraft = {
     adjuntos: number[];
     version: number;
     estado: string;
+    campos: Record<string, string>;
 };
 
 type DraftVersion = {
@@ -114,6 +127,7 @@ type DraftForm = {
     confirmar_fecha_anterior: boolean;
     resumen_correccion: string;
     respuestas: Record<number, string>;
+    campos: Record<string, string>;
 };
 
 type Props = {
@@ -149,6 +163,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
         confirmar_fecha_anterior: false,
         resumen_correccion: '',
         respuestas: Object.fromEntries(observaciones.map((observacion) => [observacion.id, observacion.respuesta ?? ''])),
+        campos: borrador?.campos ?? Object.fromEntries((plantillas[0]?.campos ?? []).map((campo) => [campo.clave, campo.predeterminado])),
     });
 
     const plantillaActual = plantillas.find((plantilla) => plantilla.id === form.data.plantilla_id);
@@ -255,14 +270,20 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     value={form.data.plantilla_id}
                                     options={plantillas.map((plantilla) => ({ value: plantilla.id, label: plantilla.nombre }))}
                                     error={form.errors.plantilla_id}
-                                    onValueChange={(value) => form.setData('plantilla_id', value ?? 0)}
+                                    onValueChange={(value) => {
+                                        form.setData((previous) => ({
+                                            ...previous,
+                                            plantilla_id: value ?? 0,
+                                            campos: Object.fromEntries((plantillas.find((item) => item.id === value)?.campos ?? []).map((campo) => [campo.clave, campo.predeterminado])),
+                                        }));
+                                    }}
                                     disabled={modo === 'corregir'}
                                 />
                                 <FormSelect
                                     id="remitente_id"
                                     label="Remitente"
                                     value={form.data.remitente_id ?? 0}
-                                    options={usuarios.map((usuario) => ({ value: usuario.id, label: `${usuario.name} · ${usuario.rol}` }))}
+                                    options={usuarios.map((usuario) => ({ value: usuario.id, label: `${usuario.name} · ${usuario.cargo}` }))}
                                     error={form.errors.remitente_id}
                                     onValueChange={(value) => form.setData('remitente_id', value || null)}
                                 />
@@ -270,7 +291,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     id="firmante_id"
                                     label="Firmante propuesto"
                                     value={form.data.firmante_id ?? 0}
-                                    options={usuarios.map((usuario) => ({ value: usuario.id, label: `${usuario.name} · ${usuario.rol}` }))}
+                                    options={usuarios.map((usuario) => ({ value: usuario.id, label: `${usuario.name} · ${usuario.cargo}` }))}
                                     error={form.errors.firmante_id}
                                     onValueChange={(value) => form.setData('firmante_id', value || null)}
                                 />
@@ -374,6 +395,12 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardDescription>La vista previa es provisional y no incluye firma ni número oficial.</CardDescription>
                             </CardHeader>
                             <CardContent className="grid gap-5">
+                                <EditableTemplateFields
+                                    campos={plantillaActual?.campos ?? []}
+                                    valores={form.data.campos}
+                                    errores={erroresRespuesta}
+                                    onChange={(clave, valor) => form.setData('campos', { ...form.data.campos, [clave]: valor })}
+                                />
                                 <Field id="introduccion" label="Introducción" error={form.errors.introduccion}>
                                     <textarea
                                         id="introduccion"
@@ -565,6 +592,9 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                                 <time className="shrink-0 text-xs text-muted-foreground">
                                                     {version.created_at ? formatDateTime(version.created_at) : ''}
                                                 </time>
+                                                <Link className={buttonVariants({ variant: 'outline', size: 'sm' })} href={TramiteBorradorController.show({ tramite: tramite.id, borrador: version.id })}>
+                                                    Vista previa
+                                                </Link>
                                             </li>
                                         ))}
                                     </ol>
@@ -576,6 +606,37 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
             </main>
         </>
     );
+}
+
+function EditableTemplateFields({ campos, valores, errores, onChange }: {
+    campos: CampoPlantilla[];
+    valores: Record<string, string>;
+    errores: Record<string, string | undefined>;
+    onChange: (clave: string, valor: string) => void;
+}) {
+    return campos.map((campo) => (
+        <Field key={campo.clave} id={`campo-${campo.clave}`} label={campo.etiqueta} error={errores[`campos.${campo.clave}`]}>
+            {['texto_largo', 'texto_enriquecido'].includes(campo.tipo) ? (
+                <textarea
+                    id={`campo-${campo.clave}`}
+                    rows={3}
+                    maxLength={campo.maximo}
+                    className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                    value={valores[campo.clave] ?? ''}
+                    onChange={(event) => onChange(campo.clave, event.target.value)}
+                />
+            ) : (
+                <Input
+                    id={`campo-${campo.clave}`}
+                    type={campo.tipo === 'fecha' ? 'date' : campo.tipo === 'numero' ? 'number' : 'text'}
+                    maxLength={campo.maximo}
+                    value={valores[campo.clave] ?? ''}
+                    onChange={(event) => onChange(campo.clave, event.target.value)}
+                />
+            )}
+            {campo.ayuda && <p className="text-xs text-muted-foreground">{campo.ayuda}</p>}
+        </Field>
+    ));
 }
 
 function Field({

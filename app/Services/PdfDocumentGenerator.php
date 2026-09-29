@@ -2,7 +2,11 @@
 
 namespace App\Services;
 
+use BaconQrCode\Common\ErrorCorrectionLevel;
+use BaconQrCode\Encoder\ByteMatrix;
+use BaconQrCode\Encoder\Encoder;
 use RuntimeException;
+use Throwable;
 
 class PdfDocumentGenerator
 {
@@ -141,10 +145,11 @@ class PdfDocumentGenerator
         $this->agregarParrafo($lineas, $documento['firmante'], 10, true, 2);
         $this->agregarParrafo($lineas, 'Versión revisada del borrador: '.$documento['version_borrador'], 8, false, 0);
 
-        $paginas = $this->distribuirEnPaginas($lineas, $documento['codigo_expediente'], $documento['codigo_verificacion']);
+        $qr = $this->matrizVerificacion($documento['codigo_verificacion']);
+        $paginas = $this->distribuirEnPaginas($lineas, $documento['codigo_expediente'], $documento['codigo_verificacion'], $qr !== null);
 
         return [
-            'bytes' => $this->construirPdf($paginas, $documento['numero'], $documento['institucion']),
+            'bytes' => $this->construirPdf($paginas, $documento['numero'], $documento['institucion'], $qr),
             'paginas' => count($paginas),
         ];
     }
@@ -239,7 +244,7 @@ class PdfDocumentGenerator
      * @param  list<array{text: string, size: int, bold: bool, gap: int, center: bool}>  $lineas
      * @return list<list<array{text: string, size: int, bold: bool, y: float, center: bool}>>
      */
-    private function distribuirEnPaginas(array $lineas, string $expediente, string $codigo): array
+    private function distribuirEnPaginas(array $lineas, string $expediente, string $codigo, bool $conQr = false): array
     {
         $paginas = [[]];
         $paginaActual = 0;
@@ -254,7 +259,7 @@ class PdfDocumentGenerator
 
             $alto = $linea['size'] + 5;
 
-            if ($y - $alto < 65) {
+            if ($y - $alto < ($conQr ? 155 : 65)) {
                 $paginas[] = [];
                 $paginaActual++;
                 $y = 786.0;
@@ -287,7 +292,7 @@ class PdfDocumentGenerator
     /**
      * @param  list<list<array{text: string, size: int, bold: bool, y: float, center: bool}>>  $paginas
      */
-    private function construirPdf(array $paginas, string $numero, string $institucion): string
+    private function construirPdf(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr = null): string
     {
         $objetos = [
             1 => '<< /Type /Catalog /Pages 2 0 R >>',
@@ -300,7 +305,7 @@ class PdfDocumentGenerator
             $idPagina = 5 + ($indice * 2);
             $idContenido = $idPagina + 1;
             $idsPaginas[] = $idPagina.' 0 R';
-            $contenido = $this->contenidoPagina($lineas);
+            $contenido = $this->contenidoPagina($lineas, $qr);
             $objetos[$idPagina] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '.$idContenido.' 0 R >>';
             $objetos[$idContenido] = '<< /Length '.strlen($contenido)." >>\nstream\n".$contenido."\nendstream";
         }
@@ -332,7 +337,7 @@ class PdfDocumentGenerator
     /**
      * @param  list<array{text: string, size: int, bold: bool, y: float, center: bool}>  $lineas
      */
-    private function contenidoPagina(array $lineas): string
+    private function contenidoPagina(array $lineas, ?ByteMatrix $qr = null): string
     {
         $contenido = "0.18 0.18 0.18 rg\n";
 
@@ -350,7 +355,60 @@ class PdfDocumentGenerator
 
         $contenido .= "q 0.65 0.65 0.65 RG 0.5 w 50 54 m 545 54 l S Q\n";
 
+        if ($qr !== null) {
+            $contenido .= $this->contenidoQr($qr);
+        }
+
         return $contenido;
+    }
+
+    private function matrizVerificacion(string $codigo): ?ByteMatrix
+    {
+        $base = trim((string) config('app.url'));
+        $partes = parse_url($base);
+
+        if (preg_match('/^[A-F0-9]{4}(?:-[A-F0-9]{4}){3}$/', $codigo) !== 1
+            || ! is_array($partes)
+            || filter_var($base, FILTER_VALIDATE_URL) === false
+            || ! in_array(strtolower((string) ($partes['scheme'] ?? '')), ['http', 'https'], true)
+            || ! is_string($partes['host'] ?? null)
+            || isset($partes['user'])
+            || isset($partes['pass'])
+            || isset($partes['query'])
+            || isset($partes['fragment'])
+            || (app()->isProduction() && in_array(strtolower($partes['host']), ['localhost', '127.0.0.1', '::1'], true))) {
+            return null;
+        }
+
+        try {
+            $url = rtrim($base, '/').route('documentos.verificar', ['codigo' => $codigo], false);
+
+            return Encoder::encode($url, ErrorCorrectionLevel::M(), 'UTF-8')->getMatrix();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function contenidoQr(ByteMatrix $qr): string
+    {
+        $dimension = $qr->getWidth();
+        $modulo = 82 / ($dimension + 8);
+        $contenido = "q 1 1 1 rg 463 62 82 82 re f 0 0 0 rg\n";
+
+        for ($fila = 0; $fila < $dimension; $fila++) {
+            for ($columna = 0; $columna < $dimension; $columna++) {
+                if ($qr->get($columna, $fila) !== 1) {
+                    continue;
+                }
+
+                $x = 463 + (($columna + 4) * $modulo);
+                $y = 62 + (($dimension + 3 - $fila) * $modulo);
+                $contenido .= number_format($x, 3, '.', '').' '.number_format($y, 3, '.', '').' '
+                    .number_format($modulo, 3, '.', '').' '.number_format($modulo, 3, '.', '')." re f\n";
+            }
+        }
+
+        return $contenido."Q\n";
     }
 
     private function pdfTexto(string $texto): string

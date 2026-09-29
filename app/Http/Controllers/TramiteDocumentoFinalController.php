@@ -11,7 +11,9 @@ use App\Models\User;
 use App\Services\Tramites\GenerateTramiteFinalDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use RuntimeException;
@@ -75,17 +77,100 @@ class TramiteDocumentoFinalController extends Controller
             ->with('success', 'Se emitió el documento oficial '.$documento->numero_documento.'.');
     }
 
+    public function annul(Request $request, Tramite $tramite, TramiteDocumentoFinal $documento): RedirectResponse
+    {
+        abort_unless((int) $documento->tramite_id === (int) $tramite->id, 404);
+        $datos = $request->validate([
+            'accion' => ['required', 'in:anular,sustituir'],
+            'motivo' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+        $motivo = trim($datos['motivo']);
+
+        if (mb_strlen($motivo) < 10) {
+            throw ValidationException::withMessages(['motivo' => 'El motivo debe tener al menos diez caracteres.']);
+        }
+
+        $estadoDocumento = $datos['accion'] === 'sustituir' ? 'sustituido' : 'anulado';
+
+        DB::transaction(function () use ($request, $tramite, $documento, $motivo, $estadoDocumento): void {
+            $registro = Tramite::query()->findOrFail($tramite->id);
+            $actual = TramiteDocumentoFinal::query()->findOrFail($documento->id);
+            $decision = $actual->rondaRevision()->value('estado');
+
+            abort_unless($registro->estado === 'documento_final_generado'
+                && (int) $actual->tramite_id === (int) $registro->id
+                && $actual->estado === 'emitido'
+                && $actual->activo
+                && in_array($decision, ['aprobado', 'rechazado'], true), 409);
+
+            $actualizados = DB::table('tramite_documentos_finales')
+                ->where('id', $actual->id)
+                ->where('tramite_id', $registro->id)
+                ->where('estado', 'emitido')
+                ->where('activo', true)
+                ->update([
+                    'estado' => $estadoDocumento,
+                    'activo' => false,
+                    'motivo_anulacion' => $motivo,
+                    'fecha_anulacion' => now(),
+                    'anulado_por' => $request->user()->id,
+                    'updated_at' => now(),
+                ]);
+            abort_unless($actualizados === 1, 409);
+
+            $actualizados = DB::table('tramite_numeraciones_documentales')
+                ->where('id', $actual->numeracion_id)
+                ->where('tramite_id', $registro->id)
+                ->where('estado', 'emitida')
+                ->update(['estado' => 'anulada', 'updated_at' => now()]);
+            abort_unless($actualizados === 1, 409);
+
+            $actualizados = DB::table('tramites')
+                ->where('id', $registro->id)
+                ->where('estado', 'documento_final_generado')
+                ->update(['estado' => $decision, 'updated_at' => now()]);
+            abort_unless($actualizados === 1, 409);
+
+            TramiteEvento::query()->create([
+                'tramite_id' => $registro->id,
+                'usuario_id' => $request->user()->id,
+                'accion' => $estadoDocumento === 'sustituido' ? 'sustitucion_autorizada' : 'documento_final_anulado',
+                'descripcion' => $estadoDocumento === 'sustituido'
+                    ? 'Se autorizó la sustitución del documento oficial '.$actual->numero_documento.'.'
+                    : 'Se anuló el documento oficial '.$actual->numero_documento.'.',
+                'estado_anterior' => 'documento_final_generado',
+                'estado_nuevo' => $decision,
+                'metadatos' => [
+                    'documento_id' => $actual->id,
+                    'numeracion_id' => $actual->numeracion_id,
+                    'motivo' => $motivo,
+                ],
+            ]);
+        });
+
+        return redirect()->route('tramites.show', $tramite)
+            ->with('success', 'El documento oficial quedó '.$estadoDocumento.'; su número no se reutilizará.');
+    }
+
     public function download(Request $request, Tramite $tramite, TramiteDocumentoFinal $documento): BinaryFileResponse
     {
         abort_unless((int) $documento->tramite_id === (int) $tramite->id, 404);
-        abort_unless($documento->estado === 'emitido' && $documento->activo && $documento->disco === 'local', 404);
+        $vigente = $documento->estado === 'emitido' && $documento->activo;
+        $historico = in_array($documento->estado, ['anulado', 'sustituido'], true) && ! $documento->activo;
+        abort_unless(($vigente || $historico) && $documento->disco === 'local', 404);
 
         $actor = $request->user();
-        $authorized = in_array($actor->rol, ['asistente', 'administrador'], true)
-            || ($actor->rol === 'estudiante'
-                && (int) $tramite->propietario_id === (int) $actor->id)
-            || ($actor->rol === 'docente'
-                && (int) $documento->rondaRevision()->value('revisor_id') === (int) $actor->id);
+        $personal = in_array($actor->rol, ['asistente', 'administrador'], true);
+        $revisorAsignado = $actor->rol === 'docente' && DB::table('tramite_rondas_revision as rondas')
+            ->join('tramite_asignaciones as asignaciones', 'asignaciones.id', '=', 'rondas.asignacion_id')
+            ->where('rondas.id', $documento->ronda_revision_id)
+            ->where('rondas.tramite_id', $tramite->id)
+            ->where('rondas.revisor_id', $actor->id)
+            ->where('asignaciones.tramite_id', $tramite->id)
+            ->where('asignaciones.revisor_id', $actor->id)
+            ->where('asignaciones.destino', 'docente')
+            ->exists();
+        $authorized = $personal || $revisorAsignado;
 
         if (! $authorized) {
             TramiteEvento::query()->create([

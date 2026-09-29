@@ -9,16 +9,38 @@ use App\Models\TramiteAsignacion;
 use App\Models\TramiteBorrador;
 use App\Models\TramitePlantilla;
 use App\Models\TramiteRondaRevision;
-use App\Models\User;
 use App\Services\Tramites\PrepareTramiteForAssignment;
 use App\Services\Tramites\SaveTramiteDraft;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 class TramiteBorradorController extends Controller
 {
+    public function show(Tramite $tramite, TramiteBorrador $borrador): InertiaResponse
+    {
+        abort_unless($borrador->tramite_id === $tramite->id, 404);
+
+        $borrador->load(['plantilla:id,nombre', 'creador:id,name']);
+
+        return Inertia::render('tramites/borrador-preview', [
+            'tramite' => ['id' => $tramite->id, 'codigo' => $tramite->codigo],
+            'borrador' => [
+                'id' => $borrador->id,
+                'version' => $borrador->version,
+                'estado' => $borrador->estado,
+                'actual' => $borrador->es_actual,
+                'plantilla' => $borrador->plantilla->nombre,
+                'version_plantilla' => $borrador->version_plantilla,
+                'creador' => $borrador->creador?->name,
+                'created_at' => $borrador->created_at?->toIso8601String(),
+                'contenido' => $borrador->contenido_renderizado,
+            ],
+        ]);
+    }
+
     public function create(Tramite $tramite): InertiaResponse
     {
         abort_unless(in_array($tramite->estado, ['digitalizado', 'borrador_preparado'], true), 409);
@@ -37,6 +59,7 @@ class TramiteBorradorController extends Controller
             'plantillas' => TramitePlantilla::query()
                 ->where('estado', 'publicada')
                 ->where('activa', true)
+                ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
                 ->orderBy('nombre')
                 ->get(['id', 'codigo', 'nombre', 'descripcion', 'modalidad', 'requiere_firma_fisica', 'permite_no_firma'])
                 ->map(fn (TramitePlantilla $plantilla): array => [
@@ -47,17 +70,9 @@ class TramiteBorradorController extends Controller
                     'modalidad' => $plantilla->modalidad,
                     'requiere_firma_fisica' => $plantilla->requiere_firma_fisica,
                     'permite_no_firma' => $plantilla->permite_no_firma,
+                    'campos' => $this->camposEditables($plantilla),
                 ])->all(),
-            'usuarios' => User::query()
-                ->where('activo', true)
-                ->whereIn('rol', ['docente', 'administrador'])
-                ->orderBy('name')
-                ->get(['id', 'name', 'rol'])
-                ->map(fn (User $user): array => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'rol' => $user->rol,
-                ])->all(),
+            'usuarios' => $this->usuariosAutorizados(),
             'borrador' => $borrador === null ? null : [
                 'plantilla_id' => $borrador->plantilla_id,
                 'remitente_id' => $borrador->remitente_id,
@@ -73,6 +88,7 @@ class TramiteBorradorController extends Controller
                 'adjuntos' => collect($borrador->adjuntos)->pluck('id')->all(),
                 'version' => $borrador->version,
                 'estado' => $borrador->estado,
+                'campos' => $this->valoresCampos($borrador),
             ],
             'archivos' => $tramite->documentos()
                 ->where('vigente', true)
@@ -131,6 +147,7 @@ class TramiteBorradorController extends Controller
             'modalidad' => $plantilla->modalidad,
             'requiere_firma_fisica' => $plantilla->requiere_firma_fisica,
             'permite_no_firma' => $plantilla->permite_no_firma,
+            'campos' => $this->camposEditables($plantilla),
         ]];
 
         return Inertia::render('tramites/borrador', [
@@ -143,13 +160,7 @@ class TramiteBorradorController extends Controller
             ],
             'hoy' => now()->toDateString(),
             'plantillas' => $plantillas,
-            'usuarios' => User::query()
-                ->where('activo', true)
-                ->whereIn('rol', ['docente', 'administrador'])
-                ->orderBy('name')
-                ->get(['id', 'name', 'rol'])
-                ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name, 'rol' => $user->rol])
-                ->all(),
+            'usuarios' => $this->usuariosAutorizados(),
             'borrador' => [
                 'plantilla_id' => $borrador->plantilla_id,
                 'remitente_id' => $borrador->remitente_id,
@@ -165,6 +176,7 @@ class TramiteBorradorController extends Controller
                 'adjuntos' => collect($borrador->adjuntos)->pluck('id')->all(),
                 'version' => $borrador->version,
                 'estado' => $borrador->estado,
+                'campos' => $this->valoresCampos($borrador),
             ],
             'archivos' => $tramite->documentos()
                 ->where('vigente', true)
@@ -224,5 +236,54 @@ class TramiteBorradorController extends Controller
 
         return redirect()->route('tramites.show', $tramite)
             ->with('success', 'El trámite quedó pendiente de asignación.');
+    }
+
+    /**
+     * @return array<int, array{clave: string, etiqueta: string, tipo: string, obligatorio: bool, maximo: int, predeterminado: string, ayuda: ?string}>
+     */
+    private function camposEditables(TramitePlantilla $plantilla): array
+    {
+        return DB::table('tramite_plantilla_campos')->where('plantilla_id', $plantilla->id)
+            ->where('activo', true)->whereNull('fuente_automatica')
+            ->whereNotIn('clave_variable', ['ASUNTO', 'LUGAR', 'FECHA', 'INTRODUCCION', 'CONTENIDO_PRINCIPAL', 'CIERRE'])
+            ->orderBy('orden')->get()
+            ->map(fn ($campo): array => [
+                'clave' => $campo->clave_variable,
+                'etiqueta' => $campo->etiqueta,
+                'tipo' => $campo->tipo_campo,
+                'obligatorio' => (bool) $campo->obligatorio,
+                'maximo' => (int) ($campo->longitud_maxima ?? 60000),
+                'predeterminado' => (string) ($campo->valor_predeterminado ?? ''),
+                'ayuda' => $campo->texto_ayuda,
+            ])->all();
+    }
+
+    /** @return array<string, string> */
+    private function valoresCampos(TramiteBorrador $borrador): array
+    {
+        return DB::table('tramite_borrador_valores as valor')
+            ->join('tramite_plantilla_campos as campo', 'campo.id', '=', 'valor.campo_id')
+            ->where('valor.borrador_id', $borrador->id)
+            ->whereNull('campo.fuente_automatica')
+            ->whereNotIn('campo.clave_variable', ['ASUNTO', 'LUGAR', 'FECHA', 'INTRODUCCION', 'CONTENIDO_PRINCIPAL', 'CIERRE'])
+            ->pluck('valor.valor', 'campo.clave_variable')->all();
+    }
+
+    /** @return array<int, array{id: int, name: string, rol: string, cargo: string}> */
+    private function usuariosAutorizados(): array
+    {
+        return DB::table('users as usuario')
+            ->join('cargos_institucionales as cargo', 'cargo.id', '=', 'usuario.cargo_institucional_id')
+            ->where('usuario.activo', true)
+            ->where('usuario.estado_cuenta', 'activo')
+            ->whereIn('usuario.rol', ['docente', 'administrador'])
+            ->orderBy('usuario.name')
+            ->get(['usuario.id', 'usuario.name', 'usuario.rol', 'cargo.nombre as cargo'])
+            ->map(fn ($usuario): array => [
+                'id' => (int) $usuario->id,
+                'name' => $usuario->name,
+                'rol' => $usuario->rol,
+                'cargo' => $usuario->cargo,
+            ])->all();
     }
 }

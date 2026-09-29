@@ -30,7 +30,7 @@ type Props = {
         seccion: string | null;
         obligatoria: boolean;
     }>;
-    documento_final: { numero: string; url_descarga: string } | null;
+    documento_final: { numero: string } | null;
     documentos_recepcion: Array<{ id: number; nombre: string; categoria: string; version: number; vigente: boolean }>;
     entrega: {
         medio: string;
@@ -106,12 +106,6 @@ export default function EstudianteTramiteShow({ tramite, comentario_publico, obs
                             <CardTitle>Documento oficial</CardTitle>
                             <CardDescription>Número {documento_final.numero}</CardDescription>
                         </CardHeader>
-                        <CardContent className="flex justify-end">
-                            <a href={documento_final.url_descarga} className={buttonVariants({ variant: 'outline' })}>
-                                <Download data-icon="inline-start" />
-                                Descargar documento oficial
-                            </a>
-                        </CardContent>
                     </Card>
                 )}
 

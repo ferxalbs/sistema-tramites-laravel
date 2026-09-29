@@ -119,6 +119,7 @@ test('signed public verification keeps a registered student pending until admini
     $url = URL::temporarySignedRoute('registration.verify', now()->addHours(24), [
         'id' => $student->id,
         'hash' => sha1($student->email),
+        'version' => $student->fresh()->verification_version,
     ]);
 
     $this->get($url)->assertRedirect(route('login'));
@@ -141,14 +142,18 @@ test('public verification rejects altered or expired signed links', function () 
     Event::fake([Verified::class]);
 
     $wrongHash = URL::temporarySignedRoute('registration.verify', now()->addHour(), [
-        'id' => $student->id, 'hash' => sha1('wrong@example.com'),
+        'id' => $student->id, 'hash' => sha1('wrong@example.com'), 'version' => $student->fresh()->verification_version,
     ]);
     $expired = URL::temporarySignedRoute('registration.verify', now()->subMinute(), [
+        'id' => $student->id, 'hash' => sha1($student->email), 'version' => $student->fresh()->verification_version,
+    ]);
+    $missingVersion = URL::temporarySignedRoute('registration.verify', now()->addHour(), [
         'id' => $student->id, 'hash' => sha1($student->email),
     ]);
 
     $this->get($wrongHash)->assertForbidden();
     $this->get($expired)->assertForbidden();
+    $this->get($missingVersion)->assertForbidden();
     expect($student->fresh()->hasVerifiedEmail())->toBeFalse();
     Event::assertNotDispatched(Verified::class);
 });

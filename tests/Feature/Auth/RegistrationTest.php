@@ -36,6 +36,7 @@ test('new users can register', function () {
         'password_confirmation' => 'ClaveNueva2026',
         'rol' => 'administrador',
         'activo' => true,
+        'cuenta_provisional' => true,
     ]);
 
     $this->assertGuest();
@@ -44,6 +45,7 @@ test('new users can register', function () {
     expect($user->rol)->toBe('estudiante')
         ->and($user->activo)->toBeFalse()
         ->and($user->estado_cuenta)->toBe('pendiente')
+        ->and($user->cuenta_provisional)->toBeFalse()
         ->and($user->hasVerifiedEmail())->toBeFalse()
         ->and($user->dni)->toBe('12345678')
         ->and($user->perfilEstudiante->programa_estudio_id)->toBe($program->id)

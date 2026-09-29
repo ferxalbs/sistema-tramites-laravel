@@ -69,6 +69,10 @@ class UserAccountController extends Controller
                 'rol' => $selected->rol,
                 'estado' => $selected->estado_cuenta,
                 'motivo' => $selected->motivo_inactivacion,
+                'teacher_request' => DB::table('teacher_access_requests as requests')
+                    ->join('cargos_institucionales as cargos', 'cargos.id', '=', 'requests.cargo_institucional_id')
+                    ->where('requests.user_id', $selected->id)
+                    ->first(['cargos.nombre as cargo', 'requests.motivo']),
                 'events' => DB::table('user_account_events')
                     ->leftJoin('users as actors', 'actors.id', '=', 'user_account_events.actor_id')
                     ->where('user_account_events.user_id', $selected->id)
@@ -87,6 +91,7 @@ class UserAccountController extends Controller
         return Inertia::render('usuarios-form', [
             'user' => null,
             'programas' => ProgramaEstudio::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
+            'cargos' => DB::table('cargos_institucionales')->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]);
     }
@@ -109,9 +114,11 @@ class UserAccountController extends Controller
                 'correo_alternativo' => $data['correo_alternativo'] ?? null,
                 'password' => $data['password'],
                 'rol' => $data['rol'],
+                'cargo_institucional_id' => $data['rol'] === 'estudiante' ? null : ($data['cargo_institucional_id'] ?? null),
                 'activo' => $active,
                 'estado_cuenta' => $active ? 'activo' : 'pendiente',
                 'debe_cambiar_password' => true,
+                'cuenta_provisional' => false,
             ]);
             $user->forceFill(['email_verified_at' => now()])->save();
 
@@ -141,6 +148,7 @@ class UserAccountController extends Controller
                 'celular' => $user->celular,
                 'email' => $user->email,
                 'correo_alternativo' => $user->correo_alternativo,
+                'cargo_institucional_id' => $user->cargo_institucional_id,
                 'codigo_estudiante' => $student?->codigo_estudiante,
                 'codigo_docente' => $teacher?->codigo_docente,
                 'programa_estudio_id' => $student instanceof PerfilEstudiante ? $student->programa_estudio_id : $teacher?->programa_estudio_id,
@@ -152,6 +160,9 @@ class UserAccountController extends Controller
                 'condicion_laboral' => $teacher?->condicion_laboral,
             ],
             'programas' => ProgramaEstudio::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
+            'cargos' => DB::table('cargos_institucionales')
+                ->where(fn ($query) => $query->where('activo', true)->orWhere('id', $user->cargo_institucional_id ?? 0))
+                ->orderBy('nombre')->get(['id', 'nombre']),
             'passwordRules' => null,
         ]);
     }
@@ -191,6 +202,8 @@ class UserAccountController extends Controller
                 'email' => $data['email'],
                 'correo_alternativo' => $data['correo_alternativo'] ?? null,
                 'rol' => $data['rol'],
+                'cargo_institucional_id' => $data['rol'] === 'estudiante' ? null : (array_key_exists('cargo_institucional_id', $data)
+                    ? $data['cargo_institucional_id'] : $current->cargo_institucional_id),
                 'sesion_version' => $current->sesion_version + (int) $roleChanged,
                 'remember_token' => $roleChanged ? Str::random(60) : $current->remember_token,
             ]);
@@ -264,7 +277,7 @@ class UserAccountController extends Controller
                 throw ValidationException::withMessages(['accion' => 'No se pudo actualizar la cuenta; verifique que no sea el último administrador activo.']);
             }
 
-            DB::table('user_account_events')->insert([
+            $accountEventId = DB::table('user_account_events')->insertGetId([
                 'user_id' => $current->id,
                 'actor_id' => $actor->id,
                 'accion' => $action,
@@ -273,6 +286,21 @@ class UserAccountController extends Controller
                 'motivo' => $input['motivo'] ?? null,
                 'created_at' => now(),
             ]);
+            if (in_array($action, ['activate', 'reject'], true)) {
+                $approved = $action === 'activate';
+                DB::table('tramite_notificaciones')->insertOrIgnore([
+                    'usuario_id' => $current->id,
+                    'account_event_id' => $accountEventId,
+                    'tipo' => $approved ? 'cuenta_aprobada' : 'cuenta_rechazada',
+                    'titulo' => $approved ? 'Cuenta aprobada' : 'Cuenta rechazada',
+                    'mensaje' => $approved
+                        ? 'Su cuenta fue aprobada y está habilitada.'
+                        : 'Su solicitud de cuenta fue rechazada.',
+                    'prioridad' => 'normal',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
             DB::table('sessions')->where('user_id', $current->id)->delete();
         });
 

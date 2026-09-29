@@ -73,6 +73,7 @@ class CreateNewUser implements CreatesNewUsers
                 'rol' => 'estudiante',
                 'activo' => false,
                 'estado_cuenta' => 'pendiente',
+                'cuenta_provisional' => false,
             ]);
 
             PerfilEstudiante::create([
