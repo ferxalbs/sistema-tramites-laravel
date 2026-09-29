@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -21,6 +22,15 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $email
  * @property string $rol
  * @property bool $activo
+ * @property string $estado_cuenta
+ * @property int $sesion_version
+ * @property bool $debe_cambiar_password
+ * @property string|null $motivo_inactivacion
+ * @property string|null $nombres
+ * @property string|null $apellidos
+ * @property string|null $dni
+ * @property string|null $celular
+ * @property string|null $correo_alternativo
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -30,7 +40,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'rol', 'activo'])]
+#[Fillable(['name', 'email', 'password', 'rol', 'activo', 'estado_cuenta', 'nombres', 'apellidos', 'dni', 'celular', 'correo_alternativo', 'debe_cambiar_password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
@@ -48,6 +58,8 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'activo' => 'boolean',
+            'sesion_version' => 'integer',
+            'debe_cambiar_password' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
@@ -60,5 +72,15 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function tramitesAsignadosComoRevisor(): HasMany
     {
         return $this->hasMany(TramiteAsignacion::class, 'revisor_id');
+    }
+
+    public function perfilEstudiante(): HasOne
+    {
+        return $this->hasOne(PerfilEstudiante::class);
+    }
+
+    public function perfilDocente(): HasOne
+    {
+        return $this->hasOne(PerfilDocente::class);
     }
 }

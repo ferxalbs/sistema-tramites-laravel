@@ -107,3 +107,48 @@ test('already verified user visiting verification link is redirected without fir
     Event::assertNotDispatched(Verified::class);
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
 });
+
+test('signed public verification keeps a registered student pending until administrative approval', function () {
+    $student = User::factory()->unverified()->create([
+        'email' => 'a.verificada@seoane.edu.pe',
+        'activo' => false,
+        'estado_cuenta' => 'pendiente',
+    ]);
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    Event::fake([Verified::class]);
+    $url = URL::temporarySignedRoute('registration.verify', now()->addHours(24), [
+        'id' => $student->id,
+        'hash' => sha1($student->email),
+    ]);
+
+    $this->get($url)->assertRedirect(route('login'));
+    $this->assertGuest();
+    expect($student->fresh()->hasVerifiedEmail())->toBeTrue()
+        ->and($student->fresh()->activo)->toBeFalse();
+    Event::assertDispatchedTimes(Verified::class, 1);
+    $this->get($url)->assertGone();
+
+    $this->actingAs($administrator)->patch(route('admin.users.update', $student), ['accion' => 'activate'])
+        ->assertRedirect();
+    $this->post(route('logout'));
+    $this->post(route('login.store'), ['email' => $student->email, 'password' => 'password'])
+        ->assertRedirect(route('dashboard', absolute: false));
+    $this->assertAuthenticatedAs($student);
+});
+
+test('public verification rejects altered or expired signed links', function () {
+    $student = User::factory()->unverified()->create(['activo' => false, 'estado_cuenta' => 'pendiente']);
+    Event::fake([Verified::class]);
+
+    $wrongHash = URL::temporarySignedRoute('registration.verify', now()->addHour(), [
+        'id' => $student->id, 'hash' => sha1('wrong@example.com'),
+    ]);
+    $expired = URL::temporarySignedRoute('registration.verify', now()->subMinute(), [
+        'id' => $student->id, 'hash' => sha1($student->email),
+    ]);
+
+    $this->get($wrongHash)->assertForbidden();
+    $this->get($expired)->assertForbidden();
+    expect($student->fresh()->hasVerifiedEmail())->toBeFalse();
+    Event::assertNotDispatched(Verified::class);
+});

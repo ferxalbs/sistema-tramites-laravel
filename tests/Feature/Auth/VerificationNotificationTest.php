@@ -32,3 +32,21 @@ test('does not send verification notification if email is verified', function ()
 
     Notification::assertNothingSent();
 });
+
+test('public resend has a neutral response and limits duplicate notifications', function () {
+    Notification::fake();
+    $pending = User::factory()->unverified()->create([
+        'email' => 'a.reenvio@seoane.edu.pe',
+        'activo' => false,
+        'estado_cuenta' => 'pendiente',
+    ]);
+
+    $first = $this->post(route('registration.resend'), ['email' => $pending->email]);
+    $unknown = $this->post(route('registration.resend'), ['email' => 'a.desconocida@seoane.edu.pe']);
+    $again = $this->post(route('registration.resend'), ['email' => $pending->email]);
+
+    $first->assertSessionHas('status');
+    $unknown->assertSessionHas('status');
+    $again->assertSessionHas('status');
+    Notification::assertSentTo($pending, VerifyEmail::class, 1);
+});

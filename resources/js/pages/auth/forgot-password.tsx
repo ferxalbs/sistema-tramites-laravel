@@ -21,18 +21,19 @@ export default function ForgotPassword({ status }: { status?: string }) {
         <>
             <Head title="Recuperar Contraseña" />
 
-            <Card className="w-full shadow-sm border-border/80">
+            <Card className="w-full border-border/80 shadow-sm">
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-xl font-bold tracking-tight">
                         Recuperar Contraseña
                     </CardTitle>
                     <CardDescription className="text-sm">
-                        Ingresa tu correo electrónico para recibir un enlace de restablecimiento
+                        Ingresa tu correo institucional. El enlace, si
+                        corresponde, vencerá en 30 minutos.
                     </CardDescription>
                     <CardAction>
                         <Button
                             variant="link"
-                            className="text-xs font-medium text-primary hover:underline px-0"
+                            className="px-0 text-xs font-medium text-primary hover:underline"
                             render={<Link href={login()} />}
                         >
                             Iniciar sesión
@@ -44,21 +45,23 @@ export default function ForgotPassword({ status }: { status?: string }) {
                         {({ processing, errors }) => (
                             <div className="flex flex-col gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo electrónico</Label>
+                                    <Label htmlFor="email">
+                                        Correo institucional
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
                                         name="email"
                                         autoComplete="email"
                                         autoFocus
-                                        placeholder="usuario@correo.com"
+                                        placeholder="a.usuario@seoane.edu.pe"
                                     />
                                     <InputError message={errors.email} />
                                 </div>
 
                                 <Button
                                     type="submit"
-                                    className="w-full mt-2"
+                                    className="mt-2 w-full"
                                     disabled={processing}
                                     data-test="email-password-reset-link-button"
                                 >
@@ -78,7 +81,10 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 <CardFooter className="flex flex-col gap-2 pt-0 pb-6 text-center text-xs text-muted-foreground">
                     <p>
                         ¿Recordaste tu contraseña?{' '}
-                        <Link href={login()} className="text-primary underline underline-offset-4">
+                        <Link
+                            href={login()}
+                            className="text-primary underline underline-offset-4"
+                        >
                             Volver al inicio de sesión
                         </Link>
                     </p>
@@ -86,7 +92,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
             </Card>
 
             {status && (
-                <div className="mt-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
+                <div className="mt-4 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
                     {status}
                 </div>
             )}

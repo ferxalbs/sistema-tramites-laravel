@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CircleHelp } from 'lucide-react';
+import { CircleHelp, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,6 +8,7 @@ import {
     DialogContent,
     DialogDescription,
     DialogFooter,
+    DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
@@ -38,14 +39,17 @@ export default function SupportWidget() {
                 ¿Necesitas ayuda?
             </DialogTrigger>
             <DialogContent className="max-h-[min(90vh,42rem)] overflow-y-auto">
-                <DialogTitle>Asistente de ayuda</DialogTitle>
-                <DialogDescription>
-                    Elija una pregunta para recibir orientación.
-                </DialogDescription>
+                <DialogHeader>
+                    <DialogTitle>Asistente de ayuda</DialogTitle>
+                    <DialogDescription>
+                        Elige una pregunta para recibir orientación.
+                    </DialogDescription>
+                </DialogHeader>
+
                 {topic ? (
-                    <section className="flex flex-col gap-4">
-                        <h3 className="font-medium">{topic.question}</h3>
-                        <p className="whitespace-pre-wrap text-muted-foreground">
+                    <div className="flex flex-col gap-4 py-2">
+                        <h3 className="text-base font-semibold">{topic.question}</h3>
+                        <p className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
                             {topic.answer}
                         </p>
                         {selectedTopic === 'whatsapp' &&
@@ -62,7 +66,7 @@ export default function SupportWidget() {
                                     Abrir WhatsApp
                                 </Button>
                             )}
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 pt-2">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -78,36 +82,37 @@ export default function SupportWidget() {
                                 Reiniciar
                             </Button>
                         </div>
-                    </section>
+                    </div>
                 ) : (
                     <div
-                        className="flex flex-col gap-2"
+                        className="flex flex-col gap-2 py-2"
                         role="list"
                         aria-label="Preguntas de ayuda"
                     >
                         {Object.entries(support.assistant_topics).map(
                             ([key, item]) => (
-                                <Button
+                                <button
                                     key={key}
                                     type="button"
-                                    variant="outline"
-                                    className="h-auto justify-start text-left whitespace-normal"
+                                    className="flex w-full items-center justify-between rounded-xl border border-border/80 bg-card p-3 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
                                     onClick={() => setSelectedTopic(key)}
                                 >
-                                    {item.question}
-                                </Button>
+                                    <span>{item.question}</span>
+                                    <ChevronRight className="size-4 shrink-0 text-muted-foreground ml-2" />
+                                </button>
                             ),
                         )}
                     </div>
                 )}
-                <DialogFooter className="items-center justify-between">
+
+                <DialogFooter className="flex-row items-center justify-between sm:justify-between">
                     <Link
                         href={supportIndex()}
-                        className="text-sm text-primary underline-offset-4 hover:underline"
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
                     >
                         Preguntas frecuentes
                     </Link>
-                    <DialogClose render={<Button variant="secondary" />}>
+                    <DialogClose render={<Button variant="secondary" size="sm" />}>
                         Cerrar
                     </DialogClose>
                 </DialogFooter>

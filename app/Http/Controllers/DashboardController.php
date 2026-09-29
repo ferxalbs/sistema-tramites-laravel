@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
 use App\Models\TramiteEvento;
+use App\Models\TramiteMedioEntrega;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -19,11 +20,21 @@ class DashboardController extends Controller
         $actor = $request->user();
         abort_unless($actor instanceof User, 401);
 
+        $documentTypes = [];
+
+        foreach (config('tramites.tipos_documento', []) as $classificationTypes) {
+            if (is_array($classificationTypes)) {
+                $documentTypes = array_merge($documentTypes, $classificationTypes);
+            }
+        }
         $filters = $request->validate([
             'desde' => ['nullable', 'date_format:Y-m-d'],
             'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
             'clasificacion' => ['nullable', Rule::in(array_keys(config('tramites.clasificaciones')))],
+            'tipo' => ['nullable', Rule::in(array_keys($documentTypes))],
             'estado' => ['nullable', Rule::in(array_keys(config('tramites.estados')))],
+            'revisor' => ['nullable', 'integer', 'exists:users,id'],
+            'medio' => ['nullable', 'integer', 'exists:tramite_medios_entrega,id'],
         ]);
         $tramites = $this->scopedTramites($actor, $filters);
         $states = (clone $tramites)
@@ -102,7 +113,7 @@ class DashboardController extends Controller
                     'registrados' => (int) $row->getAttribute('registrados'),
                     'cerrados' => (int) $row->getAttribute('cerrados'),
                 ])->values()->all();
-            $types = (clone $tramites)
+            $chartTypes = (clone $tramites)
                 ->select('clasificacion', 'tipo_documento')
                 ->selectRaw('COUNT(*) as total')
                 ->groupBy('clasificacion', 'tipo_documento')
@@ -134,7 +145,7 @@ class DashboardController extends Controller
                     'total' => (int) $row->getAttribute('total'),
                 ])->all();
 
-            $adminCharts = ['monthly' => $monthly, 'types' => $types, 'load' => $load, 'users' => $users];
+            $adminCharts = ['monthly' => $monthly, 'types' => $chartTypes, 'load' => $load, 'users' => $users];
         }
 
         $closedState = collect($states)->firstWhere('codigo', 'cerrado');
@@ -145,11 +156,21 @@ class DashboardController extends Controller
                 'desde' => $filters['desde'] ?? '',
                 'hasta' => $filters['hasta'] ?? '',
                 'clasificacion' => $filters['clasificacion'] ?? '',
+                'tipo' => $filters['tipo'] ?? '',
                 'estado' => $filters['estado'] ?? '',
+                'revisor' => (string) ($filters['revisor'] ?? ''),
+                'medio' => (string) ($filters['medio'] ?? ''),
             ],
             'catalogs' => [
                 'clasificaciones' => config('tramites.clasificaciones'),
+                'tipos' => $documentTypes,
                 'estados' => config('tramites.estados'),
+                'revisores' => in_array($actor->rol, ['asistente', 'administrador'], true)
+                    ? User::query()->whereIn('rol', ['docente', 'administrador'])->where('activo', true)->orderBy('name')->get(['id', 'name'])
+                        ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])->all()
+                    : [],
+                'medios' => TramiteMedioEntrega::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre'])
+                    ->map(fn (TramiteMedioEntrega $medio): array => ['id' => $medio->id, 'nombre' => $medio->nombre])->all(),
             ],
             'summary' => [
                 'total' => $total,
@@ -175,6 +196,12 @@ class DashboardController extends Controller
             ->when(($filters['desde'] ?? '') !== '', fn (Builder $query): Builder => $query->where('created_at', '>=', $filters['desde'].' 00:00:00'))
             ->when(($filters['hasta'] ?? '') !== '', fn (Builder $query): Builder => $query->where('created_at', '<=', $filters['hasta'].' 23:59:59'))
             ->when(($filters['clasificacion'] ?? '') !== '', fn (Builder $query): Builder => $query->where('clasificacion', $filters['clasificacion']))
-            ->when(($filters['estado'] ?? '') !== '', fn (Builder $query): Builder => $query->where('estado', $filters['estado']));
+            ->when(($filters['tipo'] ?? '') !== '', fn (Builder $query): Builder => $query->where('tipo_documento', $filters['tipo']))
+            ->when(($filters['estado'] ?? '') !== '', fn (Builder $query): Builder => $query->where('estado', $filters['estado']))
+            ->when(($filters['revisor'] ?? '') !== '', fn (Builder $query): Builder => $query->whereHas('asignaciones', fn (Builder $assignment): Builder => $assignment
+                ->where('revisor_id', (int) $filters['revisor'])
+                ->where('activa', true)))
+            ->when(($filters['medio'] ?? '') !== '', fn (Builder $query): Builder => $query->whereHas('entregaActual', fn (Builder $delivery): Builder => $delivery
+                ->where('medio_entrega_id', (int) $filters['medio'])));
     }
 }

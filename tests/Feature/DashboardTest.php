@@ -2,7 +2,10 @@
 
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
+use App\Models\TramiteDocumentoFinal;
+use App\Models\TramiteEntrega;
 use App\Models\TramiteEvento;
+use App\Models\TramiteMedioEntrega;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -105,7 +108,8 @@ test('dashboard limits teacher metrics to assigned expedientes and shows staff t
 test('dashboard filters metrics and rejects unknown states', function () {
     $administrator = User::factory()->create(['rol' => 'administrador']);
     Tramite::factory()->create(['estado' => 'cerrado', 'clasificacion' => 'estudiantil']);
-    Tramite::factory()->create(['estado' => 'digitalizado', 'clasificacion' => 'administrativo']);
+    Tramite::factory()->create(['estado' => 'digitalizado', 'clasificacion' => 'administrativo', 'tipo_documento' => 'COMUNICACION_ADMINISTRATIVA']);
+    Tramite::factory()->create(['estado' => 'observado', 'created_at' => now()->subMonths(2)]);
 
     $this->actingAs($administrator)->get(route('dashboard', ['estado' => 'cerrado', 'clasificacion' => 'estudiantil']))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -114,4 +118,52 @@ test('dashboard filters metrics and rejects unknown states', function () {
         ->where('filters.estado', 'cerrado')
         ->where('states.0.codigo', 'cerrado'));
     $this->get(route('dashboard', ['estado' => 'no-existe']))->assertSessionHasErrors('estado');
+    $this->get(route('dashboard', ['tipo' => 'FUT']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('summary.total', 2)->where('filters.tipo', 'FUT'));
+    $this->get(route('dashboard', ['desde' => now()->subDay()->toDateString()]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('summary.total', 2));
+    $this->get(route('dashboard', ['desde' => now()->toDateString(), 'hasta' => now()->subDay()->toDateString()]))
+        ->assertSessionHasErrors('hasta');
+});
+
+test('dashboard filters active reviewer and delivery medium without widening role scope', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $reviewer = User::factory()->create(['rol' => 'docente']);
+    $tramite = Tramite::factory()->create(['estado' => 'entregado']);
+    Tramite::factory()->create(['estado' => 'entregado']);
+    TramiteAsignacion::factory()->create([
+        'tramite_id' => $tramite->id,
+        'revisor_id' => $reviewer->id,
+        'asignado_por' => $assistant->id,
+        'activa' => true,
+    ]);
+    $documento = TramiteDocumentoFinal::factory()->create(['tramite_id' => $tramite->id, 'estado' => 'emitido']);
+    $medio = TramiteMedioEntrega::query()->create([
+        'codigo' => 'presencial-prueba',
+        'nombre' => 'Entrega presencial de prueba',
+        'tipo' => 'presencial',
+        'activo' => true,
+    ]);
+    TramiteEntrega::query()->create([
+        'tramite_id' => $tramite->id,
+        'documento_final_id' => $documento->id,
+        'medio_entrega_id' => $medio->id,
+        'receptor_nombre' => 'Persona de prueba',
+        'receptor_tipo' => 'estudiante',
+        'fecha_entrega' => now(),
+        'codigo_confirmacion' => 'DASH-MEDIO-PRUEBA',
+        'activa' => true,
+    ]);
+
+    $this->actingAs($administrator)->get(route('dashboard', ['revisor' => $reviewer->id, 'medio' => $medio->id]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('summary.total', 1)
+        ->where('filters.revisor', (string) $reviewer->id)
+        ->where('filters.medio', (string) $medio->id));
+    $this->get(route('dashboard', ['medio' => 999999]))->assertSessionHasErrors('medio');
+    $this->actingAs($reviewer)->get(route('dashboard', ['medio' => $medio->id]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('summary.total', 1)
+        ->has('catalogs.revisores', 0));
 });

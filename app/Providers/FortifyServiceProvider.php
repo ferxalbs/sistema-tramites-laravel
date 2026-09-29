@@ -3,16 +3,28 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\PendingRegistrationResponse;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Controllers\PasswordRecoveryController;
+use App\Models\ProgramaEstudio;
+use App\Models\User;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Controllers\PasswordResetLinkController;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -21,7 +33,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(RegisterResponse::class, PendingRegistrationResponse::class);
+        $this->app->bind(PasswordResetLinkController::class, PasswordRecoveryController::class);
     }
 
     /**
@@ -30,6 +43,18 @@ class FortifyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureActions();
+        VerifyEmail::createUrlUsing(fn (User $user): string => URL::temporarySignedRoute(
+            'registration.verify',
+            now()->addHours(24),
+            ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
+        ));
+        ResetPassword::createUrlUsing(fn (User $user, string $token): string => rtrim((string) config('app.url'), '/')
+            .route('password.reset', ['token' => $token, 'email' => $user->email], false));
+        Event::listen(Login::class, function (Login $event): void {
+            if ($event->user instanceof User && request()->hasSession()) {
+                request()->session()->put('account_session_version', $event->user->sesion_version);
+            }
+        });
         $this->configureViews();
         $this->configureRateLimiting();
     }
@@ -41,6 +66,17 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            $email = mb_strtolower(trim((string) $request->input('email', '')));
+            $user = User::query()->where('email', $email)->first();
+
+            return $user instanceof User
+                && $user->activo
+                && $user->estado_cuenta === 'activo'
+                && Hash::check((string) $request->input('password', ''), $user->password)
+                    ? $user
+                    : null;
+        });
     }
 
     /**
@@ -67,8 +103,10 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
         ]));
 
-        Fortify::registerView(fn () => Inertia::render('auth/register', [
+        Fortify::registerView(fn (Request $request) => Inertia::render('auth/register', [
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            'programas' => ProgramaEstudio::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
+            'status' => $request->session()->get('status'),
         ]));
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));

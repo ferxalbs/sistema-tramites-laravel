@@ -45,19 +45,25 @@ export default function Register({ passwordRules, programas, status }: Props) {
                 <CardHeader>
                     <CardTitle>Registro de Estudiante/Egresado</CardTitle>
                     <CardDescription>
-                        La cuenta quedará pendiente de verificación de correo y validación administrativa. Los trámites se reciben físicamente en Mesa de Partes.
+                        La cuenta quedará pendiente de verificación de correo y
+                        validación administrativa. Los trámites se reciben
+                        físicamente en Mesa de Partes.
                     </CardDescription>
                     <CardAction>
-                        <Button
-                            variant="link"
-                            render={<Link href={login()} />}
-                        >
+                        <Button variant="link" render={<Link href={login()} />}>
                             Iniciar sesión
                         </Button>
                     </CardAction>
                 </CardHeader>
                 <CardContent>
-                    {status && <p role="status" className="mb-4 rounded-xl bg-muted p-3 text-sm">{status}</p>}
+                    {status && (
+                        <p
+                            role="status"
+                            className="mb-4 rounded-xl bg-muted p-3 text-sm"
+                        >
+                            {status}
+                        </p>
+                    )}
                     <Form
                         id="register-form"
                         {...store.form()}
@@ -81,22 +87,45 @@ export default function Register({ passwordRules, programas, status }: Props) {
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="apellidos">Apellidos</Label>
-                                    <Input id="apellidos" name="apellidos" required autoComplete="family-name" maxLength={120} />
+                                    <Input
+                                        id="apellidos"
+                                        name="apellidos"
+                                        required
+                                        autoComplete="family-name"
+                                        maxLength={120}
+                                    />
                                     <InputError message={errors.apellidos} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="dni">DNI</Label>
-                                    <Input id="dni" name="dni" required inputMode="numeric" pattern="[0-9]{8}" maxLength={8} />
+                                    <Input
+                                        id="dni"
+                                        name="dni"
+                                        required
+                                        inputMode="numeric"
+                                        pattern="[0-9]{8}"
+                                        maxLength={8}
+                                    />
                                     <InputError message={errors.dni} />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="celular">Número de celular</Label>
-                                    <Input id="celular" name="celular" required autoComplete="tel" maxLength={20} />
+                                    <Label htmlFor="celular">
+                                        Número de celular
+                                    </Label>
+                                    <Input
+                                        id="celular"
+                                        name="celular"
+                                        required
+                                        autoComplete="tel"
+                                        maxLength={20}
+                                    />
                                     <InputError message={errors.celular} />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo institucional</Label>
+                                    <Label htmlFor="email">
+                                        Correo institucional
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
@@ -111,44 +140,147 @@ export default function Register({ passwordRules, programas, status }: Props) {
                                     <InputError message={errors.email} />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="correo_alternativo">Correo alternativo (opcional)</Label>
-                                    <Input id="correo_alternativo" name="correo_alternativo" type="email" maxLength={190} />
-                                    <InputError message={errors.correo_alternativo} />
+                                    <Label htmlFor="correo_alternativo">
+                                        Correo alternativo (opcional)
+                                    </Label>
+                                    <Input
+                                        id="correo_alternativo"
+                                        name="correo_alternativo"
+                                        type="email"
+                                        maxLength={190}
+                                    />
+                                    <InputError
+                                        message={errors.correo_alternativo}
+                                    />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="programa_estudio_id">Programa de estudios</Label>
-                                    <Select name="programa_estudio_id" items={programas.map((item) => ({ value: String(item.id), label: item.nombre }))} value={program} onValueChange={setProgram} required>
-                                        <SelectTrigger id="programa_estudio_id" className="w-full"><SelectValue placeholder="Seleccione un programa" /></SelectTrigger>
-                                        <SelectContent><SelectGroup>{programas.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.nombre}</SelectItem>)}</SelectGroup></SelectContent>
+                                    <Label htmlFor="programa_estudio_id">
+                                        Programa de estudios
+                                    </Label>
+                                    <Select
+                                        name="programa_estudio_id"
+                                        items={programas.map((item) => ({
+                                            value: String(item.id),
+                                            label: item.nombre,
+                                        }))}
+                                        value={program}
+                                        onValueChange={setProgram}
+                                        required
+                                    >
+                                        <SelectTrigger
+                                            id="programa_estudio_id"
+                                            className="w-full"
+                                        >
+                                            <SelectValue placeholder="Seleccione un programa" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                {programas.map((item) => (
+                                                    <SelectItem
+                                                        key={item.id}
+                                                        value={String(item.id)}
+                                                    >
+                                                        {item.nombre}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        </SelectContent>
                                     </Select>
-                                    <InputError message={errors.programa_estudio_id} />
+                                    <InputError
+                                        message={errors.programa_estudio_id}
+                                    />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="condicion_academica">Condición académica</Label>
-                                    <Select name="condicion_academica" items={[{ value: 'Estudiante', label: 'Estudiante' }, { value: 'Egresado', label: 'Egresado' }]} value={condition} onValueChange={(value) => setCondition(value ?? 'Estudiante')} required>
-                                        <SelectTrigger id="condicion_academica" className="w-full"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectGroup><SelectItem value="Estudiante">Estudiante</SelectItem><SelectItem value="Egresado">Egresado</SelectItem></SelectGroup></SelectContent>
+                                    <Label htmlFor="condicion_academica">
+                                        Condición académica
+                                    </Label>
+                                    <Select
+                                        name="condicion_academica"
+                                        items={[
+                                            {
+                                                value: 'Estudiante',
+                                                label: 'Estudiante',
+                                            },
+                                            {
+                                                value: 'Egresado',
+                                                label: 'Egresado',
+                                            },
+                                        ]}
+                                        value={condition}
+                                        onValueChange={(value) =>
+                                            setCondition(value ?? 'Estudiante')
+                                        }
+                                        required
+                                    >
+                                        <SelectTrigger
+                                            id="condicion_academica"
+                                            className="w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectItem value="Estudiante">
+                                                    Estudiante
+                                                </SelectItem>
+                                                <SelectItem value="Egresado">
+                                                    Egresado
+                                                </SelectItem>
+                                            </SelectGroup>
+                                        </SelectContent>
                                     </Select>
-                                    <InputError message={errors.condicion_academica} />
+                                    <InputError
+                                        message={errors.condicion_academica}
+                                    />
                                 </div>
                                 {condition === 'Estudiante' ? (
                                     <div className="grid gap-2">
-                                        <Label htmlFor="ciclo_actual">Ciclo actual</Label>
-                                        <Input id="ciclo_actual" name="ciclo_actual" type="number" min={1} max={10} required />
-                                        <InputError message={errors.ciclo_actual} />
+                                        <Label htmlFor="ciclo_actual">
+                                            Ciclo actual
+                                        </Label>
+                                        <Input
+                                            id="ciclo_actual"
+                                            name="ciclo_actual"
+                                            type="number"
+                                            min={1}
+                                            max={10}
+                                            required
+                                        />
+                                        <InputError
+                                            message={errors.ciclo_actual}
+                                        />
                                     </div>
                                 ) : (
                                     <div className="grid gap-2">
-                                        <Label htmlFor="anio_egreso">Año de egreso</Label>
-                                        <Input id="anio_egreso" name="anio_egreso" type="number" min={1950} max={new Date().getFullYear()} required />
-                                        <InputError message={errors.anio_egreso} />
+                                        <Label htmlFor="anio_egreso">
+                                            Año de egreso
+                                        </Label>
+                                        <Input
+                                            id="anio_egreso"
+                                            name="anio_egreso"
+                                            type="number"
+                                            min={1950}
+                                            max={new Date().getFullYear()}
+                                            required
+                                        />
+                                        <InputError
+                                            message={errors.anio_egreso}
+                                        />
                                     </div>
                                 )}
                                 <div className="grid gap-2">
-                                    <Label htmlFor="direccion_residencia">Dirección de residencia (opcional)</Label>
-                                    <Input id="direccion_residencia" name="direccion_residencia" maxLength={255} />
-                                    <InputError message={errors.direccion_residencia} />
+                                    <Label htmlFor="direccion_residencia">
+                                        Dirección de residencia (opcional)
+                                    </Label>
+                                    <Input
+                                        id="direccion_residencia"
+                                        name="direccion_residencia"
+                                        maxLength={255}
+                                    />
+                                    <InputError
+                                        message={errors.direccion_residencia}
+                                    />
                                 </div>
 
                                 <div className="grid gap-2">
@@ -181,10 +313,21 @@ export default function Register({ passwordRules, programas, status }: Props) {
                                     />
                                 </div>
                                 <div className="col-span-full flex items-start gap-2">
-                                    <Checkbox id="acepta_terminos" name="acepta_terminos" value="1" required />
+                                    <Checkbox
+                                        id="acepta_terminos"
+                                        name="acepta_terminos"
+                                        value="1"
+                                        required
+                                    />
                                     <div>
-                                        <Label htmlFor="acepta_terminos">Acepto las condiciones básicas de uso y el tratamiento de mis datos para gestionar mi cuenta.</Label>
-                                        <InputError message={errors.acepta_terminos} />
+                                        <Label htmlFor="acepta_terminos">
+                                            Acepto las condiciones básicas de
+                                            uso y el tratamiento de mis datos
+                                            para gestionar mi cuenta.
+                                        </Label>
+                                        <InputError
+                                            message={errors.acepta_terminos}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -203,13 +346,32 @@ export default function Register({ passwordRules, programas, status }: Props) {
                 </CardFooter>
             </Card>
             <Card className="mt-4 w-full max-w-3xl">
-                <CardHeader><CardTitle>Reenviar verificación</CardTitle></CardHeader>
+                <CardHeader>
+                    <CardTitle>Reenviar verificación</CardTitle>
+                </CardHeader>
                 <CardContent>
-                    <Form {...resend.form()} disableWhileProcessing className="flex flex-wrap gap-2">
-                        {({ errors }) => <>
-                            <div className="min-w-60 flex-1"><Input name="email" type="email" aria-label="Correo institucional para reenviar" placeholder="a.usuario@seoane.edu.pe" required /><InputError message={errors.email} /></div>
-                            <Button type="submit" variant="outline">Solicitar enlace</Button>
-                        </>}
+                    <Form
+                        {...resend.form()}
+                        disableWhileProcessing
+                        className="flex flex-wrap gap-2"
+                    >
+                        {({ errors }) => (
+                            <>
+                                <div className="min-w-60 flex-1">
+                                    <Input
+                                        name="email"
+                                        type="email"
+                                        aria-label="Correo institucional para reenviar"
+                                        placeholder="a.usuario@seoane.edu.pe"
+                                        required
+                                    />
+                                    <InputError message={errors.email} />
+                                </div>
+                                <Button type="submit" variant="outline">
+                                    Solicitar enlace
+                                </Button>
+                            </>
+                        )}
                     </Form>
                 </CardContent>
             </Card>

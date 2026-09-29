@@ -8,6 +8,7 @@ import {
     LayoutGrid,
     Plus,
     Search,
+    Users,
 } from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
@@ -26,6 +27,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as usersIndex } from '@/routes/admin/users';
 import { index as searchIndex } from '@/routes/search';
 import { index as supportIndex } from '@/routes/support';
 import type { Auth, NavItem } from '@/types';
@@ -93,6 +95,11 @@ export function AppSidebar() {
             title: 'Revisión de oficina',
             href: TramiteAsignacionController.oficinaIndex(),
             icon: ClipboardCheck,
+        });
+        mainNavItems.push({
+            title: 'Usuarios',
+            href: usersIndex(),
+            icon: Users,
         });
     }
 

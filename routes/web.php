@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
+use App\Http\Controllers\RegistrationVerificationController;
 use App\Http\Controllers\TramiteAsignacionController;
 use App\Http\Controllers\TramiteBorradorController;
 use App\Http\Controllers\TramiteController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\TramiteEntregaController;
 use App\Http\Controllers\TramiteEstudianteController;
 use App\Http\Controllers\TramiteRevisionController;
 use App\Http\Controllers\TramiteVerificacionPublicaController;
+use App\Http\Controllers\UserAccountController;
 use App\Services\SupportKnowledgeBase;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use Illuminate\Validation\Rules\Password;
 
 Route::inertia('/', 'welcome')->name('home');
 Route::get('ayuda', fn (Request $request, SupportKnowledgeBase $support): InertiaResponse => Inertia::render('ayuda', $support->forRequest($request)))
@@ -30,6 +33,16 @@ Route::get('verificar-documento', [TramiteVerificacionPublicaController::class, 
         ShareErrorsFromSession::class,
     ])
     ->name('documentos.verificar');
+Route::get('registro/verificar/{id}/{hash}', RegistrationVerificationController::class)
+    ->middleware(['signed', 'throttle:6,1'])
+    ->whereNumber('id')
+    ->name('registration.verify');
+Route::post('registro/reenviar', [RegistrationVerificationController::class, 'resend'])
+    ->middleware('throttle:6,1')
+    ->name('registration.resend');
+Route::get('cambiar-contrasena', fn (): InertiaResponse => Inertia::render('auth/change-required-password', [
+    'passwordRules' => Password::defaults()->toPasswordRulesString(),
+]))->middleware('auth')->name('password.change-required');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)
@@ -79,6 +92,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:administrador')->group(function (): void {
+        Route::get('admin/usuarios', [UserAccountController::class, 'index'])->name('admin.users.index');
+        Route::get('admin/usuarios/crear', [UserAccountController::class, 'create'])->name('admin.users.create');
+        Route::post('admin/usuarios', [UserAccountController::class, 'store'])->name('admin.users.store');
+        Route::get('admin/usuarios/{user}/editar', [UserAccountController::class, 'edit'])->name('admin.users.edit');
+        Route::put('admin/usuarios/{user}', [UserAccountController::class, 'save'])->name('admin.users.save');
+        Route::patch('admin/usuarios/{user}/estado', [UserAccountController::class, 'update'])->name('admin.users.update');
         Route::get('revisiones-oficina', [TramiteAsignacionController::class, 'oficinaIndex'])->name('asignaciones.oficina.index');
         Route::get('revisiones-oficina/{tramite}', [TramiteAsignacionController::class, 'oficinaShow'])->name('asignaciones.oficina.show');
     });
