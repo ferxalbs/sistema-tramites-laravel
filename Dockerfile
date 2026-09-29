@@ -3,7 +3,7 @@
 # Powered by FrankenPHP (Modern Caddy-based application server)
 # ==============================================================
 
-FROM dunglas/frankenphp:1-php8.3-bookworm
+FROM dunglas/frankenphp:1-php8.5-bookworm
 
 # Environment settings
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
@@ -31,6 +31,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && corepack prepare pnpm@12.6.0 --activate \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /app
 
