@@ -4,6 +4,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/manrope";
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -213,7 +215,7 @@
 
 @theme inline {
     --font-heading:
-        var(--font-sans);
+        'Manrope Variable', sans-serif;
     --font-sans:
         'Inter Variable', sans-serif;
     --color-sidebar-ring:
