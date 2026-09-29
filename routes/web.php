@@ -7,11 +7,20 @@ use App\Http\Controllers\TramiteDocumentoFinalController;
 use App\Http\Controllers\TramiteEntregaController;
 use App\Http\Controllers\TramiteEstudianteController;
 use App\Http\Controllers\TramiteRevisionController;
+use App\Http\Controllers\TramiteVerificacionPublicaController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::inertia('/', 'welcome')->name('home');
+Route::inertia('ayuda', 'ayuda')->name('support.index');
+Route::get('verificar-documento', [TramiteVerificacionPublicaController::class, 'show'])
+    ->middleware('throttle:30,1')
+    ->withoutMiddleware([
+        Illuminate\Session\Middleware\StartSession::class,
+        Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    ])
+    ->name('documentos.verificar');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {

@@ -68,19 +68,19 @@ final class TursoHttpClient
 
         $body = $response->json();
 
-        if (! is_array($body) || ! is_array($body['results'] ?? null)) {
+        if (! is_array($body)
+            || ! array_key_exists('baton', $body)
+            || ! array_key_exists('base_url', $body)
+            || ! array_key_exists('results', $body)
+            || ! is_array($body['results'])
+            || ($body['baton'] !== null && ! is_string($body['baton']))
+            || ($body['base_url'] !== null && ! is_string($body['base_url']))) {
             $this->pipelineUrl = $this->primaryPipelineUrl;
 
             throw new RuntimeException('Turso returned an invalid pipeline response.');
         }
 
         $nextBaton = $body['baton'] ?? null;
-
-        if ($nextBaton !== null && ! is_string($nextBaton)) {
-            $this->pipelineUrl = $this->primaryPipelineUrl;
-
-            throw new RuntimeException('Turso returned an invalid transaction baton.');
-        }
 
         if ($nextBaton !== null && is_string($body['base_url'] ?? null)) {
             $this->pipelineUrl = $this->pipelineUrlFromServer($body['base_url']);

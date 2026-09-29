@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /*
@@ -47,4 +48,39 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+function configureDisposableTursoConnection(): bool
+{
+    $url = (string) env('TURSO_TEST_DATABASE_URL', '');
+    $authToken = (string) env('TURSO_TEST_AUTH_TOKEN', '');
+    $isDisposable = filter_var(env('TURSO_TEST_DATABASE_DISPOSABLE', false), FILTER_VALIDATE_BOOLEAN);
+    $applicationUrl = (string) config('database.connections.libsql.turso_url', '');
+    $normalizeEndpoint = static function (string $databaseUrl): ?string {
+        $parts = parse_url($databaseUrl);
+
+        if (! is_array($parts) || ! is_string($parts['host'] ?? null)) {
+            return null;
+        }
+
+        $path = rtrim((string) ($parts['path'] ?? ''), '/');
+        $path = preg_replace('~/v3/pipeline$~', '', $path) ?? $path;
+
+        return strtolower($parts['host']).':'.(int) ($parts['port'] ?? 443).$path;
+    };
+    $sameDatabase = $applicationUrl !== ''
+        && $normalizeEndpoint($applicationUrl) !== null
+        && $normalizeEndpoint($applicationUrl) === $normalizeEndpoint($url);
+
+    if ($url === '' || $authToken === '' || ! $isDisposable || $sameDatabase) {
+        return false;
+    }
+
+    config([
+        'database.connections.libsql.turso_url' => $url,
+        'database.connections.libsql.auth_token' => $authToken,
+    ]);
+    DB::purge('libsql');
+
+    return true;
 }

@@ -20,8 +20,8 @@ use Mockery\MockInterface;
 use RuntimeException;
 
 test('assistant intake can be digitized, searched, audited, and downloaded privately through Turso', function () {
-    if (! config('database.connections.libsql.turso_url') || ! config('database.connections.libsql.auth_token')) {
-        $this->markTestSkipped('Turso credentials are not configured.');
+    if (! configureDisposableTursoConnection()) {
+        $this->markTestSkipped('Set separate TURSO_TEST_* credentials and confirm the database is disposable.');
     }
 
     $defaultConnection = DB::getDefaultConnection();
@@ -615,8 +615,8 @@ test('assistant intake can be digitized, searched, audited, and downloaded priva
 });
 
 test('assigned reviewer can approve a pinned round and publish a student-safe result', function () {
-    if (! config('database.connections.libsql.turso_url') || ! config('database.connections.libsql.auth_token')) {
-        $this->markTestSkipped('Turso credentials are not configured.');
+    if (! configureDisposableTursoConnection()) {
+        $this->markTestSkipped('Set separate TURSO_TEST_* credentials and confirm the database is disposable.');
     }
 
     $defaultConnection = DB::getDefaultConnection();
@@ -724,8 +724,8 @@ test('assigned reviewer can approve a pinned round and publish a student-safe re
 });
 
 test('official document issuance consumes failed numbers and verifies the private PDF', function () {
-    if (! config('database.connections.libsql.turso_url') || ! config('database.connections.libsql.auth_token')) {
-        $this->markTestSkipped('Turso credentials are not configured.');
+    if (! configureDisposableTursoConnection()) {
+        $this->markTestSkipped('Set separate TURSO_TEST_* credentials and confirm the database is disposable.');
     }
 
     $defaultConnection = DB::getDefaultConnection();
@@ -1002,8 +1002,8 @@ test('official document issuance consumes failed numbers and verifies the privat
 });
 
 test('signature delivery and closure require confirmation and produce an auditable private report', function () {
-    if (! config('database.connections.libsql.turso_url') || ! config('database.connections.libsql.auth_token')) {
-        $this->markTestSkipped('Turso credentials are not configured.');
+    if (! configureDisposableTursoConnection()) {
+        $this->markTestSkipped('Set separate TURSO_TEST_* credentials and confirm the database is disposable.');
     }
 
     $defaultConnection = DB::getDefaultConnection();
@@ -1385,4 +1385,75 @@ test('signature delivery and closure require confirmation and produce an auditab
             DB::setDefaultConnection($defaultConnection);
         }
     }
+});
+
+test('public document verification normalizes valid codes and exposes only approved metadata', function () {
+    $codigo = 'A1B2-C3D4-E5F6-7890';
+    $documento = TramiteDocumentoFinal::factory()->create([
+        'codigo_verificacion' => $codigo,
+        'tipo_documento' => 'Memorando',
+        'estado' => 'emitido',
+        'activo' => true,
+        'fecha_emision' => now(),
+        'contenido_snapshot' => ['persona_nombre' => 'Dato privado de prueba'],
+    ]);
+
+    $this->get(route('documentos.verificar', ['codigo' => strtolower($codigo)]))
+        ->assertOk()
+        ->assertCookieMissing(config('session.cookie'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('documentos/verificacion-publica')
+            ->where('resultado.estado', 'vigente')
+            ->where('resultado.documento.tipo', 'Memorando')
+            ->where('resultado.documento.numero', $documento->numero_documento)
+            ->where('resultado.documento.expediente', $documento->tramite->codigo)
+            ->where('resultado.documento.codigo', $codigo)
+            ->missing('resultado.documento.contenido_snapshot')
+            ->missing('resultado.documento.sha256')
+            ->missing('resultado.documento.ruta'));
+});
+
+test('public document verification returns a neutral result for malformed and unknown codes', function () {
+    foreach (['FFFF-FFFF-FFFF-FFFF', '<script>alert(1)</script>'] as $codigo) {
+        $this->get(route('documentos.verificar', ['codigo' => $codigo]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('documentos/verificacion-publica')
+                ->where('resultado.estado', 'invalido')
+                ->where('resultado.documento', null));
+    }
+
+    $this->get(route('documentos.verificar', ['codigo' => ['malformed']]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('resultado.estado', 'invalido')
+            ->where('resultado.documento', null));
+});
+
+test('public document verification distinguishes annulled and superseded documents', function () {
+    $anulado = TramiteDocumentoFinal::factory()->create([
+        'codigo_verificacion' => 'AAAA-BBBB-CCCC-DDDD',
+        'estado' => 'anulado',
+        'activo' => false,
+    ]);
+    $sustituido = TramiteDocumentoFinal::factory()->create([
+        'codigo_verificacion' => '1111-2222-3333-4444',
+        'estado' => 'sustituido',
+        'activo' => false,
+    ]);
+    $inactivo = TramiteDocumentoFinal::factory()->create([
+        'codigo_verificacion' => '9999-8888-7777-6666',
+        'estado' => 'emitido',
+        'activo' => false,
+    ]);
+
+    $this->get(route('documentos.verificar', ['codigo' => $anulado->codigo_verificacion]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('resultado.estado', 'anulado'));
+    $this->get(route('documentos.verificar', ['codigo' => $sustituido->codigo_verificacion]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('resultado.estado', 'sustituido'));
+    $this->get(route('documentos.verificar', ['codigo' => $inactivo->codigo_verificacion]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('resultado.estado', 'sustituido'));
 });
