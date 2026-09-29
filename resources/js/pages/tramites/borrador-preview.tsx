@@ -59,6 +59,7 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                                 Creado el{' '}
                                 {new Date(borrador.created_at).toLocaleString(
                                     'es-PE',
+                                    { timeZone: 'America/Lima' },
                                 )}
                             </time>
                         )}

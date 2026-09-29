@@ -23,8 +23,6 @@ class TramiteBorradorController extends Controller
     {
         abort_unless($borrador->tramite_id === $tramite->id, 404);
 
-        $borrador->load(['plantilla:id,nombre', 'creador:id,name']);
-
         return Inertia::render('tramites/borrador-preview', [
             'tramite' => ['id' => $tramite->id, 'codigo' => $tramite->codigo],
             'borrador' => [
@@ -32,9 +30,9 @@ class TramiteBorradorController extends Controller
                 'version' => $borrador->version,
                 'estado' => $borrador->estado,
                 'actual' => $borrador->es_actual,
-                'plantilla' => $borrador->plantilla->nombre,
+                'plantilla' => $borrador->plantilla()->value('nombre'),
                 'version_plantilla' => $borrador->version_plantilla,
-                'creador' => $borrador->creador?->name,
+                'creador' => $borrador->creador()->value('name'),
                 'created_at' => $borrador->created_at?->toIso8601String(),
                 'contenido' => $borrador->contenido_renderizado,
             ],
