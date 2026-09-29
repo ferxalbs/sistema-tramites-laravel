@@ -126,7 +126,7 @@ export default function Welcome() {
                                     </h1>
 
                                     <p className="max-w-2xl text-lg sm:text-xl text-muted-foreground text-balance leading-relaxed">
-                                        Registra tus solicitudes institucionales, supervisa el estado de tu expediente en tiempo real y valida la autenticidad de constancias y resoluciones oficiales.
+                                        Presenta tus documentos en Mesa de Partes. El personal registra tu expediente para que puedas consultar su avance y verificar la autenticidad del documento oficial.
                                     </p>
 
                                     <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -144,7 +144,7 @@ export default function Welcome() {
                                                     size="lg"
                                                     render={<Link href={login()} />}
                                                 >
-                                                    Iniciar Trámite
+                                                    Consultar mis Expedientes
                                                     <ArrowRight />
                                                 </Button>
                                                 <Button
@@ -163,10 +163,10 @@ export default function Welcome() {
                                         <div className="flex flex-col gap-1.5">
                                             <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                                                 <FileCheck2 className="size-4 text-primary" />
-                                                100% Digital
+                                                Recepción Presencial
                                             </span>
                                             <span className="text-xs text-muted-foreground leading-normal">
-                                                Sin papeleos innecesarios ni filas presenciales.
+                                                Entrega tus documentos en Mesa de Partes.
                                             </span>
                                         </div>
                                         <div className="flex flex-col gap-1.5">
@@ -307,10 +307,10 @@ export default function Welcome() {
                                     Flujo de Trabajo
                                 </Badge>
                                 <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
-                                    ¿Cómo funciona tu trámite en línea?
+                                    ¿Cómo se gestiona tu trámite?
                                 </h2>
                                 <p className="max-w-2xl text-base text-muted-foreground leading-relaxed">
-                                    Gestionar tus documentos es un proceso simple, ordenado y 100% auditable.
+                                    La recepción presencial inicia un proceso documentado y trazable.
                                 </p>
                             </div>
 
@@ -320,9 +320,9 @@ export default function Welcome() {
                                         <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
                                             1
                                         </div>
-                                        <CardTitle className="text-base">Inicia tu Solicitud</CardTitle>
+                                        <CardTitle className="text-base">Presenta tus Documentos</CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Selecciona el tipo de trámite, adjunta los requisitos requeridos y genera tu número de expediente único.
+                                            Entrega los requisitos en Mesa de Partes. El personal interno registra tu solicitud y te asigna un expediente.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
@@ -344,9 +344,9 @@ export default function Welcome() {
                                         <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
                                             3
                                         </div>
-                                        <CardTitle className="text-base">Resolución y Descarga</CardTitle>
+                                        <CardTitle className="text-base">Entrega y Confirmación</CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Obtén tu documento digital con código de verificación QR y firma institucional, listo para su uso legal y oficial.
+                                            Recibe el documento por el canal institucional y confirma su recepción. El código QR permite verificar su autenticidad.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
