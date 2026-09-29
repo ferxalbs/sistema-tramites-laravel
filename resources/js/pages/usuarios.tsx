@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useFlashToast } from '@/hooks/use-flash-toast';
 import {
     Select,
     SelectContent,
@@ -14,7 +15,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { create, edit, index, update } from '@/routes/admin/users';
+import {
+    create,
+    edit,
+    index,
+    resetPassword,
+    update,
+} from '@/routes/admin/users';
 
 type Status = 'activo' | 'pendiente' | 'inactivo' | 'rechazado';
 type UserRow = {
@@ -75,6 +82,7 @@ export default function Usuarios({
     counts,
     selected,
 }: Props) {
+    useFlashToast();
     const [query, setQuery] = useState(filters.q);
     const [role, setRole] = useState(filters.rol || 'todos');
     const [status, setStatus] = useState(filters.estado || 'todos');
@@ -104,7 +112,10 @@ export default function Usuarios({
                         Consulta cuentas, revisa cambios de estado y controla el
                         acceso.
                     </p>
-                    <Button nativeButton={false} render={<Link href={create()} />}>
+                    <Button
+                        nativeButton={false}
+                        render={<Link href={create()} />}
+                    >
                         Crear usuario
                     </Button>
                 </header>
@@ -312,7 +323,13 @@ export default function Usuarios({
                     <Card>
                         <CardHeader>
                             <CardTitle>Estado de {selected.name}</CardTitle>
-                            <Button variant="outline" nativeButton={false} render={<Link href={edit({ user: selected.id })} />}>
+                            <Button
+                                variant="outline"
+                                nativeButton={false}
+                                render={
+                                    <Link href={edit({ user: selected.id })} />
+                                }
+                            >
                                 Editar usuario
                             </Button>
                         </CardHeader>
@@ -325,6 +342,37 @@ export default function Usuarios({
                                 <p className="text-sm">
                                     Motivo registrado: {selected.motivo}
                                 </p>
+                            )}
+                            {selected.estado === 'activo' && (
+                                <div className="space-y-2">
+                                    <p className="text-sm text-muted-foreground">
+                                        Se enviará un enlace de un solo uso al
+                                        correo institucional. No se mostrará ni
+                                        cambiará la contraseña aquí.
+                                    </p>
+                                    <Form
+                                        {...resetPassword.form({
+                                            user: selected.id,
+                                        })}
+                                        disableWhileProcessing
+                                    >
+                                        {({ processing, errors }) => (
+                                            <>
+                                                <Button
+                                                    type="submit"
+                                                    variant="outline"
+                                                    disabled={processing}
+                                                >
+                                                    Generar enlace de
+                                                    restablecimiento
+                                                </Button>
+                                                <InputError
+                                                    message={errors.reset}
+                                                />
+                                            </>
+                                        )}
+                                    </Form>
+                                </div>
                             )}
                             <Form
                                 {...update.form({ user: selected.id })}
@@ -407,13 +455,19 @@ export default function Usuarios({
                                                     className="py-2"
                                                 >
                                                     <strong>
-                                                        {event.accion === 'create'
+                                                        {event.accion ===
+                                                        'create'
                                                             ? 'Cuenta creada'
-                                                            : event.accion === 'edit'
+                                                            : event.accion ===
+                                                                'edit'
                                                               ? 'Datos actualizados'
-                                                              : event.accion === 'change_role'
+                                                              : event.accion ===
+                                                                  'change_role'
                                                                 ? 'Rol cambiado'
-                                                                : `${statusLabels[event.estado_anterior]} → ${statusLabels[event.estado_nuevo]}`}
+                                                                : event.accion ===
+                                                                    'reset_link'
+                                                                  ? 'Enlace de restablecimiento'
+                                                                  : `${statusLabels[event.estado_anterior]} → ${statusLabels[event.estado_nuevo]}`}
                                                     </strong>
                                                     <span className="block text-muted-foreground">
                                                         {event.actor ??

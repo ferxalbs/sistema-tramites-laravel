@@ -17,10 +17,10 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
-use Illuminate\Validation\Rules\Password;
 
 Route::inertia('/', 'welcome')->name('home');
 Route::get('ayuda', fn (Request $request, SupportKnowledgeBase $support): InertiaResponse => Inertia::render('ayuda', $support->forRequest($request)))
@@ -98,6 +98,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('admin/usuarios/{user}/editar', [UserAccountController::class, 'edit'])->name('admin.users.edit');
         Route::put('admin/usuarios/{user}', [UserAccountController::class, 'save'])->name('admin.users.save');
         Route::patch('admin/usuarios/{user}/estado', [UserAccountController::class, 'update'])->name('admin.users.update');
+        Route::post('admin/usuarios/{user}/restablecer-contrasena', [UserAccountController::class, 'resetPassword'])->name('admin.users.reset-password');
         Route::get('revisiones-oficina', [TramiteAsignacionController::class, 'oficinaIndex'])->name('asignaciones.oficina.index');
         Route::get('revisiones-oficina/{tramite}', [TramiteAsignacionController::class, 'oficinaShow'])->name('asignaciones.oficina.show');
     });

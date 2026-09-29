@@ -64,21 +64,25 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         ];
     }
 
+    /** @return HasMany<Tramite, $this> */
     public function tramitesPropios(): HasMany
     {
         return $this->hasMany(Tramite::class, 'propietario_id');
     }
 
+    /** @return HasMany<TramiteAsignacion, $this> */
     public function tramitesAsignadosComoRevisor(): HasMany
     {
         return $this->hasMany(TramiteAsignacion::class, 'revisor_id');
     }
 
+    /** @return HasOne<PerfilEstudiante, $this> */
     public function perfilEstudiante(): HasOne
     {
         return $this->hasOne(PerfilEstudiante::class);
     }
 
+    /** @return HasOne<PerfilDocente, $this> */
     public function perfilDocente(): HasOne
     {
         return $this->hasOne(PerfilDocente::class);

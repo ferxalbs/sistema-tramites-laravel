@@ -54,7 +54,7 @@ class AdminUserRequest extends FormRequest
                 Rule::unique('users', 'correo_alternativo')->ignore($targetId),
             ],
             'confirmar_administrador' => [
-                Rule::requiredIf($role === 'administrador' && ($isCreate || $target?->rol !== 'administrador')),
+                Rule::requiredIf($role === 'administrador' && ($isCreate || $target->rol !== 'administrador')),
                 'nullable', 'accepted',
             ],
         ];

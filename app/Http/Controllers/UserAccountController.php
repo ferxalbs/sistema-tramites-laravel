@@ -7,16 +7,19 @@ use App\Models\PerfilDocente;
 use App\Models\PerfilEstudiante;
 use App\Models\ProgramaEstudio;
 use App\Models\User;
+use App\Notifications\AdministrativeResetPassword;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use Throwable;
 
 class UserAccountController extends Controller
 {
@@ -140,7 +143,7 @@ class UserAccountController extends Controller
                 'correo_alternativo' => $user->correo_alternativo,
                 'codigo_estudiante' => $student?->codigo_estudiante,
                 'codigo_docente' => $teacher?->codigo_docente,
-                'programa_estudio_id' => $student?->programa_estudio_id ?? $teacher?->programa_estudio_id,
+                'programa_estudio_id' => $student instanceof PerfilEstudiante ? $student->programa_estudio_id : $teacher?->programa_estudio_id,
                 'condicion_academica' => $student?->condicion_academica,
                 'ciclo_actual' => $student?->ciclo_actual,
                 'anio_egreso' => $student?->anio_egreso,
@@ -274,6 +277,39 @@ class UserAccountController extends Controller
         });
 
         return back()->with('success', 'Estado de cuenta actualizado.');
+    }
+
+    public function resetPassword(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 401);
+
+        $user->refresh();
+
+        if (! $user->activo || $user->estado_cuenta !== 'activo' || ! str_ends_with($user->email, '@seoane.edu.pe')) {
+            throw ValidationException::withMessages(['reset' => 'La cuenta debe estar activa y tener correo institucional.']);
+        }
+
+        $token = PasswordBroker::broker(config('fortify.passwords'))->createToken($user);
+
+        try {
+            $user->notify(new AdministrativeResetPassword($token));
+            $sent = true;
+        } catch (Throwable) {
+            $sent = false;
+        }
+
+        $this->recordEvent($user, $actor, 'reset_link', $user->estado_cuenta, $user->estado_cuenta,
+            $sent ? 'Enlace enviado al correo institucional.' : 'El correo no pudo enviarse.');
+
+        Inertia::flash('toast', [
+            'type' => $sent ? 'success' : 'error',
+            'message' => $sent
+                ? 'Se generó y envió un enlace seguro de restablecimiento.'
+                : 'El enlace no pudo enviarse. Revise la configuración de correo y reintente.',
+        ]);
+
+        return back();
     }
 
     /** @param array<string, mixed> $data */

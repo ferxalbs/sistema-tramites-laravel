@@ -1,10 +1,12 @@
 <?php
 
-use App\Models\User;
 use App\Models\ProgramaEstudio;
 use App\Models\TramiteAsignacion;
+use App\Models\User;
+use App\Notifications\AdministrativeResetPassword;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /** @return array<string, mixed> */
@@ -166,7 +168,7 @@ test('administrator creates every source role with the matching profile and temp
     $program = ProgramaEstudio::factory()->create();
     $this->actingAs($administrator)->get(route('admin.users.create'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('usuarios-form')->has('programas', 1));
+        ->component('usuarios-form')->has('programas', 1));
 
     foreach (['estudiante', 'docente', 'asistente', 'administrador'] as $index => $role) {
         $payload = adminUserPayload($role, $program->id, $index + 1);
@@ -228,8 +230,8 @@ test('editing an account changes role and profile and revokes prior sessions', f
 
     $this->actingAs($administrator)->get(route('admin.users.edit', $student))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('usuarios-form')->where('user.id', $student->id)
-            ->where('user.codigo_estudiante', 'ESTORIG'));
+        ->component('usuarios-form')->where('user.id', $student->id)
+        ->where('user.codigo_estudiante', 'ESTORIG'));
     $this->put(route('admin.users.save', $student), $payload)
         ->assertSessionHasNoErrors()->assertRedirect();
 
@@ -241,6 +243,56 @@ test('editing an account changes role and profile and revokes prior sessions', f
         ->and($student->perfilDocente?->codigo_docente)->toBe('DOC3AA')
         ->and(DB::table('sessions')->where('user_id', $student->id)->exists())->toBeFalse()
         ->and(DB::table('user_account_events')->where('user_id', $student->id)->count())->toBe(2);
+});
+
+test('editing a student keeps its own unique identity and updates its profile', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $program = ProgramaEstudio::factory()->create();
+    $student = User::factory()->create([
+        'rol' => 'estudiante',
+        'email' => 'a.usuario7@seoane.edu.pe',
+        'dni' => '80000007',
+        'correo_alternativo' => 'alternativo7@example.com',
+    ]);
+    $student->perfilEstudiante()->create([
+        'programa_estudio_id' => $program->id,
+        'codigo_estudiante' => 'EST7AA',
+        'condicion_academica' => 'Estudiante',
+        'ciclo_actual' => 3,
+    ]);
+    $payload = adminUserPayload('estudiante', $program->id, 7);
+    $payload['condicion_academica'] = 'Egresado';
+    $payload['anio_egreso'] = 2025;
+
+    $this->actingAs($administrator)->put(route('admin.users.save', $student), $payload)
+        ->assertSessionHasNoErrors()->assertRedirect();
+
+    $student->refresh();
+    expect($student->rol)->toBe('estudiante')
+        ->and($student->sesion_version)->toBe(0)
+        ->and($student->perfilEstudiante?->codigo_estudiante)->toBe('EST7AA')
+        ->and($student->perfilEstudiante?->condicion_academica)->toBe('Egresado')
+        ->and($student->perfilEstudiante?->ciclo_actual)->toBeNull()
+        ->and($student->perfilEstudiante?->anio_egreso)->toBe(2025)
+        ->and(DB::table('user_account_events')->where('user_id', $student->id)->count())->toBe(1);
+});
+
+test('promoting an account to administrator requires explicit confirmation', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $target = User::factory()->create(['rol' => 'asistente']);
+    $program = ProgramaEstudio::factory()->create();
+    $payload = adminUserPayload('administrador', $program->id, 8);
+    unset($payload['confirmar_administrador']);
+
+    $this->actingAs($administrator)->put(route('admin.users.save', $target), $payload)
+        ->assertSessionHasErrors('confirmar_administrador');
+    expect($target->fresh()->rol)->toBe('asistente');
+
+    $payload['confirmar_administrador'] = '1';
+    $this->put(route('admin.users.save', $target), $payload)
+        ->assertSessionHasNoErrors()->assertRedirect();
+    expect($target->fresh()->rol)->toBe('administrador')
+        ->and($target->fresh()->sesion_version)->toBe(1);
 });
 
 test('self role changes and changes with active assignments are rejected', function () {
@@ -289,4 +341,61 @@ test('temporary password must be changed before accessing the application', func
     expect($created->fresh()->debe_cambiar_password)->toBeFalse()
         ->and($created->fresh()->sesion_version)->toBe(1);
     $this->get(route('dashboard'))->assertOk();
+});
+
+test('only administrators can send an administrative reset link to an active institutional account', function () {
+    Notification::fake();
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $teacher = User::factory()->create(['rol' => 'docente', 'email' => 'docente.enlace@seoane.edu.pe']);
+    $inactive = User::factory()->create([
+        'rol' => 'docente',
+        'email' => 'docente.inactivo@seoane.edu.pe',
+        'activo' => false,
+        'estado_cuenta' => 'inactivo',
+    ]);
+
+    $this->post(route('admin.users.reset-password', $teacher))->assertRedirect(route('login'));
+    $this->actingAs($teacher)->post(route('admin.users.reset-password', $administrator))->assertForbidden();
+    $this->actingAs($administrator)->post(route('admin.users.reset-password', $inactive))
+        ->assertSessionHasErrors('reset');
+    Notification::assertNothingSent();
+
+    config()->set('app.url', 'https://tramites.seoane.edu.pe');
+    $this->withServerVariables(['HTTP_HOST' => 'attacker.invalid'])
+        ->post(route('admin.users.reset-password', $teacher))
+        ->assertRedirect()->assertSessionHas('inertia.flash_data.toast.type', 'success');
+    Notification::assertSentTo($teacher, AdministrativeResetPassword::class);
+    $notification = Notification::sent($teacher, AdministrativeResetPassword::class)->first();
+    $url = $notification->toMail($teacher)->actionUrl;
+    expect($url)->toStartWith('https://tramites.seoane.edu.pe/')
+        ->not->toContain('attacker.invalid');
+
+    $audit = DB::table('user_account_events')->where('user_id', $teacher->id)->first();
+    expect($audit->accion)->toBe('reset_link')
+        ->and($audit->actor_id)->toBe($administrator->id)
+        ->and($audit->motivo)->not->toContain($notification->token);
+    expect(DB::table('password_reset_tokens')->where('email', $teacher->email)->exists())->toBeTrue();
+
+    $this->post(route('logout'));
+    $this->post(route('password.update'), [
+        'token' => $notification->token,
+        'email' => $teacher->email,
+        'password' => 'NuevaClave2026',
+        'password_confirmation' => 'NuevaClave2026',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('login'));
+    expect(Hash::check('NuevaClave2026', $teacher->fresh()->password))->toBeTrue();
+});
+
+test('administrative reset reports delivery failure without disclosing the token', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $teacher = User::factory()->create(['rol' => 'docente', 'email' => 'docente.fallo@seoane.edu.pe']);
+    Notification::shouldReceive('send')->once()->andThrow(new RuntimeException('transport unavailable'));
+
+    $this->actingAs($administrator)->post(route('admin.users.reset-password', $teacher))
+        ->assertSessionHas('inertia.flash_data.toast.type', 'error');
+
+    $audit = DB::table('user_account_events')->where('user_id', $teacher->id)->first();
+    expect($audit->accion)->toBe('reset_link')
+        ->and($audit->motivo)->toBe('El correo no pudo enviarse.')
+        ->and(DB::table('password_reset_tokens')->where('email', $teacher->email)->exists())->toBeTrue();
 });

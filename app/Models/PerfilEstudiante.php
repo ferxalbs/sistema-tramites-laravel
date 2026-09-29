@@ -12,9 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $user_id
  * @property int $programa_estudio_id
+ * @property string|null $codigo_estudiante
  * @property string $condicion_academica
  * @property int|null $ciclo_actual
  * @property int|null $anio_egreso
+ * @property string|null $direccion_residencia
  */
 #[Fillable(['user_id', 'programa_estudio_id', 'codigo_estudiante', 'condicion_academica', 'ciclo_actual', 'anio_egreso', 'direccion_residencia'])]
 class PerfilEstudiante extends Model
