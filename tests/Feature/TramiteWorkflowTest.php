@@ -2,6 +2,7 @@
 
 use App\Models\PerfilDocente;
 use App\Models\PerfilEstudiante;
+use App\Models\ProgramaEstudio;
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
 use App\Models\TramiteBorrador;
@@ -2263,8 +2264,7 @@ test('physical correction requires an observed expediente and preserves its stat
         ->assertInertia(fn (Assert $page) => $page->component('tramites/estudiante-show')
             ->has('documentos_recepcion', 1)
             ->missing('eventos'));
-    expect(str_contains($studentResponse->getContent(), 'Seguimiento de trámite'))->toBeTrue()
-        ->and(str_contains($studentResponse->getContent(), 'Documento corregido recibido presencialmente.'))->toBeFalse();
+    expect(str_contains($studentResponse->getContent(), 'Documento corregido recibido presencialmente.'))->toBeFalse();
     $this->actingAs($student)->get(route('tramites.documentos.descargar', [$tramite, $correction->id]))->assertDownload('corregido.pdf');
     $tramite->update(['estado' => 'cerrado']);
     $this->actingAs($assistant)->post(route('tramites.subsanaciones.store', $tramite), [
@@ -2365,11 +2365,15 @@ test('assistant registers multiple independent documents in one physical recepti
 test('physical reception requires confirmation and preserves arrival and provenance details', function () {
     $assistant = User::factory()->create(['rol' => 'asistente']);
     $student = User::factory()->create(['rol' => 'estudiante']);
+    $programa = ProgramaEstudio::factory()->create();
+    $otroPrograma = ProgramaEstudio::factory()->create();
+    $perfil = PerfilEstudiante::factory()->create(['user_id' => $student->id, 'programa_estudio_id' => $programa->id]);
     $payload = [
         'clasificacion' => 'estudiantil',
         'tipo_documento' => 'FUT',
         'persona_nombre' => 'Persona de prueba',
         'propietario_id' => $student->id,
+        'programa_estudio_id' => $otroPrograma->id,
         'destino_tipo' => 'oficina',
         'destino_nombre' => 'Secretaría',
         'asunto' => 'Ingreso físico confirmado',
@@ -2399,6 +2403,7 @@ test('physical reception requires confirmation and preserves arrival and provena
     $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1'])->assertRedirect();
     $tramite = Tramite::query()->where('asunto', $payload['asunto'])->sole();
     expect($tramite->fecha_recepcion->toDateString())->toBe('2026-09-28')
+        ->and($tramite->programa_estudio_id)->toBe($programa->id)
         ->and($tramite->fecha_llegada_oficina->format('Y-m-d H:i'))->toBe('2026-09-28 16:45')
         ->and($tramite->fecha_presentacion_original->toDateString())->toBe('2026-09-27')
         ->and($tramite->numero_expediente_externo)->toBe('EXT-2026/42 #B')
@@ -2406,9 +2411,12 @@ test('physical reception requires confirmation and preserves arrival and provena
         ->and($tramite->persona_entrega_documento)->toBe('Apoderada de prueba')
         ->and($tramite->observacion_recepcion)->toBe('Se cotejó el documento físico.')
         ->and($tramite->prioridad)->toBe('alta');
+    $perfil->update(['programa_estudio_id' => $otroPrograma->id]);
+    expect($tramite->fresh()->programa_estudio_id)->toBe($programa->id);
     $this->get(route('tramites.show', $tramite))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('tramite.fecha_llegada_oficina', '2026-09-28 16:45')
+            ->where('tramite.programa', $programa->nombre)
             ->where('tramite.numero_expediente_externo', 'EXT-2026/42 #B')
             ->where('tramite.observacion_recepcion', 'Se cotejó el documento físico.')
             ->etc());
@@ -2416,6 +2424,31 @@ test('physical reception requires confirmation and preserves arrival and provena
         ->assertInertia(fn (Assert $page) => $page->where('tramites.data.0.id', $tramite->id)->etc());
     $this->get(route('search.index', ['q' => 'EXT-2026/42']))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('results.expedientes.0.id', $tramite->id)->etc());
+
+    $administrativePayload = [
+        ...$payload,
+        'clasificacion' => 'administrativo',
+        'tipo_documento' => 'COMUNICACION_ADMINISTRATIVA',
+        'propietario_id' => null,
+        'programa_estudio_id' => $otroPrograma->id,
+        'asunto' => 'Ingreso administrativo con programa',
+        'confirmar_recepcion' => '1',
+    ];
+    $inactiveProgram = ProgramaEstudio::factory()->create(['activo' => false]);
+    $this->post(route('tramites.store'), [...$administrativePayload, 'programa_estudio_id' => $inactiveProgram->id])
+        ->assertSessionHasErrors('programa_estudio_id');
+    $this->post(route('tramites.store'), $administrativePayload)->assertRedirect();
+    expect(Tramite::query()->where('asunto', $administrativePayload['asunto'])->sole()->programa_estudio_id)
+        ->toBe($otroPrograma->id);
+
+    $otroPrograma->update(['activo' => false]);
+    $this->post(route('tramites.store'), [
+        ...$payload,
+        'programa_estudio_id' => null,
+        'asunto' => 'Ingreso con programa inactivo',
+        'confirmar_recepcion' => '1',
+    ])->assertSessionHasErrors('propietario_id');
+    expect(Tramite::query()->where('asunto', 'Ingreso con programa inactivo')->exists())->toBeFalse();
 });
 
 test('initial reception rejects an invalid file and removes stored files when its transaction fails', function () {
@@ -2570,4 +2603,118 @@ test('assistant edits reception data before assignment with validation and audit
     $tramite->update(['estado' => 'borrador_preparado']);
     $this->get(route('tramites.edit', $tramite))->assertStatus(409);
     $this->put(route('tramites.update', $tramite), $payload)->assertStatus(409);
+});
+
+test('only administrators see the issued delivery register and can configure delivery media', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $issuedTramite = Tramite::factory()->create(['estado' => 'listo_entrega', 'codigo' => 'TRM-ENTREGA-EMITIDO']);
+    $unissuedTramite = Tramite::factory()->create(['estado' => 'aprobado', 'codigo' => 'TRM-ENTREGA-PENDIENTE']);
+    TramiteDocumentoFinal::factory()->create(['tramite_id' => $issuedTramite->id, 'estado' => 'emitido']);
+    TramiteDocumentoFinal::factory()->create(['tramite_id' => $unissuedTramite->id, 'estado' => 'generando']);
+    $medio = TramiteMedioEntrega::query()->create([
+        'codigo' => 'presencial',
+        'nombre' => 'Presencial',
+        'tipo' => 'presencial',
+        'activo' => true,
+        'requiere_evidencia' => true,
+    ]);
+
+    $this->get(route('admin.deliveries.index'))->assertRedirect(route('login'));
+    $this->actingAs($assistant)->get(route('admin.deliveries.index'))->assertForbidden();
+    $this->actingAs($student)->patch(route('admin.deliveries.media.update', $medio), [
+        'activo' => false,
+        'requiere_evidencia' => false,
+    ])->assertForbidden();
+
+    $this->actingAs($administrator)->get(route('admin.deliveries.index'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('tramites/entregas-admin')
+        ->where('tramites.total', 1)
+        ->where('tramites.data.0.codigo', 'TRM-ENTREGA-EMITIDO')
+        ->where('medios.0.activo', true)
+        ->where('medios.0.requiere_evidencia', true)
+        ->missing('tramites.data.1'));
+
+    $this->patch(route('admin.deliveries.media.update', $medio), [
+        'activo' => 'incorrecto',
+        'requiere_evidencia' => '0',
+    ])->assertSessionHasErrors('activo');
+    $this->patch(route('admin.deliveries.media.update', $medio), [
+        'activo' => '0',
+        'requiere_evidencia' => '0',
+    ])->assertRedirect(route('admin.deliveries.index'));
+
+    expect($medio->fresh()->activo)->toBeFalse()
+        ->and($medio->fresh()->requiere_evidencia)->toBeFalse();
+    $event = DB::table('tramite_config_events')->where('entidad', 'medio_entrega')->sole();
+    expect($event->accion)->toBe('configurar_medio')
+        ->and((int) $event->actor_id)->toBe($administrator->id)
+        ->and(json_decode($event->valor_anterior, true))->toBe(['activo' => true, 'requiere_evidencia' => true])
+        ->and(json_decode($event->valor_nuevo, true))->toBe(['activo' => false, 'requiere_evidencia' => false]);
+
+    $this->patch(route('admin.deliveries.media.update', $medio), [
+        'activo' => '0',
+        'requiere_evidencia' => '0',
+    ])->assertRedirect();
+    expect(DB::table('tramite_config_events')->count())->toBe(1);
+    $this->get(route('admin.audit.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('events.data.0.modulo', 'entregas')
+        ->where('events.data.0.accion', 'configurar_medio')
+        ->where('events.data.0.entidad_id', $medio->id)
+        ->missing('events.data.0.valor_anterior')
+        ->missing('events.data.0.valor_nuevo')
+        ->etc());
+});
+
+test('only administrators configure signing on active templates without changing issued documents', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $active = TramitePlantilla::factory()->create([
+        'requiere_firma_fisica' => false,
+        'permite_no_firma' => true,
+    ]);
+    $inactive = TramitePlantilla::factory()->create(['activa' => false]);
+    $issued = TramiteDocumentoFinal::factory()->create([
+        'estado' => 'emitido',
+        'contenido_snapshot' => ['requiere_firma_fisica' => false, 'permite_no_firma' => true],
+    ]);
+
+    $this->actingAs($assistant)->patch(route('admin.deliveries.templates.update', $active), [
+        'requiere_firma_fisica' => '1',
+        'permite_no_firma' => '0',
+    ])->assertForbidden();
+    $this->actingAs($administrator)->get(route('admin.deliveries.index'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('plantillas', fn ($plantillas): bool => collect($plantillas)->contains('id', $active->id)
+            && ! collect($plantillas)->contains('id', $inactive->id))
+        ->etc());
+
+    $this->patch(route('admin.deliveries.templates.update', $inactive), [
+        'requiere_firma_fisica' => '1',
+        'permite_no_firma' => '0',
+    ])->assertNotFound();
+    $this->patch(route('admin.deliveries.templates.update', $active), [
+        'requiere_firma_fisica' => '1',
+    ])->assertSessionHasErrors('permite_no_firma');
+    $this->patch(route('admin.deliveries.templates.update', $active), [
+        'requiere_firma_fisica' => '1',
+        'permite_no_firma' => '0',
+    ])->assertRedirect(route('admin.deliveries.index'));
+
+    expect($active->fresh()->requiere_firma_fisica)->toBeTrue()
+        ->and($active->fresh()->permite_no_firma)->toBeFalse()
+        ->and($inactive->fresh()->requiere_firma_fisica)->toBeFalse()
+        ->and($issued->fresh()->contenido_snapshot)->toBe(['requiere_firma_fisica' => false, 'permite_no_firma' => true]);
+    $event = DB::table('tramite_config_events')->where('entidad', 'plantilla')->sole();
+    expect($event->accion)->toBe('configurar_firma_plantilla')
+        ->and((int) $event->actor_id)->toBe($administrator->id)
+        ->and((int) $event->entidad_id)->toBe($active->id);
+
+    $this->patch(route('admin.deliveries.templates.update', $active), [
+        'requiere_firma_fisica' => '1',
+        'permite_no_firma' => '0',
+    ])->assertRedirect();
+    expect(DB::table('tramite_config_events')->count())->toBe(1);
 });

@@ -9,8 +9,10 @@ use App\Http\Controllers\TramiteAsignacionController;
 use App\Http\Controllers\TramiteBorradorController;
 use App\Http\Controllers\TramiteController;
 use App\Http\Controllers\TramiteDocumentoFinalController;
+use App\Http\Controllers\TramiteEntregaAdminController;
 use App\Http\Controllers\TramiteEntregaController;
 use App\Http\Controllers\TramiteEstudianteController;
+use App\Http\Controllers\TramiteReportController;
 use App\Http\Controllers\TramiteRevisionController;
 use App\Http\Controllers\TramiteVerificacionPublicaController;
 use App\Http\Controllers\UserAccountController;
@@ -56,6 +58,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('search.index');
 
     Route::middleware('role:asistente,administrador')->group(function (): void {
+        Route::get('admin/reportes', [TramiteReportController::class, 'index'])->name('admin.reports.index');
         Route::resource('tramites', TramiteController::class)->only(['index', 'create', 'store', 'show']);
         Route::get('tramites/{tramite}/comprobante', [TramiteController::class, 'receipt'])
             ->name('tramites.receipt');
@@ -98,6 +101,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:administrador')->group(function (): void {
+        Route::get('admin/reportes/exportar', [TramiteReportController::class, 'export'])->name('admin.reports.export');
+        Route::get('admin/entregas', [TramiteEntregaAdminController::class, 'index'])->name('admin.deliveries.index');
+        Route::patch('admin/entregas/medios/{medio}', [TramiteEntregaAdminController::class, 'updateMedium'])->name('admin.deliveries.media.update');
+        Route::patch('admin/entregas/plantillas/{plantilla}', [TramiteEntregaAdminController::class, 'updateTemplate'])->name('admin.deliveries.templates.update');
         Route::post('tramites/{tramite}/entrega/{entrega}/anular', [TramiteEntregaController::class, 'annul'])
             ->name('tramites.entrega.anular');
         Route::post('tramites/{tramite}/entrega/reabrir', [TramiteEntregaController::class, 'reopen'])

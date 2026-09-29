@@ -29,6 +29,7 @@ type Props = {
     catalogos: Catalogos;
     ahora: string;
     estudiantes: Array<{ id: number; name: string }>;
+    programas: Array<{ id: number; nombre: string }>;
     tramite: {
         id: number;
         codigo: string;
@@ -37,6 +38,7 @@ type Props = {
         persona_nombre: string;
         persona_identificador: string | null;
         propietario_id: number | null;
+        programa_estudio_id: number | null;
         destino_tipo: string;
         destino_nombre: string;
         asunto: string;
@@ -52,7 +54,7 @@ type Props = {
     } | null;
 };
 
-export default function TramiteCreate({ catalogos, ahora, estudiantes, tramite }: Props) {
+export default function TramiteCreate({ catalogos, ahora, estudiantes, programas, tramite }: Props) {
     const primeraClasificacion = tramite?.clasificacion ?? Object.keys(catalogos.clasificaciones)[0] ?? 'estudiantil';
     const [clasificacion, setClasificacion] = useState(primeraClasificacion);
     const [tipoDocumento, setTipoDocumento] = useState(
@@ -132,6 +134,25 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, tramite }
                                         <p className="text-xs text-muted-foreground">Obligatorio para los trámites de clasificación estudiantil.{estudiantes.length === 0 ? ' No hay cuentas activas disponibles.' : ''}</p>
                                         <InputError message={errors.propietario_id} />
                                     </div>
+                                    {clasificacion === 'estudiantil' ? (
+                                        <p className="self-center text-sm text-muted-foreground">
+                                            El programa de estudios se toma del perfil del estudiante seleccionado.
+                                        </p>
+                                    ) : (
+                                        <div className="grid content-start gap-2">
+                                            <Label htmlFor="programa_estudio_id">Programa de estudios</Label>
+                                            <select
+                                                id="programa_estudio_id"
+                                                name="programa_estudio_id"
+                                                defaultValue={tramite?.programa_estudio_id ?? ''}
+                                                className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
+                                            >
+                                                <option value="">No aplica</option>
+                                                {programas.map((programa) => <option key={programa.id} value={programa.id}>{programa.nombre}</option>)}
+                                            </select>
+                                            <InputError message={errors.programa_estudio_id} />
+                                        </div>
+                                    )}
                                     <FormSelect
                                         id="tipo_documento"
                                         label="Tipo de documento"

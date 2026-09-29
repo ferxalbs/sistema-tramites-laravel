@@ -49,6 +49,7 @@ type TramiteDetail = {
     id: number;
     codigo: string;
     clasificacion: string;
+    programa: string | null;
     tipo_documento: string;
     persona_nombre: string;
     persona_identificador: string | null;
@@ -310,6 +311,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                         <Detail label="DNI o código" value={tramite.persona_identificador ?? 'No registrado'} />
                         <Detail label="Cuenta asociada" value={tramite.propietario ?? 'Sin cuenta vinculada'} />
                                 <Detail label="Clasificación" value={tramite.clasificacion} />
+                                <Detail label="Programa" value={tramite.programa ?? 'No registrado'} />
                                 <Detail label="Tipo de documento" value={tramite.tipo_documento} />
                                 <Detail label="Destino" value={`${tramite.destino_tipo}: ${tramite.destino_nombre}`} />
                                 <Detail label="Fecha de recepción" value={formatDate(tramite.fecha_recepcion)} />

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ProgramaEstudio;
 use App\Models\Tramite;
 use App\Models\TramiteAsignacion;
 use App\Models\TramiteDocumentoFinal;
@@ -7,6 +8,7 @@ use App\Models\TramiteEntrega;
 use App\Models\TramiteEvento;
 use App\Models\TramiteMedioEntrega;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected to the login page', function () {
@@ -166,4 +168,136 @@ test('dashboard filters active reviewer and delivery medium without widening rol
         ->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('summary.total', 1)
         ->has('catalogs.revisores', 0));
+});
+
+test('administrative reports filter saved program and current assignment without exposing rows to other roles', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $teacher = User::factory()->create(['rol' => 'docente']);
+    $student = User::factory()->create(['rol' => 'estudiante']);
+    $programa = ProgramaEstudio::factory()->create(['nombre' => 'Programa de prueba']);
+    $otroPrograma = ProgramaEstudio::factory()->create();
+    $matching = Tramite::factory()->create([
+        'codigo' => 'TRM-REPORT-001',
+        'programa_estudio_id' => $programa->id,
+        'estado' => 'entregado',
+    ]);
+    Tramite::factory()->create([
+        'codigo' => 'TRM-REPORT-002',
+        'programa_estudio_id' => $otroPrograma->id,
+        'estado' => 'entregado',
+    ]);
+    TramiteAsignacion::factory()->create([
+        'tramite_id' => $matching->id,
+        'revisor_id' => $teacher->id,
+        'asignado_por' => $assistant->id,
+        'activa' => true,
+    ]);
+    $documento = TramiteDocumentoFinal::factory()->create(['tramite_id' => $matching->id, 'estado' => 'emitido']);
+    $medio = TramiteMedioEntrega::query()->create([
+        'codigo' => 'report-presencial',
+        'nombre' => 'Presencial para reporte',
+        'tipo' => 'presencial',
+        'activo' => true,
+    ]);
+    TramiteEntrega::query()->create([
+        'tramite_id' => $matching->id,
+        'documento_final_id' => $documento->id,
+        'medio_entrega_id' => $medio->id,
+        'receptor_nombre' => 'Persona de prueba',
+        'receptor_tipo' => 'estudiante',
+        'fecha_entrega' => now(),
+        'codigo_confirmacion' => 'REPORT-MEDIO-001',
+        'activa' => true,
+    ]);
+
+    $this->get(route('admin.reports.index'))->assertRedirect(route('login'));
+    $this->actingAs($student)->get(route('admin.reports.index'))->assertForbidden();
+    $this->actingAs($teacher)->get(route('admin.reports.index'))->assertForbidden();
+    $this->actingAs($assistant)->get(route('admin.reports.index'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('reportes')
+        ->where('rows.total', fn (int $total): bool => $total >= 2)
+        ->where('canExport', false)
+        ->etc());
+    $this->get(route('admin.reports.export'))->assertForbidden();
+
+    $filters = [
+        'programa' => $programa->id,
+        'clasificacion' => 'estudiantil',
+        'tipo' => 'FUT',
+        'estado' => 'entregado',
+        'revisor' => $teacher->id,
+        'medio' => $medio->id,
+    ];
+    $this->actingAs($administrator)->get(route('admin.reports.index', $filters))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.total', 1)
+        ->where('rows.data.0.codigo', 'TRM-REPORT-001')
+        ->where('rows.data.0.programa', 'Programa de prueba')
+        ->where('rows.data.0.revisor', $teacher->name)
+        ->where('canExport', true)
+        ->etc());
+    $this->get(route('admin.reports.index', ['programa' => 999999]))->assertSessionHasErrors('programa');
+    $this->get(route('admin.reports.index', ['desde' => now()->toDateString(), 'hasta' => now()->subDay()->toDateString()]))
+        ->assertSessionHasErrors('hasta');
+});
+
+test('only administrators export filtered semicolon CSV with BOM and neutralized spreadsheet formulas', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $programa = ProgramaEstudio::factory()->create(['nombre' => 'Programa CSV']);
+    Tramite::factory()->create([
+        'codigo' => 'TRM-CSV-001',
+        'asunto' => '=2+2',
+        'programa_estudio_id' => $programa->id,
+        'estado' => 'cerrado',
+    ]);
+    Tramite::factory()->create(['codigo' => 'TRM-CSV-002', 'estado' => 'digitalizado']);
+
+    $this->actingAs($assistant)->get(route('admin.reports.export'))->assertForbidden();
+    expect(DB::table('tramite_report_export_events')->count())->toBe(0);
+    $response = $this->actingAs($administrator)->get(route('admin.reports.export', [
+        'programa' => $programa->id,
+        'estado' => 'cerrado',
+    ]));
+    $response->assertOk()->assertDownload()->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
+    $contents = $response->streamedContent();
+    expect($contents)->toStartWith("\xEF\xBB\xBF")
+        ->and($contents)->toContain('TRM-CSV-001', "'=2+2", 'Programa CSV')
+        ->and($contents)->not->toContain('TRM-CSV-002');
+    $lines = explode("\n", trim(substr($contents, 3)));
+    expect($lines)->toHaveCount(2)
+        ->and(str_getcsv($lines[0], ';'))->toHaveCount(9)
+        ->and(str_getcsv($lines[1], ';'))->toHaveCount(9);
+    $event = DB::table('tramite_report_export_events')->sole();
+    expect((int) $event->actor_id)->toBe($administrator->id)
+        ->and((int) $event->filas)->toBe(1)
+        ->and(json_decode($event->filtros, true))->toBe(['programa' => (string) $programa->id, 'estado' => 'cerrado']);
+    $this->get(route('admin.audit.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('events.data.0.modulo', 'reportes')
+        ->where('events.data.0.accion', 'exportar_reporte_csv')
+        ->missing('events.data.0.filtros')
+        ->etc());
+});
+
+test('report pagination keeps filters and returns only the requested page', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $programa = ProgramaEstudio::factory()->create();
+    Tramite::factory()->count(26)->create(['programa_estudio_id' => $programa->id]);
+
+    $this->actingAs($assistant)->get(route('admin.reports.index', ['programa' => $programa->id]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.total', 26)
+        ->has('rows.data', 25)
+        ->where('filters.programa', (string) $programa->id)
+        ->where('rows.next_page_url', fn (string $url): bool => str_contains($url, 'programa='.$programa->id) && str_contains($url, 'page=2'))
+        ->etc());
+    $this->get(route('admin.reports.index', ['programa' => $programa->id, 'page' => 2]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.total', 26)
+        ->has('rows.data', 1)
+        ->where('rows.current_page', 2)
+        ->etc());
 });

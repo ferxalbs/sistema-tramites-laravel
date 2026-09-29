@@ -5,6 +5,8 @@ import {
     CircleHelp,
     ClipboardCheck,
     ClipboardList,
+    PackageCheck,
+    FileSpreadsheet,
     FolderGit2,
     LayoutGrid,
     Plus,
@@ -15,6 +17,7 @@ import {
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
+import TramiteEntregaAdminController from '@/actions/App/Http/Controllers/TramiteEntregaAdminController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -33,6 +36,7 @@ import { index as usersIndex } from '@/routes/admin/users';
 import { index as holidaysIndex } from '@/routes/admin/holidays';
 import { index as auditIndex } from '@/routes/admin/audit';
 import { index as searchIndex } from '@/routes/search';
+import { index as reportsIndex } from '@/routes/admin/reports';
 import { index as supportIndex } from '@/routes/support';
 import type { Auth, NavItem } from '@/types';
 
@@ -75,6 +79,11 @@ export function AppSidebar() {
                 href: TramiteController.create(),
                 icon: Plus,
             },
+            {
+                title: 'Reportes',
+                href: reportsIndex(),
+                icon: FileSpreadsheet,
+            },
         );
     }
 
@@ -95,6 +104,11 @@ export function AppSidebar() {
     }
 
     if (auth.user.rol === 'administrador') {
+        mainNavItems.push({
+            title: 'Entregas y cierres',
+            href: TramiteEntregaAdminController.index(),
+            icon: PackageCheck,
+        });
         mainNavItems.push({
             title: 'Revisión de oficina',
             href: TramiteAsignacionController.oficinaIndex(),

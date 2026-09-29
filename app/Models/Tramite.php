@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'persona_nombre',
     'persona_identificador',
     'propietario_id',
+    'programa_estudio_id',
     'destino_tipo',
     'destino_nombre',
     'asunto',
@@ -55,6 +56,12 @@ class Tramite extends Model
     public function propietario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'propietario_id');
+    }
+
+    /** @return BelongsTo<ProgramaEstudio, $this> */
+    public function programa(): BelongsTo
+    {
+        return $this->belongsTo(ProgramaEstudio::class, 'programa_estudio_id');
     }
 
     public function documentos(): HasMany

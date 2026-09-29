@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreTramiteRequest;
 use App\Http\Requests\UpdateTramiteRequest;
 use App\Http\Requests\UploadTramiteDocumentRequest;
+use App\Models\ProgramaEstudio;
 use App\Models\Tramite;
 use App\Models\TramiteDocumento;
 use App\Models\TramiteEvento;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use RuntimeException;
@@ -100,7 +102,7 @@ class TramiteController extends Controller
             'ahora' => now()->format('Y-m-d\TH:i'),
             'tramite' => $tramite->only([
                 'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador',
-                'propietario_id', 'destino_tipo', 'destino_nombre', 'asunto', 'descripcion', 'prioridad', 'folios',
+                'propietario_id', 'programa_estudio_id', 'destino_tipo', 'destino_nombre', 'asunto', 'descripcion', 'prioridad', 'folios',
                 'numero_expediente_externo', 'area_procedencia', 'persona_entrega_documento', 'observacion_recepcion',
             ]) + [
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d\TH:i')
@@ -130,6 +132,7 @@ class TramiteController extends Controller
             }
 
             $tramite = DB::transaction(function () use ($codigo, $datos, $datosDocumentos, $request): Tramite {
+                $datos['programa_estudio_id'] = $this->programaParaRecepcion($datos);
                 $estado = $datosDocumentos === [] ? 'recibido_oficina' : 'digitalizado';
                 $tramite = Tramite::create([
                     ...$datos,
@@ -201,6 +204,7 @@ class TramiteController extends Controller
         $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
 
         DB::transaction(function () use ($request, $tramite, $datos): void {
+            $datos['programa_estudio_id'] = $this->programaParaRecepcion($datos);
             $actualizados = Tramite::query()
                 ->whereKey($tramite->id)
                 ->whereIn('estado', ['recibido_oficina', 'digitalizado'])
@@ -384,6 +388,7 @@ class TramiteController extends Controller
             'eventos' => fn ($query) => $query->with('usuario')->orderBy('id'),
             'recibidoPor',
             'propietario',
+            'programa',
             'borradorActual.plantilla',
             'borradores' => fn ($query) => $query->with('plantilla')->orderByDesc('version'),
             'asignacionActual.revisor',
@@ -423,6 +428,7 @@ class TramiteController extends Controller
                 'estado_label' => config('tramites.estados.'.$tramite->estado, $tramite->estado),
                 'recibido_por' => $tramite->recibidoPor?->name,
                 'propietario' => $tramite->propietario?->name,
+                'programa' => $tramite->programa?->nombre,
                 'puede_gestionar_asignacion' => $request->user()->rol === 'asistente',
                 'puede_corregir_revision' => $request->user()->rol === 'asistente' && $tramite->estado === 'observado',
                 'puede_gestionar_documentos_recepcion' => $request->user()->rol === 'asistente'
@@ -615,7 +621,33 @@ class TramiteController extends Controller
                 ->get(['id', 'name'])
                 ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])
                 ->all(),
+            'programas' => ProgramaEstudio::query()
+                ->where('activo', true)
+                ->orderBy('nombre')
+                ->get(['id', 'nombre'])
+                ->map(fn (ProgramaEstudio $programa): array => ['id' => $programa->id, 'nombre' => $programa->nombre])
+                ->all(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $datos
+     */
+    private function programaParaRecepcion(array $datos): ?int
+    {
+        if (empty($datos['propietario_id'])) {
+            return isset($datos['programa_estudio_id']) ? (int) $datos['programa_estudio_id'] : null;
+        }
+
+        $programaId = DB::table('perfiles_estudiante')
+            ->where('user_id', $datos['propietario_id'])
+            ->value('programa_estudio_id');
+
+        if ($programaId !== null && ! ProgramaEstudio::query()->whereKey($programaId)->where('activo', true)->exists()) {
+            throw ValidationException::withMessages(['propietario_id' => 'El programa del estudiante ya no está activo.']);
+        }
+
+        return $programaId === null ? null : (int) $programaId;
     }
 
     private function canEditReception(Tramite $tramite): bool
