@@ -297,6 +297,26 @@ class TursoConnection extends SQLiteConnection
     }
 
     /**
+     * Laravel's SQLite schema grammar needs the remote engine version when altering tables.
+     */
+    #[\Override]
+    public function getServerVersion(): string
+    {
+        return $this->withoutPretending(
+            fn (): string => (string) $this->selectOne('SELECT sqlite_version() AS version')->version,
+        );
+    }
+
+    /**
+     * Laravel interpolates bindings when displaying pretend migration queries.
+     */
+    #[\Override]
+    protected function escapeString($value): string
+    {
+        return "'".str_replace("'", "''", $value)."'";
+    }
+
+    /**
      * There is no PDO handle to reconnect for the stateless HTTP transport.
      */
     #[\Override]
@@ -493,5 +513,10 @@ class TursoConnection extends SQLiteConnection
     protected function getDefaultPostProcessor(): Processor
     {
         return new TursoProcessor;
+    }
+
+    protected function getDefaultSchemaGrammar(): TursoSchemaGrammar
+    {
+        return new TursoSchemaGrammar($this);
     }
 }

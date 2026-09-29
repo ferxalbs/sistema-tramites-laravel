@@ -16,8 +16,11 @@ chmod -R 775 /app/storage /app/bootstrap/cache
 php artisan storage:link --no-interaction || true
 
 # Run database migrations if configured
-if [ -n "$DB_CONNECTION" ] && [ "$DB_CONNECTION" != "sqlite" ]; then
-    echo "Running database migrations..."
+if [ "$DB_CONNECTION" = "libsql" ]; then
+    echo "Connecting to Turso libSQL and running database migrations..."
+    php artisan migrate --force --no-interaction || true
+elif [ -n "$DB_CONNECTION" ] && [ "$DB_CONNECTION" != "sqlite" ]; then
+    echo "Running database migrations ($DB_CONNECTION)..."
     php artisan migrate --force --no-interaction || true
 elif [ "$DB_CONNECTION" = "sqlite" ] && [ -f "$DB_DATABASE" ]; then
     echo "Running SQLite migrations..."

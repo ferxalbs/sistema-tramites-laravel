@@ -1,9 +1,10 @@
 # Fallback configuration for Nixpacks builder
 [phases.setup]
-nixPkgs = ["php83", "php83Packages.composer", "nodejs_22", "corepack"]
+nixPkgs = ["php83", "php83Extensions.ffi", "php83Packages.composer", "nodejs_22", "corepack"]
 
 [phases.install]
 cmds = [
+    "mkdir -p $NIXPACKS_PHP_CONF_DIR && echo 'ffi.enable=true' > $NIXPACKS_PHP_CONF_DIR/turso-ffi.ini || true",
     "composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader",
     "corepack enable",
     "corepack prepare pnpm@12.6.0 --activate",

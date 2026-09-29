@@ -11,8 +11,9 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
     APP_ENV=production \
     PORT=80
 
-# Install production PHP extensions
+# Install production PHP extensions (including ffi for Turso libSQL)
 RUN install-php-extensions \
+    ffi \
     pdo_pgsql \
     pdo_mysql \
     bcmath \
@@ -20,7 +21,8 @@ RUN install-php-extensions \
     intl \
     opcache \
     pcntl \
-    redis
+    redis \
+    && echo "ffi.enable=true" > /usr/local/etc/php/conf.d/turso-ffi.ini
 
 # Install Node.js 22 LTS & pnpm for frontend asset compilation
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \

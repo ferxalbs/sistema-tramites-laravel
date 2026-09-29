@@ -235,6 +235,52 @@ test('Turso connection decodes SQL value types after the HTTP client receives th
     Http::assertSentCount(1);
 });
 
+test('Turso connection reads the remote SQLite version for schema alterations', function () {
+    Http::fake(fn () => Http::response([
+        'baton' => null,
+        'base_url' => null,
+        'results' => [
+            [
+                'type' => 'ok',
+                'response' => [
+                    'type' => 'batch',
+                    'result' => [
+                        'step_results' => [
+                            ['affected_row_count' => 0, 'cols' => [], 'rows' => []],
+                            [
+                                'affected_row_count' => 0,
+                                'cols' => [['name' => 'version']],
+                                'rows' => [[['type' => 'text', 'value' => '3.50.4']]],
+                            ],
+                        ],
+                        'step_errors' => [null, null],
+                    ],
+                ],
+            ],
+            ['type' => 'ok', 'response' => ['type' => 'close']],
+        ],
+    ]));
+
+    $connection = new TursoConnection(new TursoHttpClient('libsql://example.turso.io', 'test-token'), 'turso');
+
+    expect($connection->getServerVersion())->toBe('3.50.4');
+    Http::assertSentCount(1);
+});
+
+test('Turso connection previews bound SQL without a PDO connection or remote write', function () {
+    Http::preventStrayRequests();
+
+    $connection = new TursoConnection(new TursoHttpClient('libsql://example.turso.io', 'test-token'), 'turso');
+    $queries = $connection->pretend(fn (TursoConnection $connection): bool => $connection->statement(
+        'UPDATE users SET name = ? WHERE id = ?',
+        ["D'Angelo", 42],
+    ));
+
+    expect($queries)->toHaveCount(1)
+        ->and($queries[0]['query'])->toBe("UPDATE users SET name = 'D''Angelo' WHERE id = 42");
+    Http::assertNothingSent();
+});
+
 test('Turso connection rolls back on the latest baton after a failed transaction callback', function () {
     $requests = [];
     $statementResult = ['affected_row_count' => 1, 'cols' => [], 'rows' => []];
