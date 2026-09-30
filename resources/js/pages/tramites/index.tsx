@@ -20,7 +20,7 @@ type TramiteRow = {
     codigo: string;
     clasificacion: string;
     tipo_documento: string;
-    persona_nombre: string;
+    persona_nombre: string | null;
     asunto: string;
     fecha_recepcion: string;
     estado: string;
@@ -174,7 +174,7 @@ export default function TramitesIndex({ tramites, filters, estados, resumen }: P
                                                         {tramite.codigo}
                                                     </Link>
                                                 </td>
-                                                <td className="px-3 py-3">{tramite.persona_nombre}</td>
+                                                <td className="px-3 py-3">{tramite.persona_nombre ?? 'Documento institucional'}</td>
                                                 <td className="max-w-72 truncate px-3 py-3">{tramite.asunto}</td>
                                                 <td className="px-3 py-3">{tramite.tipo_documento}</td>
                                                 <td className="px-3 py-3">{formatDate(tramite.fecha_recepcion)}</td>

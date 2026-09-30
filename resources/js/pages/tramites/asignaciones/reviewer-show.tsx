@@ -44,7 +44,7 @@ type Props = {
         id: number;
         codigo: string;
         asunto: string;
-        persona_nombre: string;
+        persona_nombre: string | null;
         persona_identificador: string | null;
         descripcion: string | null;
         fecha_recepcion: string;
@@ -135,7 +135,7 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                 <CardDescription>Información de recepción vinculada a este trámite.</CardDescription>
                             </CardHeader>
                             <CardContent className="grid gap-4 sm:grid-cols-2">
-                                <Detail label="Solicitante" value={tramite.persona_nombre} />
+                                {tramite.persona_nombre !== null && <Detail label="Solicitante" value={tramite.persona_nombre} />}
                                 <Detail label="Identificador" value={tramite.persona_identificador ?? 'No registrado'} />
                                 <Detail label="Recepción" value={formatDate(tramite.fecha_recepcion)} />
                                 <Detail label="Prioridad" value={tramite.prioridad} />

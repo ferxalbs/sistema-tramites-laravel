@@ -53,7 +53,7 @@ type TramiteDetail = {
     tipo_documento: string;
     formato_salida: string | null;
     modalidad_documento: string | null;
-    persona_nombre: string;
+    persona_nombre: string | null;
     persona_identificador: string | null;
     propietario: string | null;
     destino_tipo: string;
@@ -361,7 +361,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                 <CardDescription>Datos registrados por la mesa de partes.</CardDescription>
                             </CardHeader>
                             <CardContent className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                        <Detail label="Persona solicitante" value={tramite.persona_nombre} />
+                        {tramite.persona_nombre !== null && <Detail label="Persona solicitante" value={tramite.persona_nombre} />}
                         <Detail label="DNI / documento de identidad" value={tramite.persona_identificador ?? 'No registrado'} />
                         <Detail label="Cuenta asociada" value={tramite.propietario ?? 'Sin cuenta vinculada'} />
                                 <Detail label="Clasificación" value={tramite.clasificacion} />

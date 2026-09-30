@@ -25,7 +25,13 @@ type Catalogos = {
     formatos_salida: Record<string, string>;
     modalidades_documento: Record<string, string>;
     formatos_sugeridos: Record<string, string>;
-    requisitos_tipo: Record<string, { personas_relacionadas: boolean; destinatarios_multiples: boolean; documento_original: boolean }>;
+    requisitos_tipo: Record<string, {
+        requiere_solicitante: boolean;
+        modalidad_documento: string | null;
+        personas_relacionadas: boolean;
+        destinatarios_multiples: boolean;
+        documento_original: boolean;
+    }>;
     tipos_relacion: Record<string, string>;
     destinos: Record<string, string>;
     prioridades: Record<string, string>;
@@ -42,7 +48,10 @@ type Props = {
         tipo_documento: string;
         tipo_nombre: string;
         clasificacion: string;
-        dni: string;
+        requiere_solicitante: boolean;
+        dni: string | null;
+        formato_salida: string | null;
+        modalidad_documento: string | null;
     } | null;
     tramite: {
         id: number;
@@ -51,7 +60,7 @@ type Props = {
         tipo_documento: string;
         formato_salida: string | null;
         modalidad_documento: string | null;
-        persona_nombre: string;
+        persona_nombre: string | null;
         persona_identificador: string | null;
         propietario_id: number | null;
         programa_estudio_id: number | null;
@@ -96,8 +105,8 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
         ?? estudiantes.find((estudiante) => estudiante.dni === seleccion?.dni);
     const [clasificacion, setClasificacion] = useState(primeraClasificacion);
     const [tipoDocumento, setTipoDocumento] = useState(tipoInicial);
-    const [formatoSalida, setFormatoSalida] = useState(tramite?.formato_salida ?? catalogos.formatos_sugeridos[tipoInicial] ?? 'pendiente');
-    const [modalidadDocumento, setModalidadDocumento] = useState(tramite?.modalidad_documento ?? '');
+    const [formatoSalida, setFormatoSalida] = useState(tramite?.formato_salida ?? seleccion?.formato_salida ?? catalogos.formatos_sugeridos[tipoInicial] ?? 'pendiente');
+    const [modalidadDocumento, setModalidadDocumento] = useState(tramite?.modalidad_documento ?? seleccion?.modalidad_documento ?? catalogos.requisitos_tipo[tipoInicial]?.modalidad_documento ?? '');
     const [destinoTipo, setDestinoTipo] = useState(tramite?.destino_tipo ?? 'oficina');
     const [destinoDocenteId, setDestinoDocenteId] = useState<string | null>(tramite?.destino_docente_id ? String(tramite.destino_docente_id) : null);
     const [prioridad, setPrioridad] = useState(tramite?.prioridad ?? 'normal');
@@ -107,6 +116,9 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
     const [documentos, setDocumentos] = useState<Array<{ id: number; categoria: string }>>([]);
     const siguienteDocumentoId = useRef(0);
     const formatoObligatorio = catalogos.formatos_sugeridos[tipoDocumento];
+    const modalidadSugerida = catalogos.requisitos_tipo[tipoDocumento]?.modalidad_documento ?? null;
+    const requiereSolicitante = seleccion?.requiere_solicitante ?? catalogos.requisitos_tipo[tipoDocumento]?.requiere_solicitante ?? true;
+    const esDocumentoInstitucional = !requiereSolicitante;
     const estudianteSeleccionado = estudiantes.find((estudiante) => String(estudiante.id) === propietarioId) ?? null;
     const docentesFiltrados = searchPeople(docentes, buscarDocente, destinoDocenteId);
 
@@ -115,7 +127,9 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
         const suggested = catalogos.formatos_sugeridos[nextType];
         if (suggested) {
             setFormatoSalida(suggested);
-            if (suggested !== 'memorando') setModalidadDocumento('');
+            setModalidadDocumento(catalogos.requisitos_tipo[nextType]?.modalidad_documento ?? '');
+        } else {
+            setModalidadDocumento('');
         }
     }
 
@@ -157,13 +171,15 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                         <ArrowLeft />
                     </Button>
                     <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Recepción y digitalización</p>
+                        <p className="text-sm text-muted-foreground">{esDocumentoInstitucional ? 'Documento institucional' : 'Recepción y digitalización'}</p>
                         <h1 className="text-2xl font-semibold tracking-tight">{tramite ? `Editar ${tramite.codigo}` : seleccion ? `Digitalizar: ${seleccion.tipo_nombre}` : 'Registrar trámite'}</h1>
                         <p className="text-sm text-muted-foreground">
                             {tramite
                                 ? 'Corrige los datos transcritos y de recepción. El código interno, el estado, los archivos y el historial se conservan.'
                                 : seleccion
-                                    ? 'Completa los datos que corresponden a este tipo de solicitud y adjunta el documento recibido.'
+                                    ? esDocumentoInstitucional
+                                        ? 'Registra los datos y adjunta el documento institucional. No se requieren datos de solicitante.'
+                                        : 'Completa los datos que corresponden a este tipo de solicitud y adjunta el documento recibido.'
                                     : 'Selecciona el DNI y el tipo de trámite para abrir el formulario de digitalización.'}
                         </p>
                     </div>
@@ -179,8 +195,12 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                         <>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>{seleccion ? 'Recepción de ' + seleccion.tipo_nombre : 'Datos de recepción'}</CardTitle>
-                                    <CardDescription>{seleccion?.tipo_documento === 'FUT'
+                                    <CardTitle>{seleccion
+                                        ? esDocumentoInstitucional ? 'Documento institucional: ' + seleccion.tipo_nombre : 'Solicitud: ' + seleccion.tipo_nombre
+                                        : 'Datos de recepción'}</CardTitle>
+                                    <CardDescription>{esDocumentoInstitucional
+                                        ? 'Registra el asunto, los destinatarios y los datos de control del documento.'
+                                        : seleccion?.tipo_documento === 'FUT'
                                         ? 'Transcribe los datos del FUT recibido. La fecha escrita en el FUT y la fecha de recepción en Mesa de Partes son distintas.'
                                         : seleccion
                                             ? 'Completa los datos del documento recibido para este tipo de trámite.'
@@ -194,9 +214,9 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 sm:col-span-2">
                                                 <div>
                                                     <p className="text-sm font-medium">Formulario para: {seleccion.tipo_nombre}</p>
-                                                    <p className="text-xs text-muted-foreground">DNI ingresado: {seleccion.dni}</p>
+                                                    <p className="text-xs text-muted-foreground">{seleccion.requiere_solicitante ? `DNI ingresado: ${seleccion.dni}` : 'No requiere datos de solicitante ni DNI.'}</p>
                                                 </div>
-                                                <Button type="button" variant="outline" render={<Link href={TramiteController.create()} />}>Cambiar DNI o tipo</Button>
+                                                <Button type="button" variant="outline" render={<Link href={TramiteController.create()} />}>{seleccion.requiere_solicitante ? 'Cambiar DNI o tipo' : 'Cambiar tipo'}</Button>
                                             </div>
                                         </>
                                     ) : (
@@ -271,7 +291,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         error={errors.tipo_documento}
                                         onValueChange={(value) => changeTipoDocumento(value ?? '')}
                                     />}
-                                    <FormSelect
+                                    {!esDocumentoInstitucional ? <FormSelect
                                         id="formato_salida"
                                         label="Documento de respuesta previsto"
                                         name="formato_salida"
@@ -284,8 +304,11 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             : 'Elija Constancia si esa será la respuesta; deje Pendiente de definir si aún no se ha decidido.'}
                                         error={errors.formato_salida}
                                         onValueChange={changeFormatoSalida}
-                                    />
-                                    {formatoSalida === 'memorando' && <FormSelect
+                                    /> : <>
+                                        <input type="hidden" name="formato_salida" value={formatoObligatorio ?? formatoSalida} />
+                                        {modalidadSugerida && <input type="hidden" name="modalidad_documento" value={modalidadSugerida} />}
+                                    </>}
+                                    {!esDocumentoInstitucional && formatoSalida === 'memorando' && <FormSelect
                                         id="modalidad_documento"
                                         label="Modalidad del Memorando"
                                         name="modalidad_documento"
@@ -352,7 +375,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         error={errors.prioridad}
                                         onValueChange={(value) => setPrioridad(value ?? 'normal')}
                                     />
-                                    <Field id="fecha_llegada_oficina" label="Fecha y hora de recepción en Mesa de Partes" description="Corresponde al ingreso físico del FUT. Se propone la hora actual; corríjala si registra una recepción anterior." error={errors.fecha_llegada_oficina}>
+                                    <Field id="fecha_llegada_oficina" label={esDocumentoInstitucional ? 'Fecha y hora de registro' : 'Fecha y hora de recepción en Mesa de Partes'} description={esDocumentoInstitucional ? 'Se propone la hora actual; puede corregirla si registra un documento anterior.' : 'Corresponde al ingreso físico del FUT. Se propone la hora actual; corríjala si registra una recepción anterior.'} error={errors.fecha_llegada_oficina}>
                                         <Input id="fecha_llegada_oficina" name="fecha_llegada_oficina" type="datetime-local" defaultValue={tramite?.fecha_llegada_oficina ?? ahora} required />
                                     </Field>
                                     <Field
@@ -375,7 +398,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                 </CardContent>
                             </Card>
 
-                            {clasificacion !== 'estudiantil' && <Card>
+                            {clasificacion !== 'estudiantil' && !esDocumentoInstitucional && <Card>
                                 <CardHeader>
                                     <CardTitle>Persona solicitante</CardTitle>
                                     <CardDescription>Datos de la persona que presenta la documentación.</CardDescription>
@@ -392,16 +415,18 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
 
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>{seleccion ? 'Solicitud: ' + seleccion.tipo_nombre : 'Contenido del trámite'}</CardTitle>
-                                    <CardDescription>{seleccion?.tipo_documento === 'FUT'
+                                    <CardTitle>{esDocumentoInstitucional ? 'Contenido del documento' : seleccion ? 'Solicitud: ' + seleccion.tipo_nombre : 'Contenido del trámite'}</CardTitle>
+                                    <CardDescription>{esDocumentoInstitucional
+                                        ? 'Registra el asunto y el contenido del informe o memorando.'
+                                        : seleccion?.tipo_documento === 'FUT'
                                         ? 'Transcribe la sumilla y la fundamentación del pedido tal como aparecen en el FUT.'
                                         : 'Resume la solicitud recibida y registra debajo su detalle o fundamentación.'}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid gap-5 sm:grid-cols-2">
-                                    <Field id="asunto" label={seleccion?.tipo_documento === 'FUT' ? 'Resumen de la solicitud (sumilla)' : 'Resumen de la solicitud'} error={errors.asunto} className="sm:col-span-2">
-                                        <Input id="asunto" name="asunto" defaultValue={tramite?.asunto ?? ''} required minLength={3} maxLength={255} placeholder={seleccion?.tipo_documento === 'FUT' ? 'Ej. Solicito prácticas pre profesionales' : 'Resume brevemente lo solicitado'} />
+                                    <Field id="asunto" label={esDocumentoInstitucional ? 'Asunto del documento' : seleccion?.tipo_documento === 'FUT' ? 'Resumen de la solicitud (sumilla)' : 'Resumen de la solicitud'} error={errors.asunto} className="sm:col-span-2">
+                                        <Input id="asunto" name="asunto" defaultValue={tramite?.asunto ?? ''} required minLength={3} maxLength={255} placeholder={esDocumentoInstitucional ? 'Ej. Informe de actividades del área' : seleccion?.tipo_documento === 'FUT' ? 'Ej. Solicito prácticas pre profesionales' : 'Resume brevemente lo solicitado'} />
                                     </Field>
-                                    <Field id="descripcion" label={seleccion?.tipo_documento === 'FUT' ? 'Fundamentación del pedido / detalle' : 'Detalle de la solicitud recibida'} error={errors.descripcion} className="sm:col-span-2">
+                                    <Field id="descripcion" label={esDocumentoInstitucional ? 'Contenido del documento' : seleccion?.tipo_documento === 'FUT' ? 'Fundamentación del pedido / detalle' : 'Detalle de la solicitud recibida'} error={errors.descripcion} className="sm:col-span-2">
                                         <textarea
                                             id="descripcion"
                                             name="descripcion"
@@ -411,7 +436,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             maxLength={5000}
                                             required
                                             className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-                                            placeholder={seleccion?.tipo_documento === 'FUT' ? 'Transcribe o resume la fundamentación del pedido del FUT' : 'Transcribe o resume el detalle del documento recibido'}
+                                            placeholder={esDocumentoInstitucional ? 'Escribe el contenido principal del informe o memorando' : seleccion?.tipo_documento === 'FUT' ? 'Transcribe o resume la fundamentación del pedido del FUT' : 'Transcribe o resume el detalle del documento recibido'}
                                         />
                                     </Field>
                                     <Field id="observacion_recepcion" label="Observación de recepción" error={errors.observacion_recepcion} className="sm:col-span-2">
@@ -444,8 +469,8 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
 
                             {!tramite && <Card>
                                 <CardHeader>
-                                    <CardTitle>Documentos recibidos</CardTitle>
-                                    <CardDescription>Cada archivo es un documento independiente. Puede registrar varios en esta recepción o agregarlos después.{catalogos.requisitos_tipo[tipoDocumento]?.documento_original ? ' Este tipo exige incluir un documento original.' : ''}</CardDescription>
+                                    <CardTitle>{esDocumentoInstitucional ? 'Archivos del documento' : 'Documentos recibidos'}</CardTitle>
+                                    <CardDescription>Cada archivo es un documento independiente. Puede registrar varios en este trámite o agregarlos después.{catalogos.requisitos_tipo[tipoDocumento]?.documento_original ? ' Este tipo exige incluir un documento original.' : ''}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-4">
                                     {documentos.map((documento, index) => (
@@ -489,12 +514,12 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                             {!tramite && <Card>
                                 <CardHeader>
                                     <CardTitle>Revisión y confirmación</CardTitle>
-                                    <CardDescription>Verifica los datos de la recepción física antes de registrar el expediente.</CardDescription>
+                                    <CardDescription>{esDocumentoInstitucional ? 'Verifica los datos del documento antes de registrarlo.' : 'Verifica los datos de la recepción física antes de registrar el expediente.'}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex items-center gap-3">
                                         <Checkbox id="confirmar_recepcion" name="confirmar_recepcion" value="1" required aria-invalid={Boolean(errors.confirmar_recepcion)} />
-                                        <Label htmlFor="confirmar_recepcion">Confirmo que revisé los datos de la recepción física.</Label>
+                                        <Label htmlFor="confirmar_recepcion">{esDocumentoInstitucional ? 'Confirmo que revisé los datos del documento.' : 'Confirmo que revisé los datos de la recepción física.'}</Label>
                                     </div>
                                     <InputError message={errors.confirmar_recepcion} />
                                 </CardContent>
@@ -506,7 +531,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                 </Button>
                                 <Button type="submit" disabled={processing || Boolean(seleccion && clasificacion === 'estudiantil' && !estudianteSeleccionado)}>
                                     {processing ? <Spinner /> : <FilePlus2 />}
-                                    {tramite ? 'Guardar cambios' : seleccion?.tipo_documento === 'FUT' ? 'Digitalizar FUT' : seleccion ? 'Digitalizar solicitud' : 'Guardar trámite'}
+                                    {tramite ? 'Guardar cambios' : esDocumentoInstitucional ? 'Registrar documento' : seleccion?.tipo_documento === 'FUT' ? 'Digitalizar FUT' : seleccion ? 'Digitalizar solicitud' : 'Guardar trámite'}
                                 </Button>
                             </div>
                         </>

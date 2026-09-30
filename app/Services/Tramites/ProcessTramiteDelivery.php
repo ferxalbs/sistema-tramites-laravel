@@ -576,7 +576,7 @@ class ProcessTramiteDelivery
             'documento_oficial' => $documento->numero_documento,
             'clasificacion' => $classificationLabels[$tramite->clasificacion] ?? $tramite->clasificacion,
             'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
-            'interesado' => $tramite->propietario?->name ?? $tramite->persona_nombre,
+            'interesado' => $tramite->propietario?->name ?? $tramite->persona_nombre ?? 'No aplica',
             'recibido_en' => $tramite->fecha_recepcion->toDateString(),
             'revisor' => $ronda?->revisor?->name ?? 'No registrado',
             'resultado_revision' => config('tramites.estados.'.$ronda?->estado, $ronda?->estado ?? 'No registrado'),

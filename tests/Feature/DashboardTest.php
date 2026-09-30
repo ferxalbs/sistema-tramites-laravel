@@ -118,7 +118,7 @@ test('dashboard limits teacher metrics to assigned expedientes and shows staff t
 test('dashboard filters metrics and rejects unknown states', function () {
     $administrator = User::factory()->create(['rol' => 'administrador']);
     Tramite::factory()->create(['estado' => 'cerrado', 'clasificacion' => 'estudiantil']);
-    Tramite::factory()->create(['estado' => 'digitalizado', 'clasificacion' => 'administrativo', 'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO']);
+    Tramite::factory()->create(['estado' => 'digitalizado', 'clasificacion' => 'administrativo', 'tipo_documento' => 'INFORME']);
     Tramite::factory()->create(['estado' => 'observado', 'created_at' => now()->subMonths(2)]);
 
     $this->actingAs($administrator)->get(route('dashboard', ['estado' => 'cerrado', 'clasificacion' => 'estudiantil']))
@@ -128,8 +128,8 @@ test('dashboard filters metrics and rejects unknown states', function () {
         ->where('filters.estado', 'cerrado')
         ->where('states.0.codigo', 'cerrado'));
     $this->get(route('dashboard', ['estado' => 'no-existe']))->assertSessionHasErrors('estado');
-    $this->get(route('dashboard', ['tipo' => 'REQUERIMIENTO_EQUIPAMIENTO']))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('summary.total', 1)->where('filters.tipo', 'REQUERIMIENTO_EQUIPAMIENTO'));
+    $this->get(route('dashboard', ['tipo' => 'INFORME']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('summary.total', 1)->where('filters.tipo', 'INFORME'));
     $this->get(route('dashboard', ['desde' => now()->subDay()->toDateString()]))
         ->assertOk()->assertInertia(fn (Assert $page) => $page->where('summary.total', 2));
     $this->get(route('dashboard', ['desde' => now()->toDateString(), 'hasta' => now()->subDay()->toDateString()]))

@@ -55,15 +55,14 @@ test('administrators edit classifications while reception requires active codes'
         ->and(DB::table('tramite_config_events')->where('entidad', 'clasificacion_expediente')->count())->toBe(1);
 
     $this->actingAs($assistant)->post(route('tramites.start'), [
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO', 'dni' => '90000001',
+        'tipo_documento' => 'INFORME',
     ])->assertRedirect(route('tramites.create'));
     $this->get(route('tramites.create'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->missing('catalogos.clasificaciones.administrativo'));
     $payload = [
         'clasificacion' => 'administrativo',
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO',
+        'tipo_documento' => 'INFORME',
         'formato_salida' => 'informe',
-        'persona_nombre' => 'Persona de prueba',
         'destino_tipo' => 'oficina',
         'destino_nombre' => 'Secretaría',
         'asunto' => 'Solicitud recibida físicamente',
@@ -91,23 +90,23 @@ test('administrators edit classifications while reception requires active codes'
 test('administrators edit retained types while retired types stay unavailable', function () {
     $admin = User::factory()->create(['rol' => 'administrador']);
     $assistant = User::factory()->create(['rol' => 'asistente']);
-    $type = DB::table('tipos_tramite')->where('codigo', 'REQUERIMIENTO_EQUIPAMIENTO')->first();
+    $type = DB::table('tipos_tramite')->where('codigo', 'INFORME')->first();
     expect($type)->not->toBeNull();
 
     $retiredType = DB::table('tipos_tramite')->where('codigo', 'FUT')->first();
-    $changes = ['nombre' => 'Requerimiento de equipamiento', 'descripcion' => 'Tipo disponible', 'activo' => '0'];
+    $changes = ['nombre' => 'Informe de prueba', 'descripcion' => 'Tipo disponible', 'activo' => '0'];
     $this->get(route('admin.types.index'))->assertRedirect(route('login'));
     $this->actingAs($assistant)->get(route('admin.types.index'))->assertForbidden();
     $this->patch(route('admin.types.update', $type->id), $changes)->assertForbidden();
 
     $this->actingAs($admin)->get(route('admin.types.index'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('tipos-tramite')->has('tipos', 4));
+        ->assertInertia(fn (Assert $page) => $page->component('tipos-tramite')->has('tipos', 6));
     $this->patch(route('admin.types.update', $retiredType->id), $changes)->assertNotFound();
     $this->patch(route('admin.types.update', $type->id), $changes)
         ->assertRedirect(route('admin.types.index'));
     $saved = DB::table('tipos_tramite')->where('id', $type->id)->first();
-    expect($saved->codigo)->toBe('REQUERIMIENTO_EQUIPAMIENTO')
-        ->and($saved->nombre)->toBe('Requerimiento de equipamiento')
+    expect($saved->codigo)->toBe('INFORME')
+        ->and($saved->nombre)->toBe('Informe de prueba')
         ->and((int) $saved->activo)->toBe(0)
         ->and(DB::table('tramite_config_events')->where('entidad', 'tipo_tramite')->count())->toBe(1);
 
@@ -141,11 +140,16 @@ test('administrators edit retained types while retired types stay unavailable', 
     expect(Tramite::query()->count())->toBe(0);
 
     $this->actingAs($admin)->patch(route('admin.types.update', $type->id), [
-        'nombre' => 'Requerimiento de equipamiento', 'descripcion' => 'Tipo disponible', 'activo' => '1',
+        'nombre' => 'Informe de prueba', 'descripcion' => 'Tipo disponible', 'activo' => '1',
     ])->assertRedirect(route('admin.types.index'));
-    $this->actingAs($assistant)->post(route('tramites.store'), $payload)->assertRedirect();
+    $validPayload = [
+        ...$payload,
+        'tipo_documento' => 'INFORME',
+    ];
+    unset($validPayload['persona_nombre']);
+    $this->actingAs($assistant)->post(route('tramites.store'), $validPayload)->assertRedirect();
     $this->get(route('tramites.index'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('tramites.data.0.tipo_documento', 'Requerimiento de equipamiento'));
+        ->assertInertia(fn (Assert $page) => $page->where('tramites.data.0.tipo_documento', 'Informe de prueba'));
 
     $this->actingAs($admin)->patch(route('admin.types.update', 99999), $changes)->assertNotFound();
     $this->patch(route('admin.types.update', $type->id), [
@@ -154,6 +158,65 @@ test('administrators edit retained types while retired types stay unavailable', 
     $this->patch(route('admin.types.update', $type->id), [
         'nombre' => 'Justificación', 'descripcion' => '', 'activo' => '1',
     ])->assertSessionHasErrors('nombre');
+});
+
+test('institutional reports and memorandums register without a request applicant or DNI', function () {
+    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $this->actingAs($assistant)->get(route('tramites.create'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('tramites/start')
+            ->where('tipos', function ($tipos): bool {
+                $tipos = collect($tipos)->keyBy('codigo');
+
+                return $tipos->has(['INFORME', 'MEMORANDO_SIMPLE', 'MEMORANDO_MULTIPLE'])
+                    && ! $tipos->has('REQUERIMIENTO_EQUIPAMIENTO')
+                    && $tipos['INFORME']['requiere_solicitante'] === false;
+            }));
+
+    foreach ([
+        ['INFORME', 'informe', null, []],
+        ['MEMORANDO_SIMPLE', 'memorando', 'simple', []],
+        ['MEMORANDO_MULTIPLE', 'memorando', 'multiple', [
+            ['nombres' => 'Ana Ruiz'],
+            ['nombres' => 'Luis Pérez'],
+        ]],
+    ] as [$tipo, $formato, $modalidad, $destinatarios]) {
+        $this->post(route('tramites.start'), ['tipo_documento' => $tipo])
+            ->assertRedirect(route('tramites.create'));
+        $this->get(route('tramites.create'))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('seleccion.tipo_documento', $tipo)
+            ->where('seleccion.requiere_solicitante', false)
+            ->where('seleccion.dni', null));
+
+        $payload = [
+            'clasificacion' => 'administrativo',
+            'tipo_documento' => $tipo,
+            'formato_salida' => $formato,
+            'modalidad_documento' => $modalidad,
+            'destino_tipo' => 'oficina',
+            'destino_nombre' => 'Secretaría Académica',
+            'asunto' => 'Documento interno de prueba',
+            'descripcion' => 'Contenido institucional para verificar el registro.',
+            'prioridad' => 'normal',
+            'fecha_llegada_oficina' => now()->format('Y-m-d\\TH:i'),
+            'confirmar_recepcion' => '1',
+        ];
+        if ($destinatarios !== []) {
+            $payload['destinatarios'] = $destinatarios;
+        }
+
+        $this->post(route('tramites.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $tramite = Tramite::query()->where('tipo_documento', $tipo)->sole();
+        expect($tramite->persona_nombre)->toBeNull()
+            ->and($tramite->persona_identificador)->toBeNull()
+            ->and($tramite->propietario_id)->toBeNull()
+            ->and($tramite->formato_salida)->toBe($formato)
+            ->and($tramite->modalidad_documento)->toBe($modalidad);
+    }
+
+    $this->post(route('tramites.start'), [
+        'tipo_documento' => 'MEMORANDO_SIMPLE', 'dni' => '12345678',
+    ])->assertSessionHasErrors('dni');
+    expect(Tramite::query()->count())->toBe(3);
 });
 
 test('administrators edit output formats while keeping them active for drafts', function () {
@@ -466,16 +529,15 @@ test('reception keeps preliminary lists private, validates type requirements, an
     $assistant = User::factory()->create(['rol' => 'asistente']);
     $student = User::factory()->create(['rol' => 'estudiante']);
     $this->actingAs($assistant);
-    DB::table('tipos_tramite')->where('codigo', 'REQUERIMIENTO_EQUIPAMIENTO')->update([
+    DB::table('tipos_tramite')->where('codigo', 'INFORME')->update([
         'requiere_personas_relacionadas' => true,
     ]);
     $this->post(route('tramites.start'), [
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO', 'dni' => '90000003',
+        'tipo_documento' => 'INFORME',
     ])->assertRedirect(route('tramites.create'));
     $payload = [
         'clasificacion' => 'administrativo',
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO',
-        'persona_nombre' => 'Solicitante de prueba',
+        'tipo_documento' => 'INFORME',
         'destino_tipo' => 'oficina',
         'destino_nombre' => 'Secretaría',
         'asunto' => 'Autorización presentada físicamente',
@@ -487,8 +549,8 @@ test('reception keeps preliminary lists private, validates type requirements, an
         'confirmar_recepcion' => '1',
     ];
     $this->get(route('tramites.create'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('catalogos.requisitos_tipo.REQUERIMIENTO_EQUIPAMIENTO.personas_relacionadas', true)
-        ->where('catalogos.requisitos_tipo.REQUERIMIENTO_EQUIPAMIENTO.destinatarios_multiples', false));
+        ->where('catalogos.requisitos_tipo.INFORME.personas_relacionadas', true)
+        ->where('catalogos.requisitos_tipo.INFORME.destinatarios_multiples', false));
     $this->post(route('tramites.store'), $payload)->assertSessionHasErrors('personas_relacionadas');
     $related = ['nombres' => 'Lucía Pérez', 'apellidos' => 'Gómez', 'dni' => '12345678', 'tipo_relacion' => 'interesado'];
     $this->post(route('tramites.store'), [...$payload, 'personas_relacionadas' => [[...$related, 'dni' => '123']]])
@@ -539,25 +601,24 @@ test('reception enforces multiple recipients, active positions, and a required o
     config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
     $assistant = User::factory()->create(['rol' => 'asistente']);
     $this->actingAs($assistant);
-    DB::table('tipos_tramite')->where('codigo', 'REQUERIMIENTO_EQUIPAMIENTO')->update([
+    DB::table('tipos_tramite')->where('codigo', 'MEMORANDO_MULTIPLE')->update([
         'requiere_destinatarios_multiples' => true,
         'requiere_documento_original' => true,
     ]);
     $this->post(route('tramites.start'), [
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO', 'dni' => '90000004',
+        'tipo_documento' => 'MEMORANDO_MULTIPLE',
     ])->assertRedirect(route('tramites.create'));
     $payload = [
         'clasificacion' => 'administrativo',
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO',
-        'persona_nombre' => 'Solicitante físico',
+        'tipo_documento' => 'MEMORANDO_MULTIPLE',
         'destino_tipo' => 'oficina',
         'destino_nombre' => 'Secretaría',
         'asunto' => 'Comunicación física',
         'descripcion' => 'Comunicación recibida en oficina.',
         'prioridad' => 'normal',
         'fecha_llegada_oficina' => now()->format('Y-m-d\TH:i'),
-        'formato_salida' => 'informe',
-        'modalidad_documento' => null,
+        'formato_salida' => 'memorando',
+        'modalidad_documento' => 'multiple',
         'confirmar_recepcion' => '1',
     ];
     $this->post(route('tramites.store'), [...$payload, 'destinatarios' => [['nombres' => 'Una persona']]])
@@ -603,7 +664,10 @@ test('reception validates and preserves the planned output format and memorandum
             ->where('catalogos.modalidades_documento.simple', 'Simple')
             ->where('catalogos.modalidades_documento.multiple', 'Múltiple')
             ->missing('catalogos.formatos_sugeridos.AUTORIZACION_INGRESO')
-            ->where('catalogos.formatos_sugeridos.REQUERIMIENTO_EQUIPAMIENTO', 'informe')
+            ->where('catalogos.formatos_sugeridos.INFORME', 'informe')
+            ->where('catalogos.formatos_sugeridos.MEMORANDO_SIMPLE', 'memorando')
+            ->where('catalogos.requisitos_tipo.MEMORANDO_SIMPLE.modalidad_documento', 'simple')
+            ->where('catalogos.requisitos_tipo.MEMORANDO_MULTIPLE.modalidad_documento', 'multiple')
             ->where('catalogos.formatos_sugeridos.CONSTANCIA_MODALIDAD_TITULACION', 'constancia'));
 
     $payload = [
@@ -678,7 +742,7 @@ test('reception lists active teachers and saves the selected teacher as planned 
     $student = User::factory()->create(['rol' => 'estudiante']);
 
     $this->actingAs($assistant)->post(route('tramites.start'), [
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO', 'dni' => '90000007',
+        'tipo_documento' => 'CONSTANCIA_PRACTICA', 'dni' => '90000007',
     ])->assertRedirect(route('tramites.create'));
     $this->get(route('tramites.create'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('docentes', fn ($docentes): bool => collect($docentes)->contains('id', $teacher->id)
@@ -686,7 +750,7 @@ test('reception lists active teachers and saves the selected teacher as planned 
 
     $payload = [
         'clasificacion' => 'administrativo',
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO',
+        'tipo_documento' => 'CONSTANCIA_PRACTICA',
         'persona_nombre' => 'Persona de prueba',
         'destino_tipo' => 'docente',
         'destino_docente_id' => $teacher->id,
@@ -3483,7 +3547,7 @@ test('physical reception requires confirmation and preserves arrival and provena
     $administrativePayload = [
         ...$payload,
         'clasificacion' => 'administrativo',
-        'tipo_documento' => 'REQUERIMIENTO_EQUIPAMIENTO',
+        'tipo_documento' => 'CONSTANCIA_PRACTICA',
         'destinatarios' => [
             ['nombres' => 'Destinataria principal'],
             ['nombres' => 'Segundo destinatario'],

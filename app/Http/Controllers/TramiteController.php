@@ -92,37 +92,44 @@ class TramiteController extends Controller
     public function create(Request $request): InertiaResponse
     {
         $seleccion = $request->session()->get('tramite_selection');
-        if (! is_array($seleccion)
-            || ! is_string($seleccion['tipo_documento'] ?? null)
-            || ! is_string($seleccion['dni'] ?? null)) {
+        $tiposParaIniciar = DB::table('tipos_tramite')->where('activo', true)
+            ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
+            ->orderBy('nombre')->get(['codigo', 'nombre', 'requiere_solicitante'])
+            ->map(fn (object $tipo): array => [
+                'codigo' => $tipo->codigo,
+                'nombre' => $tipo->nombre,
+                'requiere_solicitante' => (bool) $tipo->requiere_solicitante,
+            ])->all();
+        $codigoSeleccionado = is_array($seleccion) ? ($seleccion['tipo_documento'] ?? null) : null;
+
+        if (! is_string($codigoSeleccionado)) {
             return Inertia::render('tramites/start', [
-                'tipos' => DB::table('tipos_tramite')->where('activo', true)
-                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
-                    ->orderBy('nombre')->get(['codigo', 'nombre'])
-                    ->map(fn (object $tipo): array => ['codigo' => $tipo->codigo, 'nombre' => $tipo->nombre])
-                    ->all(),
+                'tipos' => $tiposParaIniciar,
             ]);
         }
 
-        $tipo = DB::table('tipos_tramite')->where('codigo', $seleccion['tipo_documento'])
+        $tipo = DB::table('tipos_tramite')->where('codigo', $codigoSeleccionado)
             ->where('activo', true)
             ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
-            ->first(['codigo', 'nombre', 'clasificacion_sugerida']);
-        if ($tipo === null || preg_match('/^[0-9]{8}$/', $seleccion['dni']) !== 1) {
+            ->first([
+                'codigo', 'nombre', 'clasificacion_sugerida', 'requiere_solicitante',
+                'tipo_documento_salida_sugerido', 'modalidad_documento_sugerida',
+            ]);
+        $requiereSolicitante = $tipo === null || (bool) $tipo->requiere_solicitante;
+        $dni = is_array($seleccion) && is_string($seleccion['dni'] ?? null) ? $seleccion['dni'] : null;
+
+        if ($tipo === null || ($requiereSolicitante && (! is_string($dni) || preg_match('/^[0-9]{8}$/', $dni) !== 1))) {
             $request->session()->forget('tramite_selection');
 
             return Inertia::render('tramites/start', [
-                'tipos' => DB::table('tipos_tramite')->where('activo', true)
-                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
-                    ->orderBy('nombre')->get(['codigo', 'nombre'])
-                    ->map(fn (object $item): array => ['codigo' => $item->codigo, 'nombre' => $item->nombre])
-                    ->all(),
+                'tipos' => $tiposParaIniciar,
             ]);
         }
 
-        $rolSolicitante = User::query()->where('dni', $seleccion['dni'])
-            ->where('activo', true)->value('rol');
-        $clasificacion = $tipo->clasificacion_sugerida;
+        $rolSolicitante = $requiereSolicitante
+            ? User::query()->where('dni', $dni)->where('activo', true)->value('rol')
+            : null;
+        $clasificacion = $requiereSolicitante ? $tipo->clasificacion_sugerida : 'administrativo';
         if ($clasificacion === 'institucional') {
             $clasificacion = 'administrativo';
         }
@@ -142,21 +149,30 @@ class TramiteController extends Controller
                 'tipo_documento' => $tipo->codigo,
                 'tipo_nombre' => $tipo->nombre,
                 'clasificacion' => $clasificacion,
-                'dni' => $seleccion['dni'],
+                'requiere_solicitante' => $requiereSolicitante,
+                'dni' => $requiereSolicitante ? $dni : null,
+                'formato_salida' => $tipo->tipo_documento_salida_sugerido,
+                'modalidad_documento' => $tipo->modalidad_documento_sugerida,
             ],
         ]);
     }
 
     public function start(Request $request): RedirectResponse
     {
+        $codigo = $request->input('tipo_documento');
+        $requiereSolicitante = TramiteTypeCatalog::requiresApplicant(is_string($codigo) ? $codigo : null);
         $seleccion = $request->validate([
             'tipo_documento' => ['required', 'string', Rule::exists('tipos_tramite', 'codigo')->where(fn ($query) => $query
                 ->where('activo', true)->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes()))],
-            'dni' => ['required', 'regex:/^[0-9]{8}$/'],
+            'dni' => [Rule::requiredIf($requiereSolicitante), Rule::prohibitedIf(! $requiereSolicitante), 'nullable', 'regex:/^[0-9]{8}$/'],
         ], [], [
             'tipo_documento' => 'tipo de trámite',
             'dni' => 'DNI',
         ]);
+
+        if (! $requiereSolicitante) {
+            unset($seleccion['dni']);
+        }
 
         return redirect()->route('tramites.create')->with('tramite_selection', $seleccion);
     }
@@ -455,7 +471,7 @@ class TramiteController extends Controller
                 'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
                 'estado_inicial' => config('tramites.estados.recibido_oficina'),
                 'destino' => $tramite->destino_nombre ?: 'Pendiente',
-                'interesado' => $tramite->persona_nombre,
+                'interesado' => $tramite->persona_nombre ?? 'Documento institucional',
                 'asunto' => $tramite->asunto,
             ],
         ]);
@@ -500,6 +516,7 @@ class TramiteController extends Controller
                 'formato_salida' => $formatoNombre ?? $tramite->formato_salida,
                 'modalidad_documento' => $modalidadNombre ?? $tramite->modalidad_documento,
                 'persona_nombre' => $tramite->persona_nombre,
+                'es_documento_institucional' => ! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento),
                 'persona_identificador' => $tramite->persona_identificador,
                 'destino_tipo' => config('tramites.destinos.'.$tramite->destino_tipo, $tramite->destino_tipo),
                 'destino_nombre' => $tramite->destino_nombre,
@@ -728,8 +745,13 @@ class TramiteController extends Controller
                     ->pluck('tipo_documento_salida_sugerido', 'codigo')->all(),
                 'requisitos_tipo' => DB::table('tipos_tramite')->where('activo', true)
                     ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
-                    ->get(['codigo', 'requiere_personas_relacionadas', 'requiere_destinatarios_multiples', 'requiere_documento_original'])
+                    ->get([
+                        'codigo', 'requiere_solicitante', 'modalidad_documento_sugerida',
+                        'requiere_personas_relacionadas', 'requiere_destinatarios_multiples', 'requiere_documento_original',
+                    ])
                     ->mapWithKeys(fn (object $tipo): array => [$tipo->codigo => [
+                        'requiere_solicitante' => (bool) $tipo->requiere_solicitante,
+                        'modalidad_documento' => $tipo->modalidad_documento_sugerida,
                         'personas_relacionadas' => (bool) $tipo->requiere_personas_relacionadas,
                         'destinatarios_multiples' => (bool) $tipo->requiere_destinatarios_multiples,
                         'documento_original' => (bool) $tipo->requiere_documento_original,

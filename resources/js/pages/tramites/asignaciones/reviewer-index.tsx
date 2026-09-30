@@ -9,7 +9,7 @@ type Assignment = {
     tramite_id: number;
     codigo: string;
     asunto: string;
-    persona_nombre: string;
+        persona_nombre: string | null;
     prioridad: string;
     fecha_asignacion: string | null;
     fecha_esperada: string | null;
@@ -56,7 +56,7 @@ export default function ReviewerIndex({ destino, destino_label, asignaciones }: 
                                         <TramiteStatusBadge estado={asignacion.estado} label={asignacion.estado_label} />
                                     </div>
                                     <p className="font-medium">{asignacion.asunto}</p>
-                                    <p className="text-sm text-muted-foreground">{asignacion.persona_nombre} · {asignacion.plantilla ?? 'Borrador preparado'}</p>
+                                    <p className="text-sm text-muted-foreground">{asignacion.persona_nombre ?? 'Documento institucional'} · {asignacion.plantilla ?? 'Borrador preparado'}</p>
                                     <p className="text-xs text-muted-foreground">Prioridad {asignacion.prioridad}{asignacion.fecha_esperada ? ` · fecha esperada ${formatDate(asignacion.fecha_esperada)}` : ''}</p>
                                 </div>
                                 <Button render={<Link href={show(asignacion.tramite_id)} />}>

@@ -36,6 +36,12 @@ class StoreTramiteRequest extends FormRequest
      */
     public function rules(): array
     {
+        $tipoDocumento = $this->input('tipo_documento');
+        $formatoSugerido = is_string($tipoDocumento)
+            ? DB::table('tipos_tramite')->where('codigo', $tipoDocumento)->value('tipo_documento_salida_sugerido')
+            : null;
+        $requiereSolicitante = TramiteTypeCatalog::requiresApplicant(is_string($tipoDocumento) ? $tipoDocumento : null);
+
         return [
             'clasificacion' => ['required', 'string', Rule::exists('clasificaciones_expediente', 'codigo')->where(fn (Builder $query) => $query
                 ->where('activo', true)->where('codigo', '<>', 'institucional'))],
@@ -51,12 +57,18 @@ class StoreTramiteRequest extends FormRequest
                         ->when($this->input('clasificacion') === 'administrativo', fn (Builder $query) => $query
                             ->orWhere('clasificacion_sugerida', 'institucional')))),
             ],
-            'formato_salida' => ['nullable', 'string', Rule::exists('tipos_documento_salida', 'codigo')->where('activo', true)],
+            'formato_salida' => [Rule::requiredIf($formatoSugerido !== null), 'nullable', 'string', Rule::exists('tipos_documento_salida', 'codigo')->where('activo', true)],
             'modalidad_documento' => ['nullable', 'string', Rule::exists('modalidades_documento', 'codigo')->where('activo', true)],
-            'persona_nombre' => ['required', 'string', 'max:200'],
-            'persona_identificador' => ['nullable', 'string', 'max:50'],
+            'dni' => ['prohibited'],
+            'persona_nombre' => $requiereSolicitante
+                ? ['required', 'string', 'max:200']
+                : ['prohibited', 'nullable', 'string', 'max:200'],
+            'persona_identificador' => $requiereSolicitante
+                ? ['nullable', 'string', 'max:50']
+                : ['prohibited', 'nullable', 'string', 'max:50'],
             'propietario_id' => [
                 'nullable',
+                ...(! $requiereSolicitante ? ['prohibited'] : []),
                 'required_if:clasificacion,estudiantil',
                 'integer',
                 Rule::exists('users', 'id')->where(fn (Builder $query) => $query->where('rol', 'estudiante')->where('activo', true)),
@@ -131,8 +143,10 @@ class StoreTramiteRequest extends FormRequest
 
             $formato = $this->input('formato_salida');
             $modalidad = $this->input('modalidad_documento');
-            $sugerido = DB::table('tipos_tramite')->where('codigo', $this->input('tipo_documento'))
-                ->value('tipo_documento_salida_sugerido');
+            $tipoSolicitud = DB::table('tipos_tramite')->where('codigo', $this->input('tipo_documento'))
+                ->first(['tipo_documento_salida_sugerido', 'modalidad_documento_sugerida', 'requiere_solicitante']);
+            $sugerido = $tipoSolicitud?->tipo_documento_salida_sugerido;
+            $modalidadSugerida = $tipoSolicitud?->modalidad_documento_sugerida;
 
             if ($sugerido !== null && $formato !== $sugerido) {
                 $validator->errors()->add('formato_salida', 'El formato documental no es compatible con el tipo de trámite.');
@@ -148,6 +162,11 @@ class StoreTramiteRequest extends FormRequest
                 }
             } elseif ($modalidad !== null) {
                 $validator->errors()->add('modalidad_documento', 'Este formato no admite modalidad de Memorando.');
+            }
+
+            if ($tipoSolicitud !== null && ! $tipoSolicitud->requiere_solicitante
+                && $modalidad !== $modalidadSugerida) {
+                $validator->errors()->add('modalidad_documento', 'La modalidad no corresponde al tipo de documento seleccionado.');
             }
 
             $tipo = DB::table('tipos_tramite')->where('codigo', $this->input('tipo_documento'))->first([

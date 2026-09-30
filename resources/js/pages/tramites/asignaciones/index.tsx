@@ -19,7 +19,7 @@ type AssignmentRow = {
     id: number;
     codigo: string;
     asunto: string;
-    persona_nombre: string;
+    persona_nombre: string | null;
     fecha_recepcion: string;
     estado: string;
     estado_label: string;
@@ -205,7 +205,7 @@ export default function AsignacionesIndex({
                                                 {tramite.asunto}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
-                                                {tramite.persona_nombre} ·{' '}
+                                                {tramite.persona_nombre ?? 'Documento institucional'} ·{' '}
                                                 {formatDate(
                                                     tramite.fecha_recepcion,
                                                 )}

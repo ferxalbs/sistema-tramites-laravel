@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 
 type Reviewer = { id: number; name: string; dni: string | null; rol: string; carga_activa: number };
 type Props = {
-    tramite: { id: number; codigo: string; asunto: string; persona_nombre: string; fecha_recepcion: string };
+    tramite: { id: number; codigo: string; asunto: string; persona_nombre: string | null; fecha_recepcion: string };
     modo: 'asignar' | 'reasignar';
     asignacion: { id: number; destino: string; revisor_id: number; revisor: string } | null;
     revisores: { docente: Reviewer[]; oficina: Reviewer[] };
@@ -63,7 +63,7 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                 <header className="flex items-start gap-3">
                     <Button render={<Link href={TramiteController.show({ tramite: tramite.id })} />} variant="outline" size="icon" aria-label="Volver al trámite"><ArrowLeft /></Button>
                     <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">{tramite.codigo} · {tramite.persona_nombre}</p>
+                        <p className="text-sm text-muted-foreground">{tramite.codigo} · {tramite.persona_nombre ?? 'Documento institucional'}</p>
                         <h1 className="text-2xl font-semibold tracking-tight">{modo === 'asignar' ? 'Asignar revisor' : 'Reasignar trámite'}</h1>
                         <p className="text-sm text-muted-foreground">{tramite.asunto}</p>
                     </div>

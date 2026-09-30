@@ -14,6 +14,7 @@ class TramiteTypeCatalog
         'COMUNICACION_ADMINISTRATIVA',
         'SOLICITUD_GENERAL',
         'JUSTIFICACION',
+        'REQUERIMIENTO_EQUIPAMIENTO',
     ];
 
     /**
@@ -66,5 +67,18 @@ class TramiteTypeCatalog
     public static function excludedCodes(): array
     {
         return self::EXCLUDED_CODES;
+    }
+
+    public static function requiresApplicant(?string $code): bool
+    {
+        if (! is_string($code) || $code === '') {
+            return true;
+        }
+
+        $requiresApplicant = DB::table('tipos_tramite')
+            ->where('codigo', $code)
+            ->value('requiere_solicitante');
+
+        return $requiresApplicant === null ? true : (bool) $requiresApplicant;
     }
 }
