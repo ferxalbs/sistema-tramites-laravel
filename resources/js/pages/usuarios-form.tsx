@@ -1,5 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useFlashToast } from '@/hooks/use-flash-toast';
 import {
     Select,
     SelectContent,
@@ -22,7 +24,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { index, save, store } from '@/routes/admin/users';
+import {
+    destroy,
+    index,
+    resetPassword,
+    save,
+    store,
+    update,
+} from '@/routes/admin/users';
 import {
     index as studentsIndex,
     save as saveStudent,
@@ -31,6 +40,8 @@ import {
 
 type Account = {
     id: number;
+    estado?: 'activo' | 'pendiente' | 'inactivo' | 'rechazado';
+    motivo_inactivacion?: string | null;
     rol: string;
     nombres: string | null;
     apellidos: string | null;
@@ -39,7 +50,6 @@ type Account = {
     email: string;
     correo_alternativo: string | null;
     cargo_institucional_id: number | null;
-    codigo_estudiante: string | null;
     codigo_docente: string | null;
     programa_estudio_id: number | null;
     condicion_academica: string | null;
@@ -48,6 +58,11 @@ type Account = {
     direccion_residencia: string | null;
     especialidad: string | null;
     condicion_laboral: string | null;
+    teacher_request?: {
+        cargo: string | null;
+        motivo: string;
+        created_at: string;
+    } | null;
 };
 
 type Props = {
@@ -56,10 +71,11 @@ type Props = {
     programas: Array<{ id: number; nombre: string }>;
     cargos?: Array<{ id: number; nombre: string }>;
     passwordRules: string | null;
+    viewerId?: number;
 };
 
 const roles = [
-    { value: 'estudiante', label: 'Estudiante/Egresado' },
+    { value: 'estudiante', label: 'Acceso estudiantil' },
     { value: 'asistente', label: 'Asistente de Gestión Documentaria' },
     { value: 'docente', label: 'Docente' },
     { value: 'administrador', label: 'Administrador' },
@@ -71,7 +87,9 @@ export default function UsuariosForm({
     programas,
     cargos = [],
     passwordRules,
+    viewerId,
 }: Props) {
+    useFlashToast();
     const [role, setRole] = useState(user?.rol ?? 'estudiante');
     const [condition, setCondition] = useState(
         user?.condicion_academica ?? 'Estudiante',
@@ -100,6 +118,17 @@ export default function UsuariosForm({
                                 ? 'El rol se asigna como estudiante/egresado en el servidor. No puede cambiar roles ni estados desde este formulario.'
                                 : 'El perfil requerido cambia según el rol. Las cuentas creadas aquí usan una contraseña temporal.'}
                         </CardDescription>
+                        {user?.teacher_request && (
+                            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                                <p className="font-medium">Solicitud de acceso docente</p>
+                                <p className="mt-1 text-muted-foreground">
+                                    Cargo solicitado: {user.teacher_request.cargo ?? 'Sin cargo'}
+                                </p>
+                                <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                                    {user.teacher_request.motivo}
+                                </p>
+                            </div>
+                        )}
                     </CardHeader>
                     <Form
                         {...(assistant
@@ -110,14 +139,20 @@ export default function UsuariosForm({
                               ? save.form({ user: user.id })
                               : store.form())}
                         disableWhileProcessing
+                        noValidate
                         resetOnSuccess={['password', 'password_confirmation']}
+                        onBefore={() => window.confirm(
+                            user
+                                ? `¿Deseas guardar los cambios de ${user.nombres ?? user.email}?`
+                                : '¿Deseas crear esta cuenta con los datos ingresados?',
+                        )}
                     >
                         {({ errors, processing }) => (
                             <>
                                 <CardContent className="grid gap-5">
                                     {!assistant && (
                                         <div className="grid gap-2">
-                                            <Label htmlFor="rol">Rol</Label>
+                                            <Label htmlFor="rol">Rol de acceso</Label>
                                             <Select
                                                 name="rol"
                                                 items={roles}
@@ -148,6 +183,11 @@ export default function UsuariosForm({
                                                 </SelectContent>
                                             </Select>
                                             <InputError message={errors.rol} />
+                                            {role === 'estudiante' && (
+                                                <p className="text-sm text-muted-foreground">
+                                                    El acceso estudiantil sirve para ambas situaciones; abajo elige si esta persona es Estudiante o Egresado.
+                                                </p>
+                                            )}
                                         </div>
                                     )}
 
@@ -301,6 +341,14 @@ export default function UsuariosForm({
                                                     errors.programa_estudio_id
                                                 }
                                             />
+                                            {programas.length === 0 && (
+                                                <p className="text-sm text-destructive">
+                                                    No hay programas de estudios
+                                                    configurados. Ejecute las
+                                                    migraciones antes de crear
+                                                    cuentas.
+                                                </p>
+                                            )}
                                         </div>
                                     )}
 
@@ -360,29 +408,13 @@ export default function UsuariosForm({
 
                                     {role === 'estudiante' && (
                                         <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="codigo_estudiante">
-                                                    Código de estudiante
-                                                </Label>
-                                                <Input
-                                                    id="codigo_estudiante"
-                                                    name="codigo_estudiante"
-                                                    defaultValue={
-                                                        user?.codigo_estudiante ??
-                                                        ''
-                                                    }
-                                                    maxLength={40}
-                                                    required
-                                                />
-                                                <InputError
-                                                    message={
-                                                        errors.codigo_estudiante
-                                                    }
-                                                />
+                                            <div className="rounded-xl border bg-muted/30 p-3 text-sm sm:col-span-2">
+                                                El DNI registrado arriba también
+                                                será el código del estudiante.
                                             </div>
                                             <div className="grid gap-2">
                                                 <Label htmlFor="condicion_academica">
-                                                    Condición académica
+                                                    Situación académica
                                                 </Label>
                                                 <Select
                                                     name="condicion_academica"
@@ -424,6 +456,9 @@ export default function UsuariosForm({
                                                         errors.condicion_academica
                                                     }
                                                 />
+                                                <p className="text-sm text-muted-foreground">
+                                                    Selecciona una sola opción: Estudiante o Egresado.
+                                                </p>
                                             </div>
                                             {condition === 'Estudiante' ? (
                                                 <div className="grid gap-2">
@@ -435,7 +470,7 @@ export default function UsuariosForm({
                                                         name="ciclo_actual"
                                                         type="number"
                                                         min={1}
-                                                        max={10}
+                                                        max={6}
                                                         defaultValue={
                                                             user?.ciclo_actual ??
                                                             ''
@@ -636,35 +671,207 @@ export default function UsuariosForm({
                                             </div>
                                         )}
                                 </CardContent>
-                                <CardFooter className="flex gap-2">
-                                    <Button type="submit" disabled={processing}>
-                                        {user
-                                            ? 'Guardar cambios'
-                                            : assistant
-                                              ? 'Crear cuenta provisional'
-                                              : 'Crear usuario'}
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        nativeButton={false}
-                                        render={
-                                            <Link
-                                                href={
-                                                    assistant
-                                                        ? studentsIndex()
-                                                        : index()
-                                                }
-                                            />
-                                        }
-                                    >
-                                        Volver
-                                    </Button>
+                                <CardFooter className="flex flex-col items-start gap-3">
+                                    {Object.keys(errors).length > 0 && (
+                                        <div role="alert" className="w-full rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                                            <p className="font-medium">No se pudo guardar el usuario. Corrige estos campos:</p>
+                                            <ul className="mt-1 list-inside list-disc">
+                                                {Object.entries(errors).map(([field, message]) => <li key={field}>{message}</li>)}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <Button type="submit" disabled={processing}>
+                                            {user
+                                                ? 'Guardar cambios'
+                                                : assistant
+                                                  ? 'Crear cuenta provisional'
+                                                  : 'Crear usuario'}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            nativeButton={false}
+                                            render={
+                                                <Link
+                                                    href={
+                                                        assistant
+                                                            ? studentsIndex()
+                                                            : index()
+                                                    }
+                                                />
+                                            }
+                                        >
+                                            Volver
+                                        </Button>
+                                    </div>
                                 </CardFooter>
                             </>
                         )}
                     </Form>
                 </Card>
+                {!assistant && user && (
+                    <AccountActions user={user} viewerId={viewerId} />
+                )}
             </main>
+        </>
+    );
+}
+
+function AccountActions({
+    user,
+    viewerId,
+}: {
+    user: Account;
+    viewerId?: number;
+}) {
+    const status = user.estado ?? 'pendiente';
+    const statusLabels = {
+        activo: 'Activa',
+        pendiente: 'Pendiente',
+        inactivo: 'Inactiva',
+        rechazado: 'Rechazada',
+    } as const;
+    const isCurrentUser = user.id === viewerId;
+
+    return (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Estado y acceso</CardTitle>
+                    <CardDescription>
+                        Estado actual de la cuenta: <Badge variant={status === 'activo' ? 'default' : 'secondary'}>{statusLabels[status]}</Badge>
+                        {user.motivo_inactivacion && (
+                            <span className="mt-2 block">
+                                Motivo registrado: {user.motivo_inactivacion}
+                            </span>
+                        )}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {status !== 'activo' && (
+                        <Form
+                            {...update.form({ user: user.id })}
+                            disableWhileProcessing
+                            onBefore={() => window.confirm(`¿Deseas activar la cuenta de ${user.nombres ?? user.email}?`)}
+                        >
+                            {({ errors, processing }) => (
+                                <div className="space-y-2">
+                                    <input type="hidden" name="accion" value="activate" />
+                                    <Button type="submit" disabled={processing}>
+                                        Activar cuenta
+                                    </Button>
+                                    <InputError message={errors.accion} />
+                                </div>
+                            )}
+                        </Form>
+                    )}
+
+                    {status === 'activo' && !isCurrentUser && (
+                        <Form
+                            {...update.form({ user: user.id })}
+                            disableWhileProcessing
+                            onBefore={() => window.confirm(`¿Deseas desactivar la cuenta de ${user.nombres ?? user.email}?`)}
+                        >
+                            {({ errors, processing }) => (
+                                <div className="space-y-2">
+                                    <input type="hidden" name="accion" value="deactivate" />
+                                    <label className="grid gap-1 text-sm" htmlFor="motivo-desactivacion">
+                                        Motivo de desactivación
+                                        <textarea
+                                            id="motivo-desactivacion"
+                                            name="motivo"
+                                            required
+                                            maxLength={500}
+                                            rows={3}
+                                            className="w-full rounded-xl border border-input bg-background p-3"
+                                        />
+                                    </label>
+                                    <InputError message={errors.motivo || errors.accion} />
+                                    <Button type="submit" variant="outline" disabled={processing}>
+                                        Desactivar cuenta
+                                    </Button>
+                                </div>
+                            )}
+                        </Form>
+                    )}
+
+                    {status === 'pendiente' && (
+                        <Form
+                            {...update.form({ user: user.id })}
+                            disableWhileProcessing
+                            onBefore={() => window.confirm(`¿Deseas rechazar la solicitud de ${user.nombres ?? user.email}?`)}
+                        >
+                            {({ errors, processing }) => (
+                                <div className="space-y-2">
+                                    <input type="hidden" name="accion" value="reject" />
+                                    <label className="grid gap-1 text-sm" htmlFor="motivo-rechazo">
+                                        Motivo de rechazo
+                                        <textarea
+                                            id="motivo-rechazo"
+                                            name="motivo"
+                                            required
+                                            maxLength={500}
+                                            rows={3}
+                                            className="w-full rounded-xl border border-input bg-background p-3"
+                                        />
+                                    </label>
+                                    <InputError message={errors.motivo || errors.accion} />
+                                    <Button type="submit" variant="destructive" disabled={processing}>
+                                        Rechazar solicitud
+                                    </Button>
+                                </div>
+                            )}
+                        </Form>
+                    )}
+
+                    {status === 'activo' && (
+                        <Form
+                            {...resetPassword.form({ user: user.id })}
+                            disableWhileProcessing
+                            onBefore={() => window.confirm(`¿Deseas enviar un enlace de restablecimiento a ${user.email}?`)}
+                        >
+                            {({ errors, processing }) => (
+                                <div className="space-y-2">
+                                    <p className="text-sm text-muted-foreground">
+                                        Se enviará un enlace de un solo uso al correo institucional.
+                                    </p>
+                                    <InputError message={errors.reset} />
+                                    <Button type="submit" variant="outline" disabled={processing}>
+                                        Enviar enlace para restablecer contraseña
+                                    </Button>
+                                </div>
+                            )}
+                        </Form>
+                    )}
+                </CardContent>
+            </Card>
+
+            {!isCurrentUser && (
+                <Card className="border-destructive/40">
+                    <CardHeader>
+                        <CardTitle>Eliminar usuario</CardTitle>
+                        <CardDescription>
+                            La eliminación es permanente. Si la cuenta tiene trámites o actividad vinculada, el sistema la bloqueará para conservar el historial; en ese caso, desactívala.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Form
+                            {...destroy.form({ user: user.id })}
+                            disableWhileProcessing
+                            onBefore={() => window.confirm(`¿Eliminar permanentemente la cuenta de ${user.nombres ?? user.email}? Esta acción no se puede deshacer.`)}
+                        >
+                            {({ errors, processing }) => (
+                                <div className="space-y-2">
+                                    <InputError message={errors.delete} />
+                                    <Button type="submit" variant="destructive" disabled={processing}>
+                                        Eliminar usuario
+                                    </Button>
+                                </div>
+                            )}
+                        </Form>
+                    </CardContent>
+                </Card>
+            )}
         </>
     );
 }

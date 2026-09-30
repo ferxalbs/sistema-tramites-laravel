@@ -33,7 +33,10 @@ class GenerateTramiteFinalDocument
         $ruta = null;
 
         try {
-            $pdf = $this->pdfDocumentGenerator->generate($reserva['snapshot']);
+            $pdf = $this->pdfDocumentGenerator->generate([
+                ...$reserva['snapshot'],
+                'firma_imagen' => $reserva['firma_imagen'],
+            ]);
 
             if (strlen($pdf['bytes']) < 500 || ! str_starts_with($pdf['bytes'], '%PDF-') || ! str_contains($pdf['bytes'], '%%EOF')) {
                 throw new RuntimeException('El generador no produjo un PDF válido.');
@@ -155,6 +158,7 @@ class GenerateTramiteFinalDocument
      *     numero: string,
      *     version_borrador: int,
      *     estado_decision: string,
+     *     firma_imagen: string,
      *     snapshot: array{
      *         institucion: string,
      *         tipo_documento: string,
@@ -214,6 +218,16 @@ class GenerateTramiteFinalDocument
 
             abort_unless($plantilla !== null && $remitente !== null && $firmante !== null, 409);
 
+            $rutaFirma = 'firmas-perfil/'.$firmante->id.'.jpg';
+
+            if (! Storage::disk('local')->exists($rutaFirma)) {
+                throw ValidationException::withMessages([
+                    'firmante_id' => 'El firmante debe registrar su firma escaneada desde Mi perfil antes de emitir el documento.',
+                ]);
+            }
+
+            $firmaImagen = Storage::disk('local')->get($rutaFirma);
+
             if ($ronda->estado === 'rechazado' && trim((string) $ronda->comentario_publico) === '') {
                 throw ValidationException::withMessages(['documento' => 'El rechazo necesita un fundamento público antes de emitir el documento.']);
             }
@@ -264,7 +278,7 @@ class GenerateTramiteFinalDocument
             $correlativo = (int) $secuencia->ultimo_correlativo;
             $numero = $serie->prefijo.'-'.$anio.'-'.str_pad((string) $correlativo, 6, '0', STR_PAD_LEFT);
             $codigoVerificacion = implode('-', str_split(Str::upper(bin2hex(random_bytes(8))), 4));
-            $snapshot = $this->crearSnapshot($registro, $borrador, $ronda, $remitente, $firmante, $numero, $codigoVerificacion);
+            $snapshot = $this->crearSnapshot($registro, $borrador, $ronda, $remitente, $firmante, $numero, $codigoVerificacion, hash('sha256', $firmaImagen));
 
             $numeracion = TramiteNumeracionDocumental::query()->create([
                 'serie_id' => $serie->id,
@@ -319,6 +333,7 @@ class GenerateTramiteFinalDocument
                 'version_borrador' => (int) $borrador->version,
                 'estado_decision' => $registro->estado,
                 'snapshot' => $snapshot,
+                'firma_imagen' => $firmaImagen,
             ];
         });
     }
@@ -338,6 +353,8 @@ class GenerateTramiteFinalDocument
      *     cierre: ?string,
      *     personas: list<string>,
      *     firmante: string,
+     *     firmante_id: int,
+     *     firma_perfil_sha256: string,
      *     decision: string,
      *     conclusion: ?string,
      *     comentario_publico: ?string,
@@ -347,7 +364,7 @@ class GenerateTramiteFinalDocument
      *     plantilla: string
      * }
      */
-    private function crearSnapshot(Tramite $tramite, TramiteBorrador $borrador, TramiteRondaRevision $ronda, User $remitente, User $firmante, string $numero, string $codigoVerificacion): array
+    private function crearSnapshot(Tramite $tramite, TramiteBorrador $borrador, TramiteRondaRevision $ronda, User $remitente, User $firmante, string $numero, string $codigoVerificacion, string $firmaHash): array
     {
         $destinatarios = array_values(array_filter(array_map(
             static fn (array $destinatario): string => trim(implode(' ', array_filter([
@@ -390,6 +407,8 @@ class GenerateTramiteFinalDocument
             'cierre' => $borrador->cierre,
             'personas' => $personas,
             'firmante' => $firmante->name.' · '.($roles[$firmante->rol] ?? $firmante->rol),
+            'firmante_id' => (int) $firmante->id,
+            'firma_perfil_sha256' => $firmaHash,
             'decision' => $ronda->estado,
             'conclusion' => $ronda->conclusion,
             'comentario_publico' => $ronda->comentario_publico,
@@ -397,7 +416,7 @@ class GenerateTramiteFinalDocument
             'version_borrador' => (int) $borrador->version,
             'borrador_renderizado_sha256' => $borrador->contenido_renderizado === null
                 ? null : hash('sha256', $borrador->contenido_renderizado),
-            'requiere_firma_fisica' => $borrador->plantilla->requiere_firma_fisica,
+            'requiere_firma_fisica' => false,
             'plantilla' => $borrador->plantilla->nombre,
         ];
     }

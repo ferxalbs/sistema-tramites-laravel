@@ -12,7 +12,6 @@ use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEvento;
 use App\Models\TramiteRondaRevision;
 use App\Models\User;
-use App\Services\Tramites\CalculateTramiteDeadline;
 use App\Services\Tramites\TramiteClassificationCatalog;
 use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Eloquent\Builder;
@@ -90,13 +89,76 @@ class TramiteController extends Controller
         ]);
     }
 
-    public function create(): InertiaResponse
+    public function create(Request $request): InertiaResponse
     {
+        $seleccion = $request->session()->get('tramite_selection');
+        if (! is_array($seleccion)
+            || ! is_string($seleccion['tipo_documento'] ?? null)
+            || ! is_string($seleccion['dni'] ?? null)) {
+            return Inertia::render('tramites/start', [
+                'tipos' => DB::table('tipos_tramite')->where('activo', true)
+                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
+                    ->orderBy('nombre')->get(['codigo', 'nombre'])
+                    ->map(fn (object $tipo): array => ['codigo' => $tipo->codigo, 'nombre' => $tipo->nombre])
+                    ->all(),
+            ]);
+        }
+
+        $tipo = DB::table('tipos_tramite')->where('codigo', $seleccion['tipo_documento'])
+            ->where('activo', true)
+            ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
+            ->first(['codigo', 'nombre', 'clasificacion_sugerida']);
+        if ($tipo === null || preg_match('/^[0-9]{8}$/', $seleccion['dni']) !== 1) {
+            $request->session()->forget('tramite_selection');
+
+            return Inertia::render('tramites/start', [
+                'tipos' => DB::table('tipos_tramite')->where('activo', true)
+                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
+                    ->orderBy('nombre')->get(['codigo', 'nombre'])
+                    ->map(fn (object $item): array => ['codigo' => $item->codigo, 'nombre' => $item->nombre])
+                    ->all(),
+            ]);
+        }
+
+        $rolSolicitante = User::query()->where('dni', $seleccion['dni'])
+            ->where('activo', true)->value('rol');
+        $clasificacion = $tipo->clasificacion_sugerida;
+        if ($clasificacion === 'institucional') {
+            $clasificacion = 'administrativo';
+        }
+        if ($clasificacion === null) {
+            $clasificacion = match (true) {
+                $tipo->codigo === 'CONSTANCIA_PRACTICA',
+                $rolSolicitante === 'estudiante' => 'estudiantil',
+                default => 'administrativo',
+            };
+        }
+
         return Inertia::render('tramites/create', [
             ...$this->receptionFormData(),
             'ahora' => now()->format('Y-m-d\TH:i'),
             'tramite' => null,
+            'seleccion' => [
+                'tipo_documento' => $tipo->codigo,
+                'tipo_nombre' => $tipo->nombre,
+                'clasificacion' => $clasificacion,
+                'dni' => $seleccion['dni'],
+            ],
         ]);
+    }
+
+    public function start(Request $request): RedirectResponse
+    {
+        $seleccion = $request->validate([
+            'tipo_documento' => ['required', 'string', Rule::exists('tipos_tramite', 'codigo')->where(fn ($query) => $query
+                ->where('activo', true)->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes()))],
+            'dni' => ['required', 'regex:/^[0-9]{8}$/'],
+        ], [], [
+            'tipo_documento' => 'tipo de trámite',
+            'dni' => 'DNI',
+        ]);
+
+        return redirect()->route('tramites.create')->with('tramite_selection', $seleccion);
     }
 
     public function edit(Tramite $tramite): InertiaResponse
@@ -109,7 +171,7 @@ class TramiteController extends Controller
             'tramite' => $tramite->only([
                 'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador',
                 'formato_salida', 'modalidad_documento',
-                'propietario_id', 'programa_estudio_id', 'destino_tipo', 'destino_nombre', 'asunto', 'descripcion', 'prioridad', 'folios',
+                'propietario_id', 'programa_estudio_id', 'destino_tipo', 'destino_nombre', 'destino_docente_id', 'asunto', 'descripcion', 'prioridad', 'folios',
                 'numero_expediente_externo', 'area_procedencia', 'persona_entrega_documento', 'observacion_recepcion',
             ]) + [
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d\TH:i')
@@ -126,6 +188,8 @@ class TramiteController extends Controller
         $documentos = $datos['documentos'] ?? [];
         $listas = $this->extractReceptionLists($datos);
         unset($datos['documentos'], $datos['confirmar_recepcion']);
+        $this->resolveStudentApplicant($datos);
+        $this->resolveReceptionDestination($datos);
         $datos['fecha_recepcion'] = substr($datos['fecha_llegada_oficina'], 0, 10);
         $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
 
@@ -211,6 +275,8 @@ class TramiteController extends Controller
     {
         $datos = $request->validated();
         $listas = $this->extractReceptionLists($datos);
+        $this->resolveStudentApplicant($datos);
+        $this->resolveReceptionDestination($datos);
         $datos['fecha_recepcion'] = substr($datos['fecha_llegada_oficina'], 0, 10);
         $datos['fecha_llegada_oficina'] = str_replace('T', ' ', $datos['fecha_llegada_oficina']).':00';
 
@@ -384,6 +450,7 @@ class TramiteController extends Controller
                 'tramite_id' => $tramite->id,
                 'codigo' => $tramite->codigo,
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
+                'fecha_documento' => $tramite->fecha_presentacion_original?->toDateString(),
                 'fecha_registro' => ($recepcion?->created_at ?? $tramite->created_at)?->toIso8601String(),
                 'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
                 'estado_inicial' => config('tramites.estados.recibido_oficina'),
@@ -394,7 +461,7 @@ class TramiteController extends Controller
         ]);
     }
 
-    public function show(Request $request, Tramite $tramite, CalculateTramiteDeadline $deadlineCalculator): InertiaResponse
+    public function show(Request $request, Tramite $tramite): InertiaResponse
     {
         $classificationLabels = TramiteClassificationCatalog::labels();
         $typeLabels = TramiteTypeCatalog::labels();
@@ -440,7 +507,6 @@ class TramiteController extends Controller
                 'descripcion' => $tramite->descripcion,
                 'prioridad' => config('tramites.prioridades.'.$tramite->prioridad, $tramite->prioridad),
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
-                'plazo' => $deadlineCalculator->forTramite($tramite),
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d H:i'),
                 'fecha_presentacion_original' => $tramite->fecha_presentacion_original?->toDateString(),
                 'numero_expediente_externo' => $tramite->numero_expediente_externo,
@@ -657,9 +723,11 @@ class TramiteController extends Controller
                 'modalidades_documento' => DB::table('modalidades_documento')->where('activo', true)
                     ->where('tipo_documento_salida', 'memorando')->orderBy('orden')->pluck('nombre', 'codigo')->all(),
                 'formatos_sugeridos' => DB::table('tipos_tramite')->where('activo', true)
+                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
                     ->whereNotNull('tipo_documento_salida_sugerido')
                     ->pluck('tipo_documento_salida_sugerido', 'codigo')->all(),
                 'requisitos_tipo' => DB::table('tipos_tramite')->where('activo', true)
+                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
                     ->get(['codigo', 'requiere_personas_relacionadas', 'requiere_destinatarios_multiples', 'requiere_documento_original'])
                     ->mapWithKeys(fn (object $tipo): array => [$tipo->codigo => [
                         'personas_relacionadas' => (bool) $tipo->requiere_personas_relacionadas,
@@ -682,8 +750,23 @@ class TramiteController extends Controller
                 ->where('rol', 'estudiante')
                 ->where('activo', true)
                 ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])
+                ->get(['id', 'name', 'dni', 'email', 'celular', 'correo_alternativo'])
+                ->map(fn (User $user): array => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'dni' => $user->dni,
+                    'email' => $user->email,
+                    'celular' => $user->celular,
+                    'correo_alternativo' => $user->correo_alternativo,
+                ])
+                ->all(),
+            'docentes' => User::query()
+                ->where('rol', 'docente')
+                ->where('activo', true)
+                ->where('estado_cuenta', 'activo')
+                ->orderBy('name')
+                ->get(['id', 'name', 'dni'])
+                ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name, 'dni' => $user->dni])
                 ->all(),
             'programas' => ProgramaEstudio::query()
                 ->where('activo', true)
@@ -709,6 +792,58 @@ class TramiteController extends Controller
         }
 
         return $listas;
+    }
+
+    /** @param array<string, mixed> $datos */
+    private function resolveReceptionDestination(array &$datos): void
+    {
+        if ($datos['destino_tipo'] !== 'docente') {
+            $datos['destino_docente_id'] = null;
+            if (! filled($datos['destino_nombre'] ?? null)) {
+                $datos['destino_nombre'] = 'Pendiente de asignación';
+            }
+
+            return;
+        }
+
+        $nombre = User::query()
+            ->whereKey($datos['destino_docente_id'])
+            ->where('rol', 'docente')
+            ->where('activo', true)
+            ->where('estado_cuenta', 'activo')
+            ->value('name');
+
+        if ($nombre === null) {
+            throw ValidationException::withMessages(['destino_docente_id' => 'Seleccione un docente activo.']);
+        }
+
+        $datos['destino_nombre'] = $nombre;
+    }
+
+    /** @param array<string, mixed> $datos */
+    private function resolveStudentApplicant(array &$datos): void
+    {
+        if ($datos['clasificacion'] !== 'estudiantil') {
+            $datos['propietario_id'] = null;
+
+            return;
+        }
+
+        $estudiante = User::query()
+            ->whereKey($datos['propietario_id'] ?? null)
+            ->where('rol', 'estudiante')
+            ->where('activo', true)
+            ->first(['id', 'name', 'dni']);
+
+        if ($estudiante === null || $estudiante->dni === null) {
+            throw ValidationException::withMessages([
+                'propietario_id' => 'Vincule una cuenta activa de estudiante con DNI registrado.',
+            ]);
+        }
+
+        $datos['propietario_id'] = $estudiante->id;
+        $datos['persona_nombre'] = $estudiante->name;
+        $datos['persona_identificador'] = $estudiante->dni;
     }
 
     /**

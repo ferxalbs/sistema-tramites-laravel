@@ -28,7 +28,7 @@ type Props = {
         asunto: string;
         fecha_documento: string;
         firmante: string | null;
-        requiere_firma_fisica: boolean;
+        firma_perfil_registrada: boolean;
     };
 };
 
@@ -68,7 +68,7 @@ export default function DocumentoFinal({ tramite, revision, borrador }: Props) {
                         <Detail label="Asunto del documento" value={borrador.asunto} />
                         <Detail label="Fecha del documento" value={formatDate(borrador.fecha_documento)} />
                         <Detail label="Firmante" value={borrador.firmante ?? 'Cuenta eliminada'} />
-                        <Detail label="Firma física" value={borrador.requiere_firma_fisica ? 'Requerida' : 'No requerida'} />
+                        <Detail label="Firma del perfil" value={borrador.firma_perfil_registrada ? 'Registrada; se insertará en el PDF' : 'Falta registrar la firma en Mi perfil'} />
                         {revision.conclusion && <Detail label="Conclusión" value={revision.conclusion} />}
                         {revision.comentario_publico && <Detail label="Comunicación al interesado" value={revision.comentario_publico} />}
                     </CardContent>
@@ -90,12 +90,17 @@ export default function DocumentoFinal({ tramite, revision, borrador }: Props) {
                                     </div>
                                     <InputError message={errors.confirmar} />
                                     <InputError message={errors.documento} />
+                                    {!borrador.firma_perfil_registrada && (
+                                        <p className="text-sm text-destructive">
+                                            El firmante debe guardar su firma escaneada en Mi perfil antes de emitir el documento.
+                                        </p>
+                                    )}
                                     <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
                                         <p className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <ShieldCheck />
                                             El archivo se guarda de forma privada y se verificará con SHA-256 en cada descarga.
                                         </p>
-                                        <Button type="submit" disabled={processing}>
+                                        <Button type="submit" disabled={processing || !borrador.firma_perfil_registrada}>
                                             {processing ? <Spinner data-icon="inline-start" /> : <FileCheck2 data-icon="inline-start" />}
                                             Emitir documento oficial
                                         </Button>

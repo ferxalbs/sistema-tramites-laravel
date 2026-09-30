@@ -40,6 +40,7 @@ class ProcessTramiteDelivery
             $documento = $this->documentoFinalEmitido($registro);
             $snapshot = $documento->contenido_snapshot;
             $requiereFirma = (bool) ($snapshot['requiere_firma_fisica'] ?? false);
+            $firmaPerfilIncluida = is_string($snapshot['firma_perfil_sha256'] ?? null);
             $estadoNuevo = $requiereFirma ? 'pendiente_firma' : 'listo_entrega';
             $actualizado = DB::table('tramites')
                 ->where('id', $registro->id)
@@ -54,8 +55,11 @@ class ProcessTramiteDelivery
                     'documento_final_id' => $documento->id,
                     'firmante_id' => $documento->borrador?->firmante_id,
                     'registrado_por' => $actor->id,
-                    'no_requiere_firma' => true,
-                    'observacion' => 'La plantilla no requiere firma física.',
+                    'no_requiere_firma' => ! $firmaPerfilIncluida,
+                    'fecha_firma' => $firmaPerfilIncluida ? now() : null,
+                    'observacion' => $firmaPerfilIncluida
+                        ? 'Se insertó en el PDF la firma escaneada guardada en el perfil del firmante.'
+                        : 'La plantilla no requiere firma física.',
                 ]);
             }
 
@@ -63,7 +67,9 @@ class ProcessTramiteDelivery
                 $registro->id,
                 $actor->id,
                 'entrega_preparada',
-                $requiereFirma ? 'El documento oficial fue enviado a firma física.' : 'El documento oficial quedó listo para entregar; la firma no es aplicable.',
+                $requiereFirma ? 'El documento oficial fue enviado a firma física.' : ($firmaPerfilIncluida
+                    ? 'El documento oficial quedó listo para entregar con la firma escaneada del perfil.'
+                    : 'El documento oficial quedó listo para entregar sin firma física.'),
                 'documento_final_generado',
                 $estadoNuevo,
                 ['documento_final_id' => $documento->id],
@@ -159,7 +165,7 @@ class ProcessTramiteDelivery
                 $documento = $this->documentoFinalEmitido($registro);
                 $medio = TramiteMedioEntrega::query()
                     ->whereKey((int) $datos['medio_entrega_id'])
-                    ->where('activo', true)
+                    ->whereIn('codigo', TramiteMedioEntrega::CODIGOS_DISPONIBLES)
                     ->first();
                 abort_unless($medio !== null, 422);
 

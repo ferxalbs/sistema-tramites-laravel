@@ -190,6 +190,13 @@ export default function Register({ passwordRules, programas, status }: Props) {
                                     <InputError
                                         message={errors.programa_estudio_id}
                                     />
+                                    {programas.length === 0 && (
+                                        <p className="text-sm text-destructive">
+                                            No hay programas de estudios
+                                            configurados. Contacte a la
+                                            administración.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="condicion_academica">
@@ -244,7 +251,7 @@ export default function Register({ passwordRules, programas, status }: Props) {
                                             name="ciclo_actual"
                                             type="number"
                                             min={1}
-                                            max={10}
+                                            max={6}
                                             required
                                         />
                                         <InputError

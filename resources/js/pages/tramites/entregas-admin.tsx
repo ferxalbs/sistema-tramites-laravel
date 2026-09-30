@@ -29,17 +29,7 @@ type Medio = {
     codigo: string;
     nombre: string;
     tipo: string;
-    activo: boolean;
     requiere_evidencia: boolean;
-};
-
-type Plantilla = {
-    id: number;
-    codigo: string;
-    version: number;
-    nombre: string;
-    requiere_firma_fisica: boolean;
-    permite_no_firma: boolean;
 };
 
 type Props = {
@@ -49,10 +39,9 @@ type Props = {
         next_page_url: string | null;
     };
     medios: Medio[];
-    plantillas: Plantilla[];
 };
 
-export default function EntregasAdmin({ tramites, medios, plantillas }: Props) {
+export default function EntregasAdmin({ tramites, medios }: Props) {
     useFlashToast();
 
     return (
@@ -65,7 +54,7 @@ export default function EntregasAdmin({ tramites, medios, plantillas }: Props) {
                     </h1>
                     <p className="text-sm text-muted-foreground">
                         Consulta documentos emitidos y administra los medios de
-                        entrega y la firma por plantilla.
+                        entrega.
                     </p>
                 </header>
 
@@ -196,7 +185,8 @@ export default function EntregasAdmin({ tramites, medios, plantillas }: Props) {
                     <CardHeader>
                         <CardTitle>Medios de entrega</CardTitle>
                         <CardDescription>
-                            El estado y la exigencia de evidencia se aplican a
+                            Presencial, correo electrónico y descarga del sistema
+                            siempre están disponibles. La evidencia se aplica a
                             nuevos registros de entrega.
                         </CardDescription>
                     </CardHeader>
@@ -207,7 +197,7 @@ export default function EntregasAdmin({ tramites, medios, plantillas }: Props) {
                                 {...TramiteEntregaAdminController.updateMedium.form(
                                     { medio: medio.id },
                                 )}
-                                className="grid gap-3 rounded-xl border p-4 sm:grid-cols-[minmax(12rem,1fr)_10rem_12rem_auto] sm:items-end"
+                                className="grid gap-3 rounded-xl border p-4 sm:grid-cols-[minmax(12rem,1fr)_12rem_auto] sm:items-end"
                             >
                                 {({ errors, processing }) => (
                                     <>
@@ -218,33 +208,6 @@ export default function EntregasAdmin({ tramites, medios, plantillas }: Props) {
                                             <p className="text-xs text-muted-foreground">
                                                 {medio.tipo} · {medio.codigo}
                                             </p>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label
-                                                htmlFor={`medio-${medio.id}-activo`}
-                                            >
-                                                Estado
-                                            </Label>
-                                            <select
-                                                id={`medio-${medio.id}-activo`}
-                                                name="activo"
-                                                defaultValue={
-                                                    medio.activo ? '1' : '0'
-                                                }
-                                                className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
-                                            >
-                                                <option value="1">
-                                                    Activo
-                                                </option>
-                                                <option value="0">
-                                                    Inactivo
-                                                </option>
-                                            </select>
-                                            {errors.activo && (
-                                                <p className="text-xs text-destructive">
-                                                    {errors.activo}
-                                                </p>
-                                            )}
                                         </div>
                                         <div className="grid gap-2">
                                             <Label
@@ -272,108 +235,6 @@ export default function EntregasAdmin({ tramites, medios, plantillas }: Props) {
                                             {errors.requiere_evidencia && (
                                                 <p className="text-xs text-destructive">
                                                     {errors.requiere_evidencia}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <Button
-                                            type="submit"
-                                            disabled={processing}
-                                        >
-                                            Guardar
-                                        </Button>
-                                    </>
-                                )}
-                            </Form>
-                        ))}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Firma por plantilla activa</CardTitle>
-                        <CardDescription>
-                            Estos ajustes afectan documentos que se emitan
-                            después; los documentos ya emitidos conservan su
-                            configuración.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {plantillas.map((plantilla) => (
-                            <Form
-                                key={plantilla.id}
-                                {...TramiteEntregaAdminController.updateTemplate.form(
-                                    { plantilla: plantilla.id },
-                                )}
-                                className="grid gap-3 rounded-xl border p-4 sm:grid-cols-[minmax(12rem,1fr)_12rem_12rem_auto] sm:items-end"
-                            >
-                                {({ errors, processing }) => (
-                                    <>
-                                        <div>
-                                            <p className="font-medium">
-                                                {plantilla.nombre} v
-                                                {plantilla.version}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {plantilla.codigo}
-                                            </p>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label
-                                                htmlFor={`plantilla-${plantilla.id}-firma`}
-                                            >
-                                                Firma física
-                                            </Label>
-                                            <select
-                                                id={`plantilla-${plantilla.id}-firma`}
-                                                name="requiere_firma_fisica"
-                                                defaultValue={
-                                                    plantilla.requiere_firma_fisica
-                                                        ? '1'
-                                                        : '0'
-                                                }
-                                                className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
-                                            >
-                                                <option value="1">
-                                                    Requerida
-                                                </option>
-                                                <option value="0">
-                                                    No requerida
-                                                </option>
-                                            </select>
-                                            {errors.requiere_firma_fisica && (
-                                                <p className="text-xs text-destructive">
-                                                    {
-                                                        errors.requiere_firma_fisica
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label
-                                                htmlFor={`plantilla-${plantilla.id}-omitir`}
-                                            >
-                                                No aplicable
-                                            </Label>
-                                            <select
-                                                id={`plantilla-${plantilla.id}-omitir`}
-                                                name="permite_no_firma"
-                                                defaultValue={
-                                                    plantilla.permite_no_firma
-                                                        ? '1'
-                                                        : '0'
-                                                }
-                                                className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
-                                            >
-                                                <option value="1">
-                                                    Permitido
-                                                </option>
-                                                <option value="0">
-                                                    No permitido
-                                                </option>
-                                            </select>
-                                            {errors.permite_no_firma && (
-                                                <p className="text-xs text-destructive">
-                                                    {errors.permite_no_firma}
                                                 </p>
                                             )}
                                         </div>

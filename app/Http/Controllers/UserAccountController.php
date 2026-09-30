@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password as PasswordBroker;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -29,16 +30,16 @@ class UserAccountController extends Controller
             'q' => ['nullable', 'string', 'max:80'],
             'rol' => ['nullable', Rule::in(['estudiante', 'asistente', 'docente', 'administrador'])],
             'estado' => ['nullable', Rule::in(['activo', 'pendiente', 'inactivo', 'rechazado'])],
-            'selected' => ['nullable', 'integer', 'exists:users,id'],
         ]);
-        $query = User::query();
+        $query = User::query()->with('perfilEstudiante:id,user_id,condicion_academica');
         $search = trim($filters['q'] ?? '');
 
         if ($search !== '') {
             $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
             $query->where(fn (Builder $users): Builder => $users
                 ->whereRaw("name LIKE ? ESCAPE '!'", [$like])
-                ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like]));
+                ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like])
+                ->orWhereRaw("dni LIKE ? ESCAPE '!'", [$like]));
         }
 
         $users = $query
@@ -51,36 +52,16 @@ class UserAccountController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'dni' => $user->dni,
                 'rol' => $user->rol,
+                'condicion_academica' => $user->perfilEstudiante?->condicion_academica,
                 'estado' => $user->estado_cuenta,
                 'created_at' => $user->created_at?->toDateString(),
             ])->withQueryString();
 
-        $selected = isset($filters['selected']) ? User::query()->find($filters['selected']) : null;
-
         return Inertia::render('usuarios', [
             'users' => $users,
-            'viewerId' => $request->user()->id,
             'filters' => ['q' => $search, 'rol' => $filters['rol'] ?? '', 'estado' => $filters['estado'] ?? ''],
-            'selected' => $selected instanceof User ? [
-                'id' => $selected->id,
-                'name' => $selected->name,
-                'email' => $selected->email,
-                'rol' => $selected->rol,
-                'estado' => $selected->estado_cuenta,
-                'motivo' => $selected->motivo_inactivacion,
-                'teacher_request' => DB::table('teacher_access_requests as requests')
-                    ->join('cargos_institucionales as cargos', 'cargos.id', '=', 'requests.cargo_institucional_id')
-                    ->where('requests.user_id', $selected->id)
-                    ->first(['cargos.nombre as cargo', 'requests.motivo']),
-                'events' => DB::table('user_account_events')
-                    ->leftJoin('users as actors', 'actors.id', '=', 'user_account_events.actor_id')
-                    ->where('user_account_events.user_id', $selected->id)
-                    ->orderByDesc('user_account_events.id')
-                    ->limit(20)
-                    ->get(['user_account_events.accion', 'user_account_events.estado_anterior', 'user_account_events.estado_nuevo', 'user_account_events.motivo', 'user_account_events.created_at', 'actors.name as actor'])
-                    ->all(),
-            ] : null,
             'counts' => User::query()->select('estado_cuenta')->selectRaw('COUNT(*) as total')->groupBy('estado_cuenta')->get()
                 ->mapWithKeys(fn (User $user): array => [$user->estado_cuenta => (int) $user->getAttribute('total')])->all(),
         ]);
@@ -128,19 +109,28 @@ class UserAccountController extends Controller
             return $user;
         });
 
-        return to_route('admin.users.index', ['selected' => $user->id])
-            ->with('success', 'Cuenta creada. La contraseña temporal deberá cambiarse al iniciar sesión.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cuenta creada. La contraseña temporal deberá cambiarse al iniciar sesión.']);
+
+        return to_route('admin.users.edit', ['user' => $user->id]);
     }
 
-    public function edit(User $user): InertiaResponse
+    public function edit(Request $request, User $user): InertiaResponse
     {
         $user->load(['perfilEstudiante', 'perfilDocente']);
         $student = $user->perfilEstudiante;
         $teacher = $user->perfilDocente;
+        $teacherRequest = $user->rol === 'docente'
+            ? DB::table('teacher_access_requests as requests')
+                ->leftJoin('cargos_institucionales as positions', 'positions.id', '=', 'requests.cargo_institucional_id')
+                ->where('requests.user_id', $user->id)
+                ->first(['requests.motivo', 'requests.created_at', 'positions.nombre as cargo'])
+            : null;
 
         return Inertia::render('usuarios-form', [
             'user' => [
                 'id' => $user->id,
+                'estado' => $user->estado_cuenta,
+                'motivo_inactivacion' => $user->motivo_inactivacion,
                 'rol' => $user->rol,
                 'nombres' => $user->nombres,
                 'apellidos' => $user->apellidos,
@@ -149,7 +139,6 @@ class UserAccountController extends Controller
                 'email' => $user->email,
                 'correo_alternativo' => $user->correo_alternativo,
                 'cargo_institucional_id' => $user->cargo_institucional_id,
-                'codigo_estudiante' => $student?->codigo_estudiante,
                 'codigo_docente' => $teacher?->codigo_docente,
                 'programa_estudio_id' => $student instanceof PerfilEstudiante ? $student->programa_estudio_id : $teacher?->programa_estudio_id,
                 'condicion_academica' => $student?->condicion_academica,
@@ -158,12 +147,18 @@ class UserAccountController extends Controller
                 'direccion_residencia' => $student?->direccion_residencia,
                 'especialidad' => $teacher?->especialidad,
                 'condicion_laboral' => $teacher?->condicion_laboral,
+                'teacher_request' => $teacherRequest ? [
+                    'cargo' => $teacherRequest->cargo,
+                    'motivo' => $teacherRequest->motivo,
+                    'created_at' => $teacherRequest->created_at,
+                ] : null,
             ],
             'programas' => ProgramaEstudio::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
             'cargos' => DB::table('cargos_institucionales')
                 ->where(fn ($query) => $query->where('activo', true)->orWhere('id', $user->cargo_institucional_id ?? 0))
                 ->orderBy('nombre')->get(['id', 'nombre']),
             'passwordRules' => null,
+            'viewerId' => (int) $request->user()->id,
         ]);
     }
 
@@ -223,7 +218,9 @@ class UserAccountController extends Controller
             }
         });
 
-        return to_route('admin.users.index', ['selected' => $user->id])->with('success', 'Usuario actualizado.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cambios realizados. Los datos del usuario se actualizaron.']);
+
+        return to_route('admin.users.edit', ['user' => $user->id]);
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -304,7 +301,87 @@ class UserAccountController extends Controller
             DB::table('sessions')->where('user_id', $current->id)->delete();
         });
 
-        return back()->with('success', 'Estado de cuenta actualizado.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cambios realizados. El estado de la cuenta se actualizó.']);
+
+        return to_route('admin.users.edit', ['user' => $user->id]);
+    }
+
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 401);
+
+        DB::transaction(function () use ($actor, $user): void {
+            $current = User::query()->findOrFail($user->id);
+
+            if ($current->id === $actor->id) {
+                throw ValidationException::withMessages(['delete' => 'No puedes eliminar tu propia cuenta.']);
+            }
+
+            if ($current->rol === 'administrador' && $current->activo && $current->estado_cuenta === 'activo') {
+                $activeAdmins = User::query()->where('rol', 'administrador')->where('activo', true)->where('estado_cuenta', 'activo')->count();
+
+                if ($activeAdmins <= 1) {
+                    throw ValidationException::withMessages(['delete' => 'No puedes eliminar al último administrador activo.']);
+                }
+            }
+
+            $hasWorkflowHistory = DB::table('tramites')->where(fn ($query) => $query
+                    ->where('propietario_id', $current->id)
+                    ->orWhere('destino_docente_id', $current->id))->exists()
+                || DB::table('tramite_documentos')->where('cargado_por', $current->id)->exists()
+                || DB::table('tramite_eventos')->where('usuario_id', $current->id)->exists()
+                || DB::table('tramite_borradores')->where(fn ($query) => $query
+                    ->where('remitente_id', $current->id)
+                    ->orWhere('firmante_id', $current->id)
+                    ->orWhere('creado_por', $current->id))->exists()
+                || DB::table('tramite_documentos_finales')->where(fn ($query) => $query
+                    ->where('reservada_por', $current->id)
+                    ->orWhere('generado_por', $current->id)
+                    ->orWhere('anulado_por', $current->id))->exists()
+                || DB::table('tramite_firmas')->where(fn ($query) => $query
+                    ->where('firmante_id', $current->id)
+                    ->orWhere('registrado_por', $current->id))->exists()
+                || DB::table('tramite_entregas')->where(fn ($query) => $query
+                    ->where('entregado_por', $current->id)
+                    ->orWhere('receptor_usuario_id', $current->id))->exists()
+                || DB::table('tramite_evidencias_entrega')->where('registrado_por', $current->id)->exists()
+                || DB::table('tramite_cierres')->where('cerrado_por', $current->id)->exists()
+                || DB::table('tramite_informes_cierre')->where('generado_por', $current->id)->exists()
+                || DB::table('tramite_asignaciones')->where('revisor_id', $current->id)->exists()
+                || DB::table('tramite_rondas_revision')->where('revisor_id', $current->id)->exists()
+                || DB::table('tramite_observaciones_revision')->where('revisor_id', $current->id)->exists()
+                || DB::table('tramite_respuestas_observacion')->where('asistente_id', $current->id)->exists()
+                || DB::table('tramite_borrador_valores')->where('usuario_id', $current->id)->exists()
+                || DB::table('tramite_notificaciones')->where('usuario_id', $current->id)->whereNotNull('tramite_id')->exists()
+                || DB::table('tramite_notificacion_eventos')->where('actor_id', $current->id)->exists();
+
+            if ($hasWorkflowHistory) {
+                throw ValidationException::withMessages([
+                    'delete' => 'Esta cuenta tiene trámites o registros vinculados. Desactívala para conservar el historial.',
+                ]);
+            }
+
+            DB::table('user_account_events')->insert([
+                'user_id' => $current->id,
+                'actor_id' => $actor->id,
+                'accion' => 'delete',
+                'estado_anterior' => $current->estado_cuenta,
+                'estado_nuevo' => 'eliminado',
+                'motivo' => 'Cuenta eliminada permanentemente.',
+                'created_at' => now(),
+            ]);
+
+            DB::table('tramite_notificaciones')->where('usuario_id', $current->id)->whereNull('tramite_id')->delete();
+            DB::table('sessions')->where('user_id', $current->id)->delete();
+            DB::table('password_reset_tokens')->where('email', $current->email)->delete();
+            $current->delete();
+        });
+
+        Storage::disk('local')->delete('firmas-perfil/'.$user->id.'.jpg');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario eliminado correctamente.']);
+
+        return to_route('admin.users.index');
     }
 
     public function resetPassword(Request $request, User $user): RedirectResponse
@@ -337,7 +414,7 @@ class UserAccountController extends Controller
                 : 'El enlace no pudo enviarse. Revise la configuración de correo y reintente.',
         ]);
 
-        return back();
+        return to_route('admin.users.edit', ['user' => $user->id]);
     }
 
     /** @param array<string, mixed> $data */
@@ -345,7 +422,7 @@ class UserAccountController extends Controller
     {
         if ($data['rol'] === 'estudiante') {
             PerfilEstudiante::query()->updateOrCreate(['user_id' => $user->id], [
-                'codigo_estudiante' => $data['codigo_estudiante'],
+                'codigo_estudiante' => $data['dni'],
                 'programa_estudio_id' => $data['programa_estudio_id'],
                 'condicion_academica' => $data['condicion_academica'],
                 'ciclo_actual' => $data['condicion_academica'] === 'Estudiante' ? $data['ciclo_actual'] : null,

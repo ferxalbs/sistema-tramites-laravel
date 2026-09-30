@@ -1,4 +1,4 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,15 +11,8 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { update } from '@/routes/admin/output-formats';
+import { index as templatesIndex } from '@/routes/admin/templates';
 
 type OutputFormat = {
     id: number;
@@ -27,13 +20,23 @@ type OutputFormat = {
     nombre: string;
     descripcion: string | null;
     permite_modalidad_multiple: boolean | number;
-    activo: boolean | number;
+};
+
+type PublishedTemplate = {
+    id: number;
+    codigo: string;
+    nombre: string;
+    version: number;
+    tipo_documento_salida: string;
+    modalidad: string | null;
 };
 
 export default function FormatosSalida({
     formatos,
+    plantillasFinales,
 }: {
     formatos: OutputFormat[];
+    plantillasFinales: PublishedTemplate[];
 }) {
     return (
         <>
@@ -44,104 +47,93 @@ export default function FormatosSalida({
                         Formatos de salida
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Informe y Memorando del catálogo institucional. Un formato inactivo no admite nuevos borradores.
+                        Los formatos se mantienen disponibles. Aquí puedes revisar sus plantillas finales publicadas.
                     </p>
                 </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {formatos.map((formato) => (
-                        <Card key={formato.id} className="transition-all hover:border-foreground/20">
-                            <CardHeader>
-                                <CardTitle>{formato.codigo}</CardTitle>
-                                <CardDescription>
-                                    {formato.permite_modalidad_multiple
-                                        ? 'Admite memorando simple o múltiple.'
-                                        : 'Sin modalidad múltiple.'}
-                                </CardDescription>
-                            </CardHeader>
-                        <Form
-                            {...update.form({ format: formato.id })}
-                            disableWhileProcessing
-                        >
-                            {({ errors, processing }) => (
-                                <>
-                                    <CardContent className="grid gap-4">
-                                        <Label htmlFor={`nombre-${formato.id}`}>
-                                            Nombre
-                                        </Label>
-                                        <Input
-                                            id={`nombre-${formato.id}`}
-                                            name="nombre"
-                                            required
-                                            minLength={2}
-                                            maxLength={120}
-                                            defaultValue={formato.nombre}
-                                        />
-                                        <InputError message={errors.nombre} />
-                                        <Label
-                                            htmlFor={`descripcion-${formato.id}`}
-                                        >
-                                            Descripción
-                                        </Label>
-                                        <Input
-                                            id={`descripcion-${formato.id}`}
-                                            name="descripcion"
-                                            maxLength={255}
-                                            defaultValue={
-                                                formato.descripcion ?? ''
-                                            }
-                                        />
-                                        <InputError
-                                            message={errors.descripcion}
-                                        />
-                                        <Label htmlFor={`activo-${formato.id}`}>
-                                            Estado
-                                        </Label>
-                                        <Select
-                                            name="activo"
-                                            defaultValue={
-                                                formato.activo ? '1' : '0'
-                                            }
-                                            items={[
-                                                { value: '1', label: 'Activo' },
-                                                {
-                                                    value: '0',
-                                                    label: 'Inactivo',
-                                                },
-                                            ]}
-                                            required
-                                        >
-                                            <SelectTrigger
-                                                id={`activo-${formato.id}`}
-                                            >
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectGroup>
-                                                    <SelectItem value="1">
-                                                        Activo
-                                                    </SelectItem>
-                                                    <SelectItem value="0">
-                                                        Inactivo
-                                                    </SelectItem>
-                                                </SelectGroup>
-                                            </SelectContent>
-                                        </Select>
-                                        <InputError message={errors.activo} />
-                                    </CardContent>
-                                    <CardFooter>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {formatos.map((formato) => {
+                        const versiones = plantillasFinales.filter(
+                            (plantilla) => plantilla.tipo_documento_salida === formato.codigo,
+                        );
+
+                        return (
+                            <Card key={formato.id} className="transition-all hover:border-foreground/20">
+                                <CardHeader>
+                                    <CardTitle>{formato.codigo}</CardTitle>
+                                    <CardDescription>
+                                        {formato.permite_modalidad_multiple
+                                            ? 'Admite memorando simple o múltiple.'
+                                            : 'Sin modalidad múltiple.'}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-5">
+                                    <section aria-label={`Plantillas publicadas para ${formato.nombre}`}>
+                                        <h2 className="mb-2 text-sm font-medium">
+                                            Versiones finales publicadas
+                                        </h2>
+                                        {versiones.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                Todavía no hay una plantilla final publicada para este formato.
+                                            </p>
+                                        ) : (
+                                            <ul className="space-y-1 text-sm">
+                                                {versiones.map((plantilla) => (
+                                                    <li key={plantilla.id}>
+                                                        {plantilla.nombre} · v{plantilla.version}
+                                                        {plantilla.modalidad ? ` · ${plantilla.modalidad}` : ''}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
                                         <Button
-                                            type="submit"
-                                            disabled={processing}
+                                            className="mt-3"
+                                            variant="outline"
+                                            render={<Link href={templatesIndex()} />}
                                         >
-                                            Guardar
+                                            Administrar plantillas
                                         </Button>
-                                    </CardFooter>
-                                </>
-                            )}
-                        </Form>
-                    </Card>
-                ))}
+                                    </section>
+
+                                    <Form {...update.form({ format: formato.id })} disableWhileProcessing>
+                                        {({ errors, processing }) => (
+                                            <>
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor={`nombre-${formato.id}`}>
+                                                        Nombre
+                                                    </Label>
+                                                    <Input
+                                                        id={`nombre-${formato.id}`}
+                                                        name="nombre"
+                                                        required
+                                                        minLength={2}
+                                                        maxLength={120}
+                                                        defaultValue={formato.nombre}
+                                                    />
+                                                    <InputError message={errors.nombre} />
+                                                    <Label htmlFor={`descripcion-${formato.id}`}>
+                                                        Descripción
+                                                    </Label>
+                                                    <Input
+                                                        id={`descripcion-${formato.id}`}
+                                                        name="descripcion"
+                                                        maxLength={255}
+                                                        defaultValue={formato.descripcion ?? ''}
+                                                    />
+                                                    <InputError message={errors.descripcion} />
+                                                </div>
+                                                <CardFooter className="px-0 pb-0">
+                                                    <Button type="submit" disabled={processing}>
+                                                        Guardar cambios
+                                                    </Button>
+                                                </CardFooter>
+                                            </>
+                                        )}
+                                    </Form>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
             </div>
         </>

@@ -49,8 +49,9 @@ export default function TiposTramite({ tipos }: { tipos: TramiteType[] }) {
                     {tipos.map((tipo) => (
                         <Card key={tipo.id} className="transition-all hover:border-foreground/20">
                             <CardHeader>
-                                <CardTitle>{tipo.codigo}</CardTitle>
+                                <CardTitle>{tipo.nombre}</CardTitle>
                                 <CardDescription>
+                                    {tipo.codigo} ·{' '}
                                     {tipo.clasificacion_sugerida
                                         ? `Clasificación: ${tipo.clasificacion_sugerida}. `
                                         : 'Todas las clasificaciones. '}

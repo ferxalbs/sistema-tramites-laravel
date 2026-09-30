@@ -6,13 +6,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('student sees validated identity and updates only contact details', function () {
+test('student can edit personal and contact details but not account identifiers', function () {
     $student = User::factory()->create([
         'rol' => 'estudiante',
         'email' => 'a.estudiante@seoane.edu.pe',
         'dni' => '87654321',
     ]);
-    $profile = PerfilEstudiante::factory()->create(['user_id' => $student->id, 'codigo_estudiante' => 'EST-123']);
+    $profile = PerfilEstudiante::factory()->create(['user_id' => $student->id, 'codigo_estudiante' => '87654321']);
     $originalName = $student->name;
     $originalEmailVerification = $student->email_verified_at;
 
@@ -21,11 +21,12 @@ test('student sees validated identity and updates only contact details', functio
             ->component('settings/profile')
             ->where('identity.email', $student->email)
             ->where('identity.dni', '87654321')
-            ->where('profile.codigo', 'EST-123')
             ->missing('identity.password')
             ->etc());
 
     $this->patch(route('profile.update'), [
+        'nombres' => 'Kevin Percy',
+        'apellidos' => 'Perez Silva',
         'celular' => ' 987654321 ',
         'correo_alternativo' => '  NUEVO@EXAMPLE.COM ',
         'direccion_residencia' => '  Jr. Los Pinos 123 ',
@@ -38,8 +39,11 @@ test('student sees validated identity and updates only contact details', functio
 
     $student->refresh();
     expect($student->celular)->toBe('987654321')
+        ->and($student->name)->toBe('Kevin Percy Perez Silva')
+        ->and($student->nombres)->toBe('Kevin Percy')
+        ->and($student->apellidos)->toBe('Perez Silva')
         ->and($student->correo_alternativo)->toBe('nuevo@example.com')
-        ->and($student->name)->toBe($originalName)
+        ->and($student->name)->not->toBe($originalName)
         ->and($student->email)->toBe('a.estudiante@seoane.edu.pe')
         ->and($student->dni)->toBe('87654321')
         ->and($student->rol)->toBe('estudiante')
@@ -57,7 +61,7 @@ test('student contact validation rejects duplicates and malformed values without
     $profile = PerfilEstudiante::factory()->create(['user_id' => $student->id]);
     $other = User::factory()->create(['email' => 'otra@seoane.edu.pe', 'correo_alternativo' => 'otro@example.com']);
 
-    $payload = ['celular' => '900111222', 'correo_alternativo' => $other->email, 'direccion_residencia' => 'Cambio indebido'];
+    $payload = ['nombres' => 'Nombre válido', 'apellidos' => 'Apellido válido', 'celular' => '900111222', 'correo_alternativo' => $other->email, 'direccion_residencia' => 'Cambio indebido'];
     $this->actingAs($student)->patch(route('profile.update'), $payload)->assertSessionHasErrors('correo_alternativo');
     $this->patch(route('profile.update'), [...$payload, 'correo_alternativo' => $other->correo_alternativo])
         ->assertSessionHasErrors('correo_alternativo');
@@ -79,6 +83,8 @@ test('profile update rolls back when the academic profile is missing', function 
     $student = User::factory()->create(['rol' => 'estudiante', 'celular' => '987654321']);
 
     $this->actingAs($student)->patch(route('profile.update'), [
+        'nombres' => 'Nombre válido',
+        'apellidos' => 'Apellido válido',
         'celular' => '900111222',
         'correo_alternativo' => 'otro@example.com',
         'direccion_residencia' => 'Nueva dirección',
@@ -99,6 +105,8 @@ test('teacher changes professional contacts without changing institutional ident
             ->where('profile.codigo', 'DOC-1')
             ->etc());
     $this->patch(route('profile.update'), [
+        'nombres' => 'Docente actualizado',
+        'apellidos' => 'Apellido actualizado',
         'celular' => '+51 987 654 321',
         'especialidad' => '  Matemática ',
         'condicion_laboral' => '  Nombrado ',
@@ -115,7 +123,7 @@ test('teacher changes professional contacts without changing institutional ident
         ->assertSessionHasErrors('especialidad');
 });
 
-test('assistant and administrator cannot self-edit or delete institutional accounts', function () {
+test('assistant and administrator can edit their personal profile without changing role', function () {
     foreach (['asistente', 'administrador'] as $role) {
         $user = User::factory()->create(['rol' => $role]);
         $this->actingAs($user)->get(route('profile.edit'))->assertOk()
@@ -124,7 +132,14 @@ test('assistant and administrator cannot self-edit or delete institutional accou
                 ->where('identity.cuenta_provisional', false)
                 ->where('profile', null)
                 ->etc());
-        $this->patch(route('profile.update'), ['celular' => '987654321'])->assertForbidden();
+        $this->patch(route('profile.update'), [
+            'nombres' => 'Cuenta actualizada',
+            'apellidos' => 'Apellido de prueba',
+            'celular' => '987654321',
+            'correo_alternativo' => 'contacto'.$user->id.'@example.com',
+        ])->assertRedirect(route('profile.edit'))->assertSessionHasNoErrors();
+        expect($user->fresh()->name)->toBe('Cuenta actualizada Apellido de prueba')
+            ->and($user->fresh()->rol)->toBe($role);
         $this->delete('/settings/profile', ['password' => 'password'])->assertStatus(405);
         expect($user->fresh())->not->toBeNull();
     }
@@ -134,5 +149,5 @@ test('assistant and administrator cannot self-edit or delete institutional accou
     $legacyAssistant = User::factory()->create(['rol' => 'asistente', 'cuenta_provisional' => null]);
     $this->actingAs($legacyAssistant)->get(route('profile.edit'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('identity.cuenta_provisional', null)->etc());
-    expect(DB::table('user_account_events')->count())->toBe(0);
+    expect(DB::table('user_account_events')->where('accion', 'edit_profile')->count())->toBe(2);
 });

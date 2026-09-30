@@ -89,12 +89,6 @@ return [
             'assistant' => false,
             'faq' => true,
         ],
-        'plazos' => [
-            'question' => '¿Los plazos mostrados son oficiales?',
-            'answer' => 'Solo cuando la configuración lo indique; de lo contrario se identifican como referenciales.',
-            'assistant' => false,
-            'faq' => true,
-        ],
         'password-compartida' => [
             'question' => '¿Puedo compartir mi contraseña?',
             'answer' => 'No. La contraseña es personal y no debe compartirse.',
@@ -135,7 +129,6 @@ return [
             ['title' => 'Usuarios', 'description' => 'Administre cuentas y roles.'],
             ['title' => 'Catálogos', 'description' => 'Mantenga configuraciones vigentes.'],
             ['title' => 'Reportes', 'description' => 'Consulte indicadores reales.'],
-            ['title' => 'Auditoría', 'description' => 'Revise acciones sensibles.'],
         ],
     ],
 ];

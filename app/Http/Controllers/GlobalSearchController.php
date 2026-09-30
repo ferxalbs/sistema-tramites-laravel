@@ -30,6 +30,7 @@ class GlobalSearchController extends Controller
             $actor = $request->user();
             $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $query).'%';
             $isReviewer = $actor->rol === 'docente';
+            $isStudent = $actor->rol === 'estudiante';
 
             $results['expedientes'] = Tramite::query()
                 ->when($isReviewer, fn (Builder $builder): Builder => $builder->whereHas('asignaciones', fn (Builder $assignment): Builder => $assignment
@@ -37,22 +38,30 @@ class GlobalSearchController extends Controller
                     ->where('destino', 'docente')
                     ->where(fn (Builder $assignment): Builder => $assignment->where('activa', true)
                         ->orWhereIn('estado', ['aprobado', 'rechazado']))))
-                ->where(function (Builder $builder) use ($like, $isReviewer): void {
+                ->when($isStudent, fn (Builder $builder): Builder => $builder->where('propietario_id', $actor->id))
+                ->where(function (Builder $builder) use ($like): void {
                     $builder->whereRaw("codigo LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("numero_expediente_externo LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("asunto LIKE ? ESCAPE '!'", [$like])
-                        ->orWhereRaw("tipo_documento LIKE ? ESCAPE '!'", [$like]);
-
-                    if (! $isReviewer) {
-                        $builder->orWhereRaw("persona_nombre LIKE ? ESCAPE '!'", [$like])
-                            ->orWhereRaw("persona_identificador LIKE ? ESCAPE '!'", [$like])
-                            ->orWhereHas('propietario', fn (Builder $owner): Builder => $owner
-                                ->whereRaw("name LIKE ? ESCAPE '!'", [$like])
-                                ->orWhereRaw("nombres LIKE ? ESCAPE '!'", [$like])
-                                ->orWhereRaw("apellidos LIKE ? ESCAPE '!'", [$like])
-                                ->orWhereRaw("dni LIKE ? ESCAPE '!'", [$like])
-                                ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like]));
-                    }
+                        ->orWhereRaw("tipo_documento LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("persona_nombre LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("persona_identificador LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereHas('propietario', fn (Builder $owner): Builder => $owner
+                            ->whereRaw("name LIKE ? ESCAPE '!'", [$like])
+                            ->orWhereRaw("nombres LIKE ? ESCAPE '!'", [$like])
+                            ->orWhereRaw("apellidos LIKE ? ESCAPE '!'", [$like])
+                            ->orWhereRaw("dni LIKE ? ESCAPE '!'", [$like])
+                            ->orWhereRaw("email LIKE ? ESCAPE '!'", [$like]))
+                        ->orWhereExists(fn ($related) => $related->selectRaw('1')
+                            ->from('personas_relacionadas_expediente as related')
+                            ->whereColumn('related.tramite_id', 'tramites.id')
+                            ->where('related.activo', true)
+                            ->whereRaw("related.dni LIKE ? ESCAPE '!'", [$like]))
+                        ->orWhereExists(fn ($mentioned) => $mentioned->selectRaw('1')
+                            ->from('documento_personas_mencionadas as mentioned')
+                            ->whereColumn('mentioned.tramite_id', 'tramites.id')
+                            ->where('mentioned.activo', true)
+                            ->whereRaw("mentioned.dni LIKE ? ESCAPE '!'", [$like]));
                 })
                 ->orderByDesc('updated_at')
                 ->orderByDesc('id')
@@ -66,7 +75,7 @@ class GlobalSearchController extends Controller
                     'tipo_documento' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
                 ])->all();
 
-            if (! $isReviewer) {
+            if (! $isReviewer && ! $isStudent) {
                 $results['personas'] = User::query()
                     ->when($actor->rol === 'asistente', fn (Builder $builder): Builder => $builder->where('rol', 'estudiante'))
                     ->where(fn (Builder $builder): Builder => $builder
@@ -109,6 +118,7 @@ class GlobalSearchController extends Controller
             'status' => $status,
             'results' => $results,
             'reviewer' => $request->user()->rol === 'docente',
+            'student' => $request->user()->rol === 'estudiante',
             'administrator' => $request->user()->rol === 'administrador',
         ]);
     }

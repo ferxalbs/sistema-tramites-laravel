@@ -30,7 +30,7 @@ test('new users can register', function () {
         'correo_alternativo' => 'maria@example.com',
         'programa_estudio_id' => $program->id,
         'condicion_academica' => 'Estudiante',
-        'ciclo_actual' => 4,
+        'ciclo_actual' => 6,
         'acepta_terminos' => '1',
         'password' => 'ClaveNueva2026',
         'password_confirmation' => 'ClaveNueva2026',
@@ -49,10 +49,24 @@ test('new users can register', function () {
         ->and($user->hasVerifiedEmail())->toBeFalse()
         ->and($user->dni)->toBe('12345678')
         ->and($user->perfilEstudiante->programa_estudio_id)->toBe($program->id)
-        ->and($user->perfilEstudiante->ciclo_actual)->toBe(4);
+        ->and($user->perfilEstudiante->ciclo_actual)->toBe(6);
     Notification::assertSentTo($user, VerifyEmail::class);
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'ClaveNueva2026']);
     $this->assertGuest();
+});
+
+test('public registration rejects a seventh cycle', function () {
+    $program = ProgramaEstudio::query()->where('activo', true)->firstOrFail();
+
+    $this->post(route('register.store'), [
+        'nombres' => 'María', 'apellidos' => 'Pérez', 'dni' => '12345679',
+        'celular' => '987654321', 'email' => 'a.ciclo7@seoane.edu.pe',
+        'programa_estudio_id' => $program->id, 'condicion_academica' => 'Estudiante',
+        'ciclo_actual' => 7, 'acepta_terminos' => '1',
+        'password' => 'ClaveNueva2026', 'password_confirmation' => 'ClaveNueva2026',
+    ])->assertSessionHasErrors('ciclo_actual');
+
+    expect(User::query()->where('email', 'a.ciclo7@seoane.edu.pe')->exists())->toBeFalse();
 });
 
 test('public registration rejects noninstitutional identity, inactive programs and missing consent', function () {

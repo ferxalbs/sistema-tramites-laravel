@@ -12,12 +12,15 @@ import type { Auth } from '@/types';
 
 type Identity = {
     name: string;
+    nombres: string;
+    apellidos: string;
     email: string;
     rol: 'estudiante' | 'docente' | 'asistente' | 'administrador';
     dni: string | null;
     celular: string | null;
     correo_alternativo: string | null;
     cuenta_provisional: boolean | null;
+    firma_registrada: boolean;
 };
 
 type ProfileData = {
@@ -57,24 +60,16 @@ export default function Profile({ identity, profile, status }: Props) {
                     variant="small"
                     title="Mi perfil"
                     description={
-                        isStudent || isTeacher
-                            ? 'Los datos de identidad y el correo institucional los actualiza la administración.'
-                            : 'Los datos de esta cuenta los actualiza la administración.'
+                        "Actualiza tus nombres y datos de contacto. El rol, DNI y correo institucional identifican tu cuenta."
                     }
                 />
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Datos institucionales</CardTitle>
+                        <CardTitle>Datos de cuenta</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <dl className="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <dt className="text-sm text-muted-foreground">
-                                    Nombre
-                                </dt>
-                                <dd>{identity.name}</dd>
-                            </div>
                             <div>
                                 <dt className="text-sm text-muted-foreground">
                                     Rol
@@ -109,10 +104,10 @@ export default function Profile({ identity, profile, status }: Props) {
                                     <dd>{identity.dni}</dd>
                                 </div>
                             )}
-                            {profile?.codigo && (
+                            {isTeacher && profile?.codigo && (
                                 <div>
                                     <dt className="text-sm text-muted-foreground">
-                                        Código
+                                        Código docente
                                     </dt>
                                     <dd>{profile.codigo}</dd>
                                 </div>
@@ -162,23 +157,46 @@ export default function Profile({ identity, profile, status }: Props) {
                     </p>
                 )}
 
-                {(isStudent || isTeacher) && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                {isStudent
-                                    ? 'Datos de contacto'
-                                    : 'Datos de contacto y profesionales'}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Editar datos del perfil</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                             <Form
                                 {...ProfileController.update.form()}
                                 options={{ preserveScroll: true }}
+                                onBefore={() =>
+                                    window.confirm('¿Deseas guardar los cambios de tu perfil?')
+                                }
                                 className="space-y-4"
                             >
                                 {({ processing, errors }) => (
                                     <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="nombres">Nombres</Label>
+                                            <Input
+                                                id="nombres"
+                                                name="nombres"
+                                                defaultValue={identity.nombres}
+                                                minLength={2}
+                                                maxLength={120}
+                                                required
+                                                autoComplete="given-name"
+                                            />
+                                            <InputError message={errors.nombres} />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="apellidos">Apellidos</Label>
+                                            <Input
+                                                id="apellidos"
+                                                name="apellidos"
+                                                defaultValue={identity.apellidos}
+                                                minLength={2}
+                                                maxLength={120}
+                                                autoComplete="family-name"
+                                            />
+                                            <InputError message={errors.apellidos} />
+                                        </div>
                                         <div className="grid gap-2">
                                             <Label htmlFor="celular">
                                                 Celular
@@ -196,28 +214,21 @@ export default function Profile({ identity, profile, status }: Props) {
                                                 message={errors.celular}
                                             />
                                         </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="correo_alternativo">
+                                                Correo alternativo
+                                            </Label>
+                                            <Input
+                                                id="correo_alternativo"
+                                                name="correo_alternativo"
+                                                type="email"
+                                                defaultValue={identity.correo_alternativo ?? ''}
+                                                autoComplete="email"
+                                            />
+                                            <InputError message={errors.correo_alternativo} />
+                                        </div>
                                         {isStudent && (
                                             <>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="correo_alternativo">
-                                                        Correo alternativo
-                                                    </Label>
-                                                    <Input
-                                                        id="correo_alternativo"
-                                                        name="correo_alternativo"
-                                                        type="email"
-                                                        defaultValue={
-                                                            identity.correo_alternativo ??
-                                                            ''
-                                                        }
-                                                        autoComplete="email"
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.correo_alternativo
-                                                        }
-                                                    />
-                                                </div>
                                                 <div className="grid gap-2">
                                                     <Label htmlFor="direccion_residencia">
                                                         Dirección de residencia
@@ -283,6 +294,64 @@ export default function Profile({ identity, profile, status }: Props) {
                                             disabled={processing}
                                         >
                                             Guardar perfil
+                                        </Button>
+                                    </>
+                                )}
+                            </Form>
+                    </CardContent>
+                </Card>
+
+                {(isStudent || isTeacher || identity.rol === 'administrador') && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Firma escaneada</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                {isStudent
+                                    ? 'Sube una imagen recortada de la firma que aparece en tu solicitud inicial. Quedará guardada de forma privada en tu perfil.'
+                                    : 'La firma se insertará en los nuevos documentos PDF cuando esta cuenta sea el firmante. Los documentos ya emitidos no cambiarán.'}
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-sm">
+                                Estado: {identity.firma_registrada ? 'firma registrada' : 'falta registrar la firma'}
+                            </p>
+                            <Form
+                                {...ProfileController.uploadSignature.form()}
+                                options={{ preserveScroll: true }}
+                                className="space-y-4"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="firma">
+                                                Imagen JPG o PNG (máximo 4 MB)
+                                            </Label>
+                                            <Input
+                                                id="firma"
+                                                name="firma"
+                                                type="file"
+                                                accept="image/jpeg,image/png"
+                                                required
+                                            />
+                                            <InputError message={errors.firma} />
+                                        </div>
+                                        <label className="flex items-start gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                name="confirmar_uso"
+                                                value="1"
+                                                required
+                                                className="mt-0.5 size-4 rounded border-input"
+                                            />
+                                            <span>
+                                                {isStudent
+                                                    ? 'Confirmo que esta imagen corresponde a mi firma y autorizo guardarla en mi perfil.'
+                                                    : 'Confirmo que esta imagen corresponde a mi firma y autorizo insertarla en los documentos PDF que firme.'}
+                                            </span>
+                                        </label>
+                                        <InputError message={errors.confirmar_uso} />
+                                        <Button type="submit" disabled={processing}>
+                                            {identity.firma_registrada ? 'Actualizar firma' : 'Guardar firma'}
                                         </Button>
                                     </>
                                 )}

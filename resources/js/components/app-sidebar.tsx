@@ -3,7 +3,6 @@ import {
     BookOpen,
     Bell,
     BriefcaseBusiness,
-    CalendarDays,
     CircleHelp,
     ClipboardCheck,
     ClipboardList,
@@ -14,7 +13,6 @@ import {
     LayoutGrid,
     Plus,
     Search,
-    ShieldCheck,
     Users,
 } from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
@@ -36,14 +34,11 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as usersIndex } from '@/routes/admin/users';
-import { index as holidaysIndex } from '@/routes/admin/holidays';
-import { index as auditIndex } from '@/routes/admin/audit';
 import { index as positionsIndex } from '@/routes/admin/positions';
 import { index as typesIndex } from '@/routes/admin/types';
 import { index as classificationsIndex } from '@/routes/admin/classifications';
 import { index as outputFormatsIndex } from '@/routes/admin/output-formats';
 import { index as templatesIndex } from '@/routes/admin/templates';
-import { index as deadlinesIndex } from '@/routes/admin/deadlines';
 import { index as searchIndex } from '@/routes/search';
 import { index as reportsIndex } from '@/routes/admin/reports';
 import { index as supportIndex } from '@/routes/support';
@@ -146,11 +141,6 @@ export function AppSidebar() {
             icon: Users,
         });
         mainNavItems.push({
-            title: 'Feriados',
-            href: holidaysIndex(),
-            icon: CalendarDays,
-        });
-        mainNavItems.push({
             title: 'Cargos institucionales',
             href: positionsIndex(),
             icon: BriefcaseBusiness,
@@ -175,16 +165,6 @@ export function AppSidebar() {
             href: templatesIndex(),
             icon: FileText,
         });
-        mainNavItems.push({
-            title: 'Plazos',
-            href: deadlinesIndex(),
-            icon: CalendarDays,
-        });
-        mainNavItems.push({
-            title: 'Auditoría',
-            href: auditIndex(),
-            icon: ShieldCheck,
-        });
     }
 
     if (auth.user.rol === 'estudiante') {
@@ -195,7 +175,7 @@ export function AppSidebar() {
         });
     }
 
-    if (['asistente', 'docente', 'administrador'].includes(auth.user.rol)) {
+    if (['estudiante', 'asistente', 'docente', 'administrador'].includes(auth.user.rol)) {
         mainNavItems.push({
             title: 'Buscar',
             href: searchIndex(),

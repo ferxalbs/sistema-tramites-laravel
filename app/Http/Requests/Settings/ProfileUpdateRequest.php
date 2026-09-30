@@ -13,16 +13,23 @@ class ProfileUpdateRequest extends FormRequest
     {
         return $this->user() instanceof User
             && $this->user()->activo
-            && in_array($this->user()->rol, ['estudiante', 'docente'], true);
+            && in_array($this->user()->rol, ['estudiante', 'asistente', 'docente', 'administrador'], true);
     }
 
     protected function prepareForValidation(): void
     {
-        $normalized = ['celular' => $this->normalizedText('celular')];
+        $normalized = [
+            'nombres' => $this->normalizedText('nombres'),
+            'apellidos' => $this->normalizedText('apellidos'),
+            'celular' => $this->normalizedText('celular'),
+        ];
+
+        $alternativeEmail = $this->normalizedText('correo_alternativo');
+        $normalized['correo_alternativo'] = is_string($alternativeEmail)
+            ? mb_strtolower($alternativeEmail)
+            : $alternativeEmail;
 
         if ($this->user()?->rol === 'estudiante') {
-            $alternativeEmail = $this->normalizedText('correo_alternativo');
-            $normalized['correo_alternativo'] = is_string($alternativeEmail) ? mb_strtolower($alternativeEmail) : $alternativeEmail;
             $normalized['direccion_residencia'] = $this->normalizedText('direccion_residencia');
         } elseif ($this->user()?->rol === 'docente') {
             $normalized['especialidad'] = $this->normalizedText('especialidad');
@@ -40,16 +47,18 @@ class ProfileUpdateRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
+            'nombres' => ['required', 'string', 'min:2', 'max:120', 'regex:/^[\p{L}\p{M} .\'-]+$/u'],
+            'apellidos' => ['nullable', 'string', 'min:2', 'max:120', 'regex:/^[\p{L}\p{M} .\'-]+$/u'],
             'celular' => ['required', 'string', 'regex:/^[0-9+() -]{7,20}$/'],
-        ];
-
-        if ($this->user()?->rol === 'estudiante') {
-            $rules['correo_alternativo'] = [
+            'correo_alternativo' => [
                 'nullable', 'email', 'max:190',
                 Rule::notIn([$this->user()->email]),
                 Rule::unique('users', 'email')->ignore($this->user()->id),
                 Rule::unique('users', 'correo_alternativo')->ignore($this->user()->id),
-            ];
+            ],
+        ];
+
+        if ($this->user()?->rol === 'estudiante') {
             $rules['direccion_residencia'] = ['nullable', 'string', 'max:255'];
         } elseif ($this->user()?->rol === 'docente') {
             $rules['especialidad'] = ['nullable', 'string', 'max:160'];

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Rules\SafeReceptionDocument;
+use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Http\FormRequest;
@@ -36,15 +37,19 @@ class StoreTramiteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'clasificacion' => ['required', 'string', Rule::exists('clasificaciones_expediente', 'codigo')->where('activo', true)],
+            'clasificacion' => ['required', 'string', Rule::exists('clasificaciones_expediente', 'codigo')->where(fn (Builder $query) => $query
+                ->where('activo', true)->where('codigo', '<>', 'institucional'))],
             'tipo_documento' => [
                 'required',
                 'string',
                 Rule::exists('tipos_tramite', 'codigo')->where(fn (Builder $query) => $query
                     ->where('activo', true)
+                    ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
                     ->where(fn (Builder $classification) => $classification
                         ->whereNull('clasificacion_sugerida')
-                        ->orWhere('clasificacion_sugerida', $this->input('clasificacion')))),
+                        ->orWhere('clasificacion_sugerida', $this->input('clasificacion'))
+                        ->when($this->input('clasificacion') === 'administrativo', fn (Builder $query) => $query
+                            ->orWhere('clasificacion_sugerida', 'institucional')))),
             ],
             'formato_salida' => ['nullable', 'string', Rule::exists('tipos_documento_salida', 'codigo')->where('activo', true)],
             'modalidad_documento' => ['nullable', 'string', Rule::exists('modalidades_documento', 'codigo')->where('activo', true)],
@@ -62,7 +67,16 @@ class StoreTramiteRequest extends FormRequest
                 Rule::exists('programas_estudio', 'id')->where(fn (Builder $query) => $query->where('activo', true)),
             ],
             'destino_tipo' => ['required', 'string', Rule::in(array_keys(config('tramites.destinos')))],
-            'destino_nombre' => ['required', 'string', 'max:200'],
+            'destino_nombre' => ['nullable', 'string', 'max:200'],
+            'destino_docente_id' => [
+                'required_if:destino_tipo,docente',
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(fn (Builder $query) => $query
+                    ->where('rol', 'docente')
+                    ->where('activo', true)
+                    ->where('estado_cuenta', 'activo')),
+            ],
             'asunto' => ['required', 'string', 'min:3', 'max:255'],
             'descripcion' => ['required', 'string', 'min:3', 'max:5000'],
             'prioridad' => ['required', 'string', Rule::in(array_keys(config('tramites.prioridades')))],
@@ -133,7 +147,7 @@ class StoreTramiteRequest extends FormRequest
                     $validator->errors()->add('modalidad_documento', 'El Memorando exige una modalidad simple o múltiple válida.');
                 }
             } elseif ($modalidad !== null) {
-                $validator->errors()->add('modalidad_documento', 'El Informe o formato pendiente no admite modalidad de Memorando.');
+                $validator->errors()->add('modalidad_documento', 'Este formato no admite modalidad de Memorando.');
             }
 
             $tipo = DB::table('tipos_tramite')->where('codigo', $this->input('tipo_documento'))->first([
@@ -163,16 +177,17 @@ class StoreTramiteRequest extends FormRequest
             'formato_salida' => 'formato documental previsto',
             'modalidad_documento' => 'modalidad del Memorando',
             'persona_nombre' => 'nombre de la persona solicitante',
-            'persona_identificador' => 'documento de identidad o código',
+            'persona_identificador' => 'DNI o documento de identidad',
             'propietario_id' => 'estudiante o egresado relacionado',
             'programa_estudio_id' => 'programa de estudios',
             'destino_tipo' => 'tipo de destino',
             'destino_nombre' => 'destino',
-            'asunto' => 'asunto',
-            'descripcion' => 'descripción',
+            'destino_docente_id' => 'docente de destino',
+            'asunto' => 'resumen de la solicitud (sumilla)',
+            'descripcion' => 'fundamentación del pedido',
             'prioridad' => 'prioridad',
-            'fecha_llegada_oficina' => 'fecha y hora de llegada a oficina',
-            'fecha_presentacion_original' => 'fecha de presentación original',
+            'fecha_llegada_oficina' => 'fecha y hora de recepción en Mesa de Partes',
+            'fecha_presentacion_original' => 'fecha del documento (FUT)',
             'numero_expediente_externo' => 'referencia física externa',
             'area_procedencia' => 'área de procedencia',
             'persona_entrega_documento' => 'persona que entrega el documento',

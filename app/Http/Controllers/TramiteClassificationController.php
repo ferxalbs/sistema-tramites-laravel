@@ -14,14 +14,17 @@ class TramiteClassificationController extends Controller
     public function index(): InertiaResponse
     {
         return Inertia::render('clasificaciones-expediente', [
-            'clasificaciones' => DB::table('clasificaciones_expediente')->orderBy('orden')
+            'clasificaciones' => DB::table('clasificaciones_expediente')
+                ->where('codigo', '<>', 'institucional')
+                ->orderBy('orden')
                 ->get(['id', 'codigo', 'nombre', 'descripcion', 'requiere_estudiante', 'activo']),
         ]);
     }
 
     public function update(Request $request, int $classification): RedirectResponse
     {
-        abort_unless(DB::table('clasificaciones_expediente')->where('id', $classification)->exists(), 404);
+        abort_unless(DB::table('clasificaciones_expediente')->where('id', $classification)
+            ->where('codigo', '<>', 'institucional')->exists(), 404);
 
         $request->merge([
             'nombre' => trim((string) $request->input('nombre', '')),

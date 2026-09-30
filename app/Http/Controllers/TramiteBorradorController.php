@@ -14,6 +14,7 @@ use App\Services\Tramites\SaveTramiteDraft;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -59,15 +60,13 @@ class TramiteBorradorController extends Controller
                 ->where('activa', true)
                 ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
                 ->orderBy('nombre')
-                ->get(['id', 'codigo', 'nombre', 'descripcion', 'modalidad', 'requiere_firma_fisica', 'permite_no_firma'])
+                ->get(['id', 'codigo', 'nombre', 'descripcion', 'modalidad'])
                 ->map(fn (TramitePlantilla $plantilla): array => [
                     'id' => $plantilla->id,
                     'codigo' => $plantilla->codigo,
                     'nombre' => $plantilla->nombre,
                     'descripcion' => $plantilla->descripcion,
                     'modalidad' => $plantilla->modalidad,
-                    'requiere_firma_fisica' => $plantilla->requiere_firma_fisica,
-                    'permite_no_firma' => $plantilla->permite_no_firma,
                     'campos' => $this->camposEditables($plantilla),
                 ])->all(),
             'usuarios' => $this->usuariosAutorizados(),
@@ -143,8 +142,6 @@ class TramiteBorradorController extends Controller
             'nombre' => $plantilla->nombre,
             'descripcion' => $plantilla->descripcion,
             'modalidad' => $plantilla->modalidad,
-            'requiere_firma_fisica' => $plantilla->requiere_firma_fisica,
-            'permite_no_firma' => $plantilla->permite_no_firma,
             'campos' => $this->camposEditables($plantilla),
         ]];
 
@@ -267,7 +264,7 @@ class TramiteBorradorController extends Controller
             ->pluck('valor.valor', 'campo.clave_variable')->all();
     }
 
-    /** @return array<int, array{id: int, name: string, rol: string, cargo: string}> */
+    /** @return array<int, array{id: int, name: string, rol: string, cargo: string, firma_registrada: bool}> */
     private function usuariosAutorizados(): array
     {
         return DB::table('users as usuario')
@@ -282,6 +279,7 @@ class TramiteBorradorController extends Controller
                 'name' => $usuario->name,
                 'rol' => $usuario->rol,
                 'cargo' => $usuario->cargo,
+                'firma_registrada' => Storage::disk('local')->exists('firmas-perfil/'.$usuario->id.'.jpg'),
             ])->all();
     }
 }

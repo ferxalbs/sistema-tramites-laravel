@@ -7,6 +7,15 @@ use RuntimeException;
 
 class TramiteTypeCatalog
 {
+    /** @var list<string> */
+    private const EXCLUDED_CODES = [
+        'FUT',
+        'AUTORIZACION_INGRESO',
+        'COMUNICACION_ADMINISTRATIVA',
+        'SOLICITUD_GENERAL',
+        'JUSTIFICACION',
+    ];
+
     /**
      * @return array<string, string>
      */
@@ -21,6 +30,7 @@ class TramiteTypeCatalog
     public static function activeByClassification(): array
     {
         $types = DB::table('tipos_tramite')->where('activo', true)
+            ->whereNotIn('codigo', self::EXCLUDED_CODES)
             ->orderBy('nombre')->get(['codigo', 'nombre', 'clasificacion_sugerida']);
         $byClassification = [];
 
@@ -31,12 +41,30 @@ class TramiteTypeCatalog
                     throw new RuntimeException('Tipo de trámite inválido.');
                 }
 
-                if ($type->clasificacion_sugerida === null || $type->clasificacion_sugerida === $classification) {
+                $suggestedClassification = $type->clasificacion_sugerida === 'institucional'
+                    ? 'administrativo'
+                    : $type->clasificacion_sugerida;
+
+                if ($suggestedClassification === null || $suggestedClassification === $classification) {
                     $byClassification[$classification][$type->codigo] = $type->nombre;
                 }
             }
         }
 
         return $byClassification;
+    }
+
+    /** @return array<string, string> */
+    public static function activeLabels(): array
+    {
+        return DB::table('tipos_tramite')->where('activo', true)
+            ->whereNotIn('codigo', self::EXCLUDED_CODES)
+            ->orderBy('nombre')->pluck('nombre', 'codigo')->all();
+    }
+
+    /** @return list<string> */
+    public static function excludedCodes(): array
+    {
+        return self::EXCLUDED_CODES;
     }
 }

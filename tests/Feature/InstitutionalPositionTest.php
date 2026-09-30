@@ -39,9 +39,6 @@ test('editing a position is audited and inactive positions cannot be requested',
         ->and($saved->descripcion)->toBe('Cargo sin privilegios de sistema')
         ->and((int) $saved->activo)->toBe(0)
         ->and(DB::table('tramite_config_events')->value('accion'))->toBe('edicion_catalogo_documental');
-    $this->get(route('admin.audit.index'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('events.data.0.modulo', 'catalogos'));
-
     $this->post(route('logout'));
     $this->get(route('teacher-access.create'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/teacher-access-request')->has('cargos', 2));

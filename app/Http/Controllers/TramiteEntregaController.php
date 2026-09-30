@@ -50,6 +50,7 @@ class TramiteEntregaController extends Controller
                 'id' => $documento->id,
                 'numero' => $documento->numero_documento,
                 'requiere_firma' => (bool) ($documento->contenido_snapshot['requiere_firma_fisica'] ?? false),
+                'firma_perfil_incluida' => is_string($documento->contenido_snapshot['firma_perfil_sha256'] ?? null),
                 'permite_no_firma' => (bool) ($documento->contenido_snapshot['permite_no_firma'] ?? false),
             ],
             'firma' => $firma === null ? null : [
@@ -97,7 +98,7 @@ class TramiteEntregaController extends Controller
                 ],
             ],
             'medios' => TramiteMedioEntrega::query()
-                ->where('activo', true)
+                ->whereIn('codigo', TramiteMedioEntrega::CODIGOS_DISPONIBLES)
                 ->orderBy('nombre')
                 ->get(['id', 'codigo', 'nombre', 'tipo', 'requiere_evidencia'])
                 ->map(fn (TramiteMedioEntrega $medio): array => [

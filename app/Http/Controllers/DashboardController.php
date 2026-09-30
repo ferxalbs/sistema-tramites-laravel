@@ -8,7 +8,6 @@ use App\Models\TramiteAsignacion;
 use App\Models\TramiteEvento;
 use App\Models\TramiteMedioEntrega;
 use App\Models\User;
-use App\Services\Tramites\CalculateTramiteDeadline;
 use App\Services\Tramites\TramiteClassificationCatalog;
 use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,16 +19,16 @@ use Inertia\Response as InertiaResponse;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, CalculateTramiteDeadline $deadlineCalculator): InertiaResponse
+    public function __invoke(Request $request): InertiaResponse
     {
         $actor = $request->user();
         abort_unless($actor instanceof User, 401);
 
-        $documentTypes = TramiteTypeCatalog::labels();
+        $documentTypes = TramiteTypeCatalog::activeLabels();
         $filters = $request->validate([
             'desde' => ['nullable', 'date_format:Y-m-d'],
             'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
-            'clasificacion' => ['nullable', Rule::in(array_keys(TramiteClassificationCatalog::labels()))],
+            'clasificacion' => ['nullable', Rule::in(array_keys(TramiteClassificationCatalog::activeLabels()))],
             'programa' => ['nullable', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
             'tipo' => ['nullable', Rule::in(array_keys($documentTypes))],
             'estado' => ['nullable', Rule::in(array_keys(config('tramites.estados')))],
@@ -48,24 +47,15 @@ class DashboardController extends Controller
                 'total' => (int) $tramite->getAttribute('total'),
             ])->sortBy(fn (array $state): int => array_flip(array_keys(config('tramites.estados')))[$state['codigo']] ?? PHP_INT_MAX)->values()->all();
         $total = array_sum(array_column($states, 'total'));
-        $overdue = 0;
-        $soon = 0;
         $attentionHours = [];
-        $deadlineRows = (clone $tramites)->get(['id', 'tipo_documento', 'estado', 'fecha_llegada_oficina', 'fecha_recepcion']);
-        $ids = $deadlineRows->pluck('id')->all();
+        $attentionRows = (clone $tramites)->get(['id', 'fecha_llegada_oficina', 'fecha_recepcion']);
+        $ids = $attentionRows->pluck('id')->all();
         $deliveryDates = DB::table('tramite_entregas')->whereIn('tramite_id', $ids)
             ->where('activa', true)->pluck('fecha_entrega', 'tramite_id');
         $closureDates = DB::table('tramite_cierres')->whereIn('tramite_id', $ids)
             ->where('activo', true)->pluck('fecha_cierre', 'tramite_id');
 
-        foreach ($deadlineRows as $tramite) {
-            $deadline = $deadlineCalculator->forTramite($tramite);
-            if ($deadline !== null && $deadline['alerta'] === 'vencido') {
-                $overdue++;
-            } elseif ($deadline !== null && in_array($deadline['alerta'], ['proximo', 'hoy'], true)) {
-                $soon++;
-            }
-
+        foreach ($attentionRows as $tramite) {
             $arrival = $tramite->getRawOriginal('fecha_llegada_oficina');
             $end = $deliveryDates[$tramite->id] ?? $closureDates[$tramite->id] ?? null;
             if (is_string($arrival) && is_string($end)) {
@@ -106,8 +96,6 @@ class DashboardController extends Controller
             'entrega_registrada' => 'Entrega registrada',
             'recepcion_confirmada' => 'Recepción confirmada',
             'expediente_cerrado' => 'Expediente cerrado',
-            'plazo_proximo' => 'Plazo referencial próximo',
-            'plazo_vencido' => 'Plazo referencial vencido',
         ];
         $activity = $events->map(function (TramiteEvento $event) use ($actor, $activeAssignmentIds, $activityLabels): ?array {
             $tramite = $event->tramite;
@@ -194,7 +182,7 @@ class DashboardController extends Controller
                 'medio' => (string) ($filters['medio'] ?? ''),
             ],
             'catalogs' => [
-                'clasificaciones' => TramiteClassificationCatalog::labels(),
+                'clasificaciones' => TramiteClassificationCatalog::activeLabels(),
                 'programas' => ProgramaEstudio::query()->where('activo', true)->orderBy('nombre')
                     ->get(['id', 'nombre'])->map(fn (ProgramaEstudio $programa): array => [
                         'id' => $programa->id, 'nombre' => $programa->nombre,
@@ -205,14 +193,15 @@ class DashboardController extends Controller
                     ? User::query()->whereIn('rol', ['docente', 'administrador'])->where('activo', true)->orderBy('name')->get(['id', 'name'])
                         ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])->all()
                     : [],
-                'medios' => TramiteMedioEntrega::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre'])
+                'medios' => TramiteMedioEntrega::query()
+                    ->whereIn('codigo', TramiteMedioEntrega::CODIGOS_DISPONIBLES)
+                    ->orderBy('nombre')
+                    ->get(['id', 'nombre'])
                     ->map(fn (TramiteMedioEntrega $medio): array => ['id' => $medio->id, 'nombre' => $medio->nombre])->all(),
             ],
             'summary' => [
                 'total' => $total,
                 'cerrados' => $closedState['total'] ?? 0,
-                'proximos' => $soon,
-                'vencidos' => $overdue,
                 'horas_promedio_atencion' => $averageHours,
             ],
             'states' => $states,

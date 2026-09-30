@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings, UserRound } from 'lucide-react';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -8,8 +8,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
+import { markLoggedOut } from '@/lib/auth-history';
 import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
+import { edit as editSecurity } from '@/routes/security';
 import type { User } from '@/types';
 
 type Props = {
@@ -20,6 +22,7 @@ export function UserMenuContent({ user }: Props) {
     const cleanup = useMobileNavigation();
 
     const handleLogout = () => {
+        markLoggedOut();
         cleanup();
         router.flushAll();
     };
@@ -42,8 +45,19 @@ export function UserMenuContent({ user }: Props) {
                         prefetch
                         onClick={cleanup}
                     >
+                        <UserRound className="mr-2" />
+                        Mi perfil
+                    </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                    <Link
+                        className="block w-full cursor-pointer"
+                        href={editSecurity()}
+                        prefetch
+                        onClick={cleanup}
+                    >
                         <Settings className="mr-2" />
-                        Settings
+                        Configuración
                     </Link>
                 </DropdownMenuItem>
             </DropdownMenuGroup>

@@ -19,6 +19,7 @@ RUN install-php-extensions \
     bcmath \
     zip \
     intl \
+    gd \
     opcache \
     pcntl \
     redis \

@@ -15,7 +15,7 @@ test('public teacher request is pending, keeps the teacher role, and awaits veri
 
     $this->get(route('teacher-access.create'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/teacher-access-request')
-            ->has('programas', 1)->has('cargos', 3));
+            ->has('programas', 3)->has('cargos', 3));
 
     $this->post(route('teacher-access.store'), [
         'nombres' => 'Elena',
@@ -50,11 +50,9 @@ test('public teacher request is pending, keeps the teacher role, and awaits veri
         ->and($user->fresh()->estado_cuenta)->toBe('pendiente');
 
     $administrator = User::factory()->create(['rol' => 'administrador']);
-    $this->actingAs($administrator)->get(route('admin.users.index', ['selected' => $user->id]))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('selected.teacher_request.cargo', 'Docente')
-            ->where('selected.teacher_request.motivo', 'Solicito acceso para revisar expedientes asignados.'));
-    $this->get(route('admin.audit.index'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('events.data.0.accion', 'solicitud_acceso_docente'));
+    $this->actingAs($administrator)->get(route('admin.users.edit', $user))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('user.teacher_request.cargo', 'Docente')
+            ->where('user.teacher_request.motivo', 'Solicito acceso para revisar expedientes asignados.'));
     $this->patch(route('admin.users.update', $user), ['accion' => 'activate'])->assertRedirect();
     expect($user->fresh()->estado_cuenta)->toBe('activo')
         ->and($user->fresh()->cuenta_provisional)->toBeTrue();

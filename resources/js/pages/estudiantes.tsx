@@ -19,7 +19,6 @@ type Student = {
     nombre: string;
     email: string;
     dni: string | null;
-    codigo: string | null;
     programa: string | null;
     condicion: string | null;
     estado: string;
@@ -92,7 +91,7 @@ export default function Estudiantes({ students, filters, programas }: Props) {
                         >
                             <div className="grid gap-2">
                                 <Label htmlFor="student-query">
-                                    Nombre, DNI, correo o código
+                                    Nombre, DNI o correo
                                 </Label>
                                 <Input
                                     id="student-query"
@@ -252,9 +251,6 @@ export default function Estudiantes({ students, filters, programas }: Props) {
                                                 DNI
                                             </th>
                                             <th className="p-3 font-medium">
-                                                Código
-                                            </th>
-                                            <th className="p-3 font-medium">
                                                 Programa
                                             </th>
                                             <th className="p-3 font-medium">
@@ -280,9 +276,6 @@ export default function Estudiantes({ students, filters, programas }: Props) {
                                                 </td>
                                                 <td className="p-3">
                                                     {student.dni ?? '—'}
-                                                </td>
-                                                <td className="p-3">
-                                                    {student.codigo ?? '—'}
                                                 </td>
                                                 <td className="p-3">
                                                     {student.programa ?? '—'}

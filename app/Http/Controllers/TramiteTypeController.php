@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,14 +15,24 @@ class TramiteTypeController extends Controller
     public function index(): InertiaResponse
     {
         return Inertia::render('tipos-tramite', [
-            'tipos' => DB::table('tipos_tramite')->orderBy('nombre')
-                ->get(['id', 'codigo', 'nombre', 'descripcion', 'clasificacion_sugerida', 'es_demostracion', 'activo']),
+            'tipos' => DB::table('tipos_tramite')
+                ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())
+                ->orderBy('nombre')
+                ->get(['id', 'codigo', 'nombre', 'descripcion', 'clasificacion_sugerida', 'es_demostracion', 'activo'])
+                ->map(function (object $type): object {
+                    if ($type->clasificacion_sugerida === 'institucional') {
+                        $type->clasificacion_sugerida = 'administrativo';
+                    }
+
+                    return $type;
+                }),
         ]);
     }
 
     public function update(Request $request, int $type): RedirectResponse
     {
-        abort_unless(DB::table('tipos_tramite')->where('id', $type)->exists(), 404);
+        abort_unless(DB::table('tipos_tramite')->where('id', $type)
+            ->whereNotIn('codigo', TramiteTypeCatalog::excludedCodes())->exists(), 404);
 
         $request->merge([
             'nombre' => trim((string) $request->input('nombre', '')),

@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TramiteMedioEntrega extends Model
 {
+    public const CODIGOS_DISPONIBLES = [
+        'presencial',
+        'correo_electronico',
+        'descarga_sistema',
+    ];
+
     protected $table = 'tramite_medios_entrega';
 
     protected $fillable = [

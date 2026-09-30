@@ -1,10 +1,8 @@
 <?php
 
 use App\Http\Controllers\AssistantStudentAccountController;
-use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
-use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\InstitutionalPositionController;
 use App\Http\Controllers\OutputDocumentTypeController;
 use App\Http\Controllers\RegistrationVerificationController;
@@ -13,7 +11,6 @@ use App\Http\Controllers\TramiteAsignacionController;
 use App\Http\Controllers\TramiteBorradorController;
 use App\Http\Controllers\TramiteClassificationController;
 use App\Http\Controllers\TramiteController;
-use App\Http\Controllers\TramiteDeadlineController;
 use App\Http\Controllers\TramiteDocumentoFinalController;
 use App\Http\Controllers\TramiteEntregaAdminController;
 use App\Http\Controllers\TramiteEntregaController;
@@ -76,11 +73,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('dashboard');
 
     Route::get('buscar', GlobalSearchController::class)
-        ->middleware('role:asistente,docente,administrador')
+        ->middleware('role:estudiante,asistente,docente,administrador')
         ->name('search.index');
 
     Route::middleware('role:asistente,administrador')->group(function (): void {
         Route::get('admin/reportes', [TramiteReportController::class, 'index'])->name('admin.reports.index');
+        Route::post('tramites/iniciar', [TramiteController::class, 'start'])->name('tramites.start');
         Route::resource('tramites', TramiteController::class)->only(['index', 'create', 'store', 'show']);
         Route::get('tramites/{tramite}/comprobante', [TramiteController::class, 'receipt'])
             ->name('tramites.receipt');
@@ -133,14 +131,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('admin/reportes/exportar', [TramiteReportController::class, 'export'])->name('admin.reports.export');
         Route::get('admin/entregas', [TramiteEntregaAdminController::class, 'index'])->name('admin.deliveries.index');
         Route::patch('admin/entregas/medios/{medio}', [TramiteEntregaAdminController::class, 'updateMedium'])->name('admin.deliveries.media.update');
-        Route::patch('admin/entregas/plantillas/{plantilla}', [TramiteEntregaAdminController::class, 'updateTemplate'])->name('admin.deliveries.templates.update');
         Route::post('tramites/{tramite}/entrega/{entrega}/anular', [TramiteEntregaController::class, 'annul'])
             ->name('tramites.entrega.anular');
         Route::post('tramites/{tramite}/documentos-finales/{documento}/anular', [TramiteDocumentoFinalController::class, 'annul'])
             ->name('tramites.documento-final.anular');
         Route::post('tramites/{tramite}/entrega/reabrir', [TramiteEntregaController::class, 'reopen'])
             ->name('tramites.entrega.reabrir');
-        Route::get('admin/feriados', [HolidayController::class, 'index'])->name('admin.holidays.index');
         Route::get('admin/cargos', [InstitutionalPositionController::class, 'index'])->name('admin.positions.index');
         Route::patch('admin/cargos/{position}', [InstitutionalPositionController::class, 'update'])
             ->whereNumber('position')->name('admin.positions.update');
@@ -165,18 +161,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->whereNumber('field')->name('admin.templates.fields.update');
         Route::patch('admin/plantillas/{plantilla}/campos/{field}/mover', [TramitePlantillaController::class, 'moveField'])
             ->whereNumber('field')->name('admin.templates.fields.move');
-        Route::get('admin/plazos', [TramiteDeadlineController::class, 'index'])->name('admin.deadlines.index');
-        Route::patch('admin/plazos/{deadline}', [TramiteDeadlineController::class, 'update'])
-            ->whereNumber('deadline')->name('admin.deadlines.update');
-        Route::post('admin/feriados', [HolidayController::class, 'store'])->name('admin.holidays.store');
-        Route::patch('admin/feriados/{holiday}/desactivar', [HolidayController::class, 'deactivate'])->whereNumber('holiday')->name('admin.holidays.deactivate');
-        Route::get('admin/auditoria', AuditLogController::class)->name('admin.audit.index');
         Route::get('admin/usuarios', [UserAccountController::class, 'index'])->name('admin.users.index');
         Route::get('admin/usuarios/crear', [UserAccountController::class, 'create'])->name('admin.users.create');
         Route::post('admin/usuarios', [UserAccountController::class, 'store'])->name('admin.users.store');
         Route::get('admin/usuarios/{user}/editar', [UserAccountController::class, 'edit'])->name('admin.users.edit');
         Route::put('admin/usuarios/{user}', [UserAccountController::class, 'save'])->name('admin.users.save');
         Route::patch('admin/usuarios/{user}/estado', [UserAccountController::class, 'update'])->name('admin.users.update');
+        Route::delete('admin/usuarios/{user}', [UserAccountController::class, 'destroy'])->name('admin.users.destroy');
         Route::post('admin/usuarios/{user}/restablecer-contrasena', [UserAccountController::class, 'resetPassword'])->name('admin.users.reset-password');
         Route::get('revisiones-oficina', [TramiteAsignacionController::class, 'oficinaIndex'])->name('asignaciones.oficina.index');
         Route::get('revisiones-oficina/{tramite}', [TramiteAsignacionController::class, 'oficinaShow'])->name('asignaciones.oficina.show');

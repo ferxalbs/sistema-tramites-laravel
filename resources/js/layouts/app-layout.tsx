@@ -1,5 +1,5 @@
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
-import SupportWidget from '@/components/support-widget';
+import HelpTools from '@/components/help-tools';
 import type { BreadcrumbItem } from '@/types';
 
 export default function AppLayout({
@@ -14,7 +14,7 @@ export default function AppLayout({
             <AppLayoutTemplate breadcrumbs={breadcrumbs}>
                 {children}
             </AppLayoutTemplate>
-            <SupportWidget />
+            <HelpTools />
         </>
     );
 }

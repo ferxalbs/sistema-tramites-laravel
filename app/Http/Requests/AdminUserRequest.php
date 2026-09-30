@@ -31,7 +31,7 @@ class AdminUserRequest extends FormRequest
         $targetId = $target instanceof User ? $target->id : null;
         $role = $this->input('rol');
         $isCreate = $targetId === null;
-        $studentProfileId = $target instanceof User ? $target->perfilEstudiante?->id : null;
+        $requiresAdminConfirmation = $role === 'administrador' && ($isCreate || $target->rol !== 'administrador');
         $teacherProfileId = $target instanceof User ? $target->perfilDocente?->id : null;
 
         $rules = [
@@ -53,10 +53,7 @@ class AdminUserRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($targetId),
                 Rule::unique('users', 'correo_alternativo')->ignore($targetId),
             ],
-            'confirmar_administrador' => [
-                Rule::requiredIf($role === 'administrador' && ($isCreate || $target->rol !== 'administrador')),
-                'nullable', 'accepted',
-            ],
+            'confirmar_administrador' => $requiresAdminConfirmation ? ['required', 'accepted'] : ['sometimes', 'nullable'],
         ];
 
         if ($role !== 'estudiante') {
@@ -79,13 +76,9 @@ class AdminUserRequest extends FormRequest
 
         if ($role === 'estudiante') {
             $rules += [
-                'codigo_estudiante' => [
-                    'required', 'regex:/^[A-Z0-9._-]{3,40}$/',
-                    Rule::unique('perfiles_estudiante', 'codigo_estudiante')->ignore($studentProfileId),
-                ],
                 'programa_estudio_id' => ['required', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
                 'condicion_academica' => ['required', Rule::in(['Estudiante', 'Egresado'])],
-                'ciclo_actual' => [Rule::requiredIf($this->input('condicion_academica') === 'Estudiante'), 'nullable', 'integer', 'between:1,10'],
+                'ciclo_actual' => [Rule::requiredIf($this->input('condicion_academica') === 'Estudiante'), 'nullable', 'integer', 'between:1,6'],
                 'anio_egreso' => [Rule::requiredIf($this->input('condicion_academica') === 'Egresado'), 'nullable', 'integer', 'between:1950,'.now()->year],
                 'direccion_residencia' => ['nullable', 'string', 'max:255'],
             ];
@@ -120,7 +113,7 @@ class AdminUserRequest extends FormRequest
             }
         }
 
-        foreach (['codigo_estudiante', 'codigo_docente'] as $field) {
+        foreach (['codigo_docente'] as $field) {
             if (is_string($this->input($field))) {
                 $normalized[$field] = mb_strtoupper(trim($this->input($field)));
             }

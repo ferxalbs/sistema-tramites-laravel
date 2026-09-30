@@ -4,12 +4,14 @@ use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('public help page presents the approved topics without an unconfigured contact channel', function () {
+    config(['support.contact.whatsapp' => '']);
+
     $this->get(route('support.index'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('ayuda')
             ->has('assistant_topics', 9)
-            ->has('faq', 14)
+            ->has('faq', 13)
             ->has('tutorials', 6)
             ->where('role_guide', [])
             ->where('whatsapp_url', null)

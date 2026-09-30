@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, ClipboardCheck, Save } from 'lucide-react';
+import { useState } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import InputError from '@/components/input-error';
@@ -9,12 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 
-type Reviewer = { id: number; name: string; rol: string; carga_activa: number };
+type Reviewer = { id: number; name: string; dni: string | null; rol: string; carga_activa: number };
 type Props = {
     tramite: { id: number; codigo: string; asunto: string; persona_nombre: string; fecha_recepcion: string };
     modo: 'asignar' | 'reasignar';
     asignacion: { id: number; destino: string; revisor_id: number; revisor: string } | null;
     revisores: { docente: Reviewer[]; oficina: Reviewer[] };
+    destino_inicial?: string;
+    revisor_sugerido_id?: number | null;
 };
 
 type FormData = {
@@ -26,16 +29,24 @@ type FormData = {
     motivo_reasignacion: string;
 };
 
-export default function AsignacionForm({ tramite, modo, asignacion, revisores }: Props) {
+export default function AsignacionForm({ tramite, modo, asignacion, revisores, destino_inicial, revisor_sugerido_id }: Props) {
+    const [busquedaRevisor, setBusquedaRevisor] = useState('');
     const form = useForm<FormData>({
-        destino: asignacion?.destino ?? 'docente',
-        revisor_id: asignacion?.revisor_id ?? null,
+        destino: asignacion?.destino ?? destino_inicial ?? 'docente',
+        revisor_id: asignacion?.revisor_id ?? revisor_sugerido_id ?? null,
         motivo: '',
         instrucciones_revision: '',
         fecha_esperada: '',
         motivo_reasignacion: '',
     });
     const candidatos = form.data.destino === 'docente' ? revisores.docente : revisores.oficina;
+    const textoBusqueda = busquedaRevisor.trim().toLocaleLowerCase();
+    const dniBusqueda = busquedaRevisor.replace(/\D/g, '');
+    const candidatosFiltrados = candidatos.filter((revisor) =>
+        revisor.id === form.data.revisor_id
+        || revisor.name.toLocaleLowerCase().includes(textoBusqueda)
+        || (dniBusqueda !== '' && (revisor.dni ?? '').includes(dniBusqueda)),
+    );
     const endpoint = modo === 'asignar'
         ? TramiteAsignacionController.store.url({ tramite: tramite.id })
         : TramiteAsignacionController.update.url({ tramite: tramite.id });
@@ -79,13 +90,24 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores }:
                                     onChange={(event) => {
                                         form.setData('destino', event.target.value);
                                         form.setData('revisor_id', null);
+                                        setBusquedaRevisor('');
                                     }}
                                 >
                                     <option value="docente">Docente</option>
                                     <option value="oficina">Oficina</option>
                                 </select>
                             </Field>
-                            <Field id="revisor_id" label="Revisor activo" error={form.errors.revisor_id}>
+                            <div className="grid content-start gap-2">
+                                <Label htmlFor="buscar_revisor">Buscar revisor por nombre o DNI</Label>
+                                <Input
+                                    id="buscar_revisor"
+                                    type="search"
+                                    value={busquedaRevisor}
+                                    onChange={(event) => setBusquedaRevisor(event.target.value)}
+                                    placeholder="Escribe el nombre o DNI"
+                                    maxLength={80}
+                                />
+                                <Label htmlFor="revisor_id">Revisor activo</Label>
                                 <select
                                     id="revisor_id"
                                     className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
@@ -94,12 +116,17 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores }:
                                     onChange={(event) => form.setData('revisor_id', event.target.value === '' ? null : Number(event.target.value))}
                                 >
                                     <option value="">Seleccione un revisor</option>
-                                    {candidatos.map((revisor) => (
-                                        <option key={revisor.id} value={revisor.id}>{revisor.name} · {revisor.carga_activa} asignaciones activas</option>
+                                    {candidatosFiltrados.map((revisor) => (
+                                        <option key={revisor.id} value={revisor.id}>{revisor.name} · DNI {revisor.dni ?? 'sin registrar'} · {revisor.carga_activa} asignaciones activas</option>
                                     ))}
                                 </select>
-                                {candidatos.length === 0 && <p className="text-xs text-destructive">No hay revisores activos disponibles para este destino.</p>}
-                            </Field>
+                                <InputError message={form.errors.revisor_id} />
+                                {candidatos.length === 0
+                                    ? <p className="text-xs text-destructive">No hay revisores activos disponibles para este destino.</p>
+                                    : candidatosFiltrados.length === 0
+                                        ? <p className="text-xs text-muted-foreground">No hay revisores con ese nombre o DNI.</p>
+                                        : null}
+                            </div>
                             {modo === 'reasignar' && (
                                 <Field id="motivo_reasignacion" label="Justificación de reasignación" error={form.errors.motivo_reasignacion}>
                                     <textarea

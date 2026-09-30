@@ -96,6 +96,7 @@ class PdfDocumentGenerator
      *     cierre: ?string,
      *     personas: list<string>,
      *     firmante: string,
+     *     firma_imagen?: string,
      *     decision: string,
      *     conclusion: ?string,
      *     comentario_publico: ?string,
@@ -106,6 +107,7 @@ class PdfDocumentGenerator
      */
     public function generate(array $documento): array
     {
+        $firmaImagen = $documento['firma_imagen'] ?? null;
         $lineas = [];
         $this->agregarParrafo($lineas, $documento['institucion'], 10, true, 4, true);
         $this->agregarParrafo($lineas, 'GESTIÓN DOCUMENTARIA INSTITUCIONAL', 9, false, 18, true);
@@ -140,7 +142,12 @@ class PdfDocumentGenerator
             $this->agregarSeccion($lineas, 'Comunicación al interesado', $documento['comentario_publico']);
         }
 
-        $this->agregarParrafo($lineas, 'Atentamente,', 10, false, 22);
+        $this->agregarParrafo($lineas, 'Atentamente,', 10, false, $firmaImagen === null ? 22 : 4);
+
+        if ($firmaImagen !== null) {
+            $lineas[] = ['firma' => true, 'alto' => 42];
+        }
+
         $this->agregarParrafo($lineas, '________________________________________', 10, false, 4);
         $this->agregarParrafo($lineas, $documento['firmante'], 10, true, 2);
         $this->agregarParrafo($lineas, 'Versión revisada del borrador: '.$documento['version_borrador'], 8, false, 0);
@@ -149,7 +156,7 @@ class PdfDocumentGenerator
         $paginas = $this->distribuirEnPaginas($lineas, $documento['codigo_expediente'], $documento['codigo_verificacion'], $qr !== null);
 
         return [
-            'bytes' => $this->construirPdf($paginas, $documento['numero'], $documento['institucion'], $qr),
+            'bytes' => $this->construirPdf($paginas, $documento['numero'], $documento['institucion'], $qr, $firmaImagen),
             'paginas' => count($paginas),
         ];
     }
@@ -241,8 +248,8 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array{text: string, size: int, bold: bool, gap: int, center: bool}>  $lineas
-     * @return list<list<array{text: string, size: int, bold: bool, y: float, center: bool}>>
+     * @param  list<array{text?: string, size?: int, bold?: bool, gap?: int, center?: bool, firma?: bool, alto?: int}>  $lineas
+     * @return list<list<array{text?: string, size?: int, bold?: bool, y: float, center?: bool, firma?: bool, alto?: int}>>
      */
     private function distribuirEnPaginas(array $lineas, string $expediente, string $codigo, bool $conQr = false): array
     {
@@ -251,6 +258,21 @@ class PdfDocumentGenerator
         $y = 786.0;
 
         foreach ($lineas as $linea) {
+            if (($linea['firma'] ?? false) === true) {
+                $altoFirma = (float) ($linea['alto'] ?? 42);
+
+                if ($y - $altoFirma - 8 < ($conQr ? 155 : 65)) {
+                    $paginas[] = [];
+                    $paginaActual++;
+                    $y = 786.0;
+                }
+
+                $paginas[$paginaActual][] = ['firma' => true, 'y' => $y - $altoFirma, 'alto' => (int) $altoFirma];
+                $y -= $altoFirma + 8;
+
+                continue;
+            }
+
             if ($linea['text'] === '' && $linea['gap'] > 0) {
                 $y -= $linea['gap'];
 
@@ -292,7 +314,7 @@ class PdfDocumentGenerator
     /**
      * @param  list<list<array{text: string, size: int, bold: bool, y: float, center: bool}>>  $paginas
      */
-    private function construirPdf(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr = null): string
+    private function construirPdf(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr = null, ?string $firmaImagen = null): string
     {
         $objetos = [
             1 => '<< /Type /Catalog /Pages 2 0 R >>',
@@ -300,18 +322,34 @@ class PdfDocumentGenerator
             4 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
         ];
         $idsPaginas = [];
+        $imagen = $firmaImagen === null ? null : @getimagesizefromstring($firmaImagen);
+
+        if ($firmaImagen !== null && (! is_array($imagen) || ($imagen[2] ?? null) !== IMAGETYPE_JPEG)) {
+            throw new RuntimeException('La firma del perfil no está en un formato de imagen válido.');
+        }
+
+        $idImagenFirma = $firmaImagen === null ? null : 5;
+
+        if ($firmaImagen !== null && is_array($imagen)) {
+            $objetos[$idImagenFirma] = '<< /Type /XObject /Subtype /Image /Width '.(int) $imagen[0].' /Height '.(int) $imagen[1]
+                .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($firmaImagen)." >>\nstream\n"
+                .$firmaImagen."\nendstream";
+        }
+
+        $primerIdPagina = $idImagenFirma === null ? 5 : 6;
 
         foreach ($paginas as $indice => $lineas) {
-            $idPagina = 5 + ($indice * 2);
+            $idPagina = $primerIdPagina + ($indice * 2);
             $idContenido = $idPagina + 1;
             $idsPaginas[] = $idPagina.' 0 R';
-            $contenido = $this->contenidoPagina($lineas, $qr);
-            $objetos[$idPagina] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '.$idContenido.' 0 R >>';
+            $contenido = $this->contenidoPagina($lineas, $qr, $imagen);
+            $recursosImagen = $idImagenFirma === null ? '' : ' /XObject << /Firma '.$idImagenFirma.' 0 R >>';
+            $objetos[$idPagina] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>'.$recursosImagen.' >> /Contents '.$idContenido.' 0 R >>';
             $objetos[$idContenido] = '<< /Length '.strlen($contenido)." >>\nstream\n".$contenido."\nendstream";
         }
 
         $objetos[2] = '<< /Type /Pages /Kids ['.implode(' ', $idsPaginas).'] /Count '.count($paginas).' >>';
-        $idInfo = 5 + (count($paginas) * 2);
+        $idInfo = $primerIdPagina + (count($paginas) * 2);
         $objetos[$idInfo] = '<< /Title '.$this->pdfTexto($numero).' /Author '.$this->pdfTexto($institucion).' /Creator '.$this->pdfTexto('Sistema de Gestión Documentaria Laravel').' >>';
         ksort($objetos);
 
@@ -335,20 +373,31 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array{text: string, size: int, bold: bool, y: float, center: bool}>  $lineas
+     * @param  list<array{text?: string, size?: int, bold?: bool, y: float, center?: bool, firma?: bool, alto?: int}>  $lineas
      */
-    private function contenidoPagina(array $lineas, ?ByteMatrix $qr = null): string
+    private function contenidoPagina(array $lineas, ?ByteMatrix $qr = null, ?array $imagenFirma = null): string
     {
         $contenido = "0.18 0.18 0.18 rg\n";
 
         foreach ($lineas as $linea) {
-            $fuente = $linea['bold'] ? 'F2' : 'F1';
-            $x = $linea['center']
-                ? max(50, (595 - ($linea['size'] * mb_strwidth($linea['text']) * 0.52)) / 2)
-                : 50;
-            $contenido .= 'BT /'.$fuente.' '.$linea['size'].' Tf 1 0 0 1 '.number_format($x, 2, '.', '').' '.number_format($linea['y'], 2, '.', '').' Tm '.$this->pdfTexto($linea['text'])." Tj ET\n";
+            if (($linea['firma'] ?? false) === true && is_array($imagenFirma)) {
+                $escala = min(150 / (int) $imagenFirma[0], 42 / (int) $imagenFirma[1]);
+                $ancho = (int) round((int) $imagenFirma[0] * $escala, 2);
+                $alto = (int) round((int) $imagenFirma[1] * $escala, 2);
+                $contenido .= 'q '.$ancho.' 0 0 '.$alto.' 50 '.number_format($linea['y'], 2, '.', '')." cm /Firma Do Q\n";
 
-            if ($linea['text'] === '' && $linea['y'] > 730) {
+                continue;
+            }
+
+            $fuente = ($linea['bold'] ?? false) ? 'F2' : 'F1';
+            $texto = (string) ($linea['text'] ?? '');
+            $size = (int) ($linea['size'] ?? 10);
+            $x = ($linea['center'] ?? false)
+                ? max(50, (595 - ($size * mb_strwidth($texto) * 0.52)) / 2)
+                : 50;
+            $contenido .= 'BT /'.$fuente.' '.$size.' Tf 1 0 0 1 '.number_format($x, 2, '.', '').' '.number_format($linea['y'], 2, '.', '').' Tm '.$this->pdfTexto($texto)." Tj ET\n";
+
+            if ($texto === '' && $linea['y'] > 730) {
                 $contenido .= "q 0.42 0.08 0.18 RG 1.2 w 50 755 m 545 755 l S Q\n";
             }
         }

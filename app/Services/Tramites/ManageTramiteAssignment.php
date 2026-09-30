@@ -12,14 +12,14 @@ use Illuminate\Validation\ValidationException;
 class ManageTramiteAssignment
 {
     /**
-     * @return array{docente: array<int, array{id: int, name: string, rol: string, carga_activa: int}>, oficina: array<int, array{id: int, name: string, rol: string, carga_activa: int}>}
+     * @return array{docente: array<int, array{id: int, name: string, dni: string|null, rol: string, carga_activa: int}>, oficina: array<int, array{id: int, name: string, dni: string|null, rol: string, carga_activa: int}>}
      */
     public function eligibleReviewers(): array
     {
         $users = User::query()
             ->where('activo', true)
             ->whereIn('rol', ['docente', 'administrador'])
-            ->select(['id', 'name', 'rol'])
+            ->select(['id', 'name', 'dni', 'rol'])
             ->selectSub(
                 DB::table('tramite_asignaciones')
                     ->selectRaw('COUNT(*)')
@@ -273,13 +273,14 @@ class ManageTramiteAssignment
     }
 
     /**
-     * @return array{id: int, name: string, rol: string, carga_activa: int}
+     * @return array{id: int, name: string, dni: string|null, rol: string, carga_activa: int}
      */
     private function reviewerOption(User $user): array
     {
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'dni' => $user->dni,
             'rol' => $user->rol,
             'carga_activa' => (int) $user->carga_activa,
         ];

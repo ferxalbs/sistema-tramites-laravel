@@ -97,12 +97,19 @@ class TramiteAsignacionController extends Controller
     {
         abort_unless($tramite->estado === 'pendiente_asignacion', 409);
         abort_unless($tramite->borradorActual?->estado === 'preparado_asignacion', 409);
+        $revisores = $manageTramiteAssignment->eligibleReviewers();
+        $docenteSugeridoId = $tramite->destino_tipo === 'docente'
+            && collect($revisores['docente'])->contains('id', (int) $tramite->destino_docente_id)
+                ? (int) $tramite->destino_docente_id
+                : null;
 
         return Inertia::render('tramites/asignaciones/form', [
             'tramite' => $this->tramiteSummary($tramite),
             'modo' => 'asignar',
             'asignacion' => null,
-            'revisores' => $manageTramiteAssignment->eligibleReviewers(),
+            'revisores' => $revisores,
+            'destino_inicial' => $tramite->destino_tipo,
+            'revisor_sugerido_id' => $docenteSugeridoId,
         ]);
     }
 

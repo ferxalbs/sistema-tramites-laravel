@@ -14,7 +14,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import AppLogoIcon from '@/components/app-logo-icon';
-import SupportWidget from '@/components/support-widget';
+import HelpTools from '@/components/help-tools';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -267,7 +267,7 @@ export default function Welcome() {
                                         </div>
                                         <CardTitle className="text-lg">Seguimiento Continuo</CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Conoce la etapa exacta de tu expediente: derivación entre oficinas, dictámenes técnicos y emisión del documento final con plazos transparentes.
+                                            Conoce la etapa de tu expediente: derivación entre oficinas, dictámenes técnicos y emisión del documento final.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
@@ -334,7 +334,7 @@ export default function Welcome() {
                                         </div>
                                         <CardTitle className="text-base">Revisión y Dictamen</CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Las unidades responsables revisan tu solicitud y emiten observaciones o aprobación conforme a plazos normativos.
+                                            Las unidades responsables revisan tu solicitud y emiten observaciones o aprobación.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
@@ -380,7 +380,7 @@ export default function Welcome() {
                 </div>
             </ScrollArea>
 
-            <SupportWidget />
+            <HelpTools />
         </>
     );
 }

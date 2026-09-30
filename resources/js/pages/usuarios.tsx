@@ -19,8 +19,6 @@ import {
     create,
     edit,
     index,
-    resetPassword,
-    update,
 } from '@/routes/admin/users';
 
 type Status = 'activo' | 'pendiente' | 'inactivo' | 'rechazado';
@@ -28,17 +26,11 @@ type UserRow = {
     id: number;
     name: string;
     email: string;
+    dni: string | null;
     rol: string;
+    condicion_academica: 'Estudiante' | 'Egresado' | null;
     estado: Status;
     created_at: string | null;
-};
-type Event = {
-    accion: string;
-    estado_anterior: Status;
-    estado_nuevo: Status;
-    motivo: string | null;
-    created_at: string;
-    actor: string | null;
 };
 type Props = {
     users: {
@@ -47,16 +39,8 @@ type Props = {
         last_page: number;
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    viewerId: number;
     filters: { q: string; rol: string; estado: string };
     counts: Partial<Record<Status, number>>;
-    selected:
-        | (UserRow & {
-              motivo: string | null;
-              teacher_request: { cargo: string; motivo: string } | null;
-              events: Event[];
-          })
-        | null;
 };
 
 const statusLabels: Record<Status, string> = {
@@ -66,7 +50,7 @@ const statusLabels: Record<Status, string> = {
     rechazado: 'Rechazado',
 };
 const roleLabels: Record<string, string> = {
-    estudiante: 'Estudiante/Egresado',
+    estudiante: 'Cuenta estudiantil',
     asistente: 'Asistente',
     docente: 'Docente',
     administrador: 'Administrador',
@@ -83,10 +67,8 @@ const dateFormatter = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' });
 
 export default function Usuarios({
     users,
-    viewerId,
     filters,
     counts,
-    selected,
 }: Props) {
     useFlashToast();
     const [query, setQuery] = useState(filters.q);
@@ -127,7 +109,7 @@ export default function Usuarios({
                 </header>
 
                 <section
-                    className="grid gap-3 sm:grid-cols-4"
+                    className="order-2 grid gap-3 sm:grid-cols-4"
                     aria-label="Estados de cuenta"
                 >
                     {(Object.keys(statusLabels) as Status[]).map((state) => (
@@ -144,7 +126,7 @@ export default function Usuarios({
                     ))}
                 </section>
 
-                <Card>
+                <Card className="order-2">
                     <CardHeader>
                         <CardTitle>Buscar y filtrar</CardTitle>
                     </CardHeader>
@@ -155,7 +137,7 @@ export default function Usuarios({
                         >
                             <Input
                                 aria-label="Buscar usuario"
-                                placeholder="Nombre o correo"
+                                placeholder="Nombre, correo o DNI"
                                 value={query}
                                 onChange={(event) =>
                                     setQuery(event.target.value)
@@ -181,7 +163,7 @@ export default function Usuarios({
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="order-2">
                     <CardHeader>
                         <CardTitle>
                             Cuentas · página {users.current_page} de{' '}
@@ -202,7 +184,7 @@ export default function Usuarios({
                                                 Usuario
                                             </th>
                                             <th className="p-3 font-medium">
-                                                Rol
+                                                Rol / perfil
                                             </th>
                                             <th className="p-3 font-medium">
                                                 Estado
@@ -223,10 +205,18 @@ export default function Usuarios({
                                                     <span className="block text-muted-foreground">
                                                         {user.email}
                                                     </span>
+                                                    {user.dni && (
+                                                        <span className="block text-muted-foreground">
+                                                            DNI {user.dni}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="p-3">
-                                                    {roleLabels[user.rol] ??
-                                                        user.rol}
+                                                    {user.rol === 'estudiante'
+                                                        ? user.condicion_academica ??
+                                                          'Perfil incompleto'
+                                                        : (roleLabels[user.rol] ??
+                                                          user.rol)}
                                                 </td>
                                                 <td className="p-3">
                                                     <Badge
@@ -259,17 +249,13 @@ export default function Usuarios({
                                                         size="sm"
                                                         render={
                                                             <Link
-                                                                href={index({
-                                                                    query: {
-                                                                        ...filters,
-                                                                        selected:
-                                                                            user.id,
-                                                                    },
+                                                                href={edit({
+                                                                    user: user.id,
                                                                 })}
                                                             />
                                                         }
                                                     >
-                                                        Gestionar
+                                                        Editar
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -325,192 +311,6 @@ export default function Usuarios({
                     </CardContent>
                 </Card>
 
-                {selected && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Estado de {selected.name}</CardTitle>
-                            <Button
-                                variant="outline"
-                                nativeButton={false}
-                                render={
-                                    <Link href={edit({ user: selected.id })} />
-                                }
-                            >
-                                Editar usuario
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-5">
-                            <p className="text-sm text-muted-foreground">
-                                {selected.email} · {roleLabels[selected.rol]} ·{' '}
-                                {statusLabels[selected.estado]}
-                            </p>
-                            {selected.motivo && (
-                                <p className="text-sm">
-                                    Motivo registrado: {selected.motivo}
-                                </p>
-                            )}
-                            {selected.teacher_request && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Solicitud docente</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <p>
-                                            Cargo:{' '}
-                                            {selected.teacher_request.cargo}
-                                        </p>
-                                        <p>
-                                            Motivo:{' '}
-                                            {selected.teacher_request.motivo}
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            {selected.estado === 'activo' && (
-                                <div className="space-y-2">
-                                    <p className="text-sm text-muted-foreground">
-                                        Se enviará un enlace de un solo uso al
-                                        correo institucional. No se mostrará ni
-                                        cambiará la contraseña aquí.
-                                    </p>
-                                    <Form
-                                        {...resetPassword.form({
-                                            user: selected.id,
-                                        })}
-                                        disableWhileProcessing
-                                    >
-                                        {({ processing, errors }) => (
-                                            <>
-                                                <Button
-                                                    type="submit"
-                                                    variant="outline"
-                                                    disabled={processing}
-                                                >
-                                                    Generar enlace de
-                                                    restablecimiento
-                                                </Button>
-                                                <InputError
-                                                    message={errors.reset}
-                                                />
-                                            </>
-                                        )}
-                                    </Form>
-                                </div>
-                            )}
-                            <Form
-                                {...update.form({ user: selected.id })}
-                                resetOnSuccess={['motivo']}
-                                disableWhileProcessing
-                            >
-                                {({ errors, processing }) => (
-                                    <div className="space-y-3">
-                                        <label
-                                            className="grid gap-1 text-sm"
-                                            htmlFor="motivo-cuenta"
-                                        >
-                                            Motivo para desactivar o rechazar
-                                            <textarea
-                                                id="motivo-cuenta"
-                                                name="motivo"
-                                                maxLength={500}
-                                                rows={3}
-                                                className="w-full rounded-xl border border-input bg-background p-3"
-                                            />
-                                        </label>
-                                        <InputError
-                                            message={
-                                                errors.motivo || errors.accion
-                                            }
-                                        />
-                                        <div className="flex flex-wrap gap-2">
-                                            {selected.estado !== 'activo' && (
-                                                <Button
-                                                    type="submit"
-                                                    name="accion"
-                                                    value="activate"
-                                                    disabled={processing}
-                                                >
-                                                    Activar
-                                                </Button>
-                                            )}
-                                            {selected.estado === 'activo' &&
-                                                selected.id !== viewerId && (
-                                                    <Button
-                                                        type="submit"
-                                                        name="accion"
-                                                        value="deactivate"
-                                                        variant="outline"
-                                                        disabled={processing}
-                                                    >
-                                                        Desactivar
-                                                    </Button>
-                                                )}
-                                            {selected.estado ===
-                                                'pendiente' && (
-                                                <Button
-                                                    type="submit"
-                                                    name="accion"
-                                                    value="reject"
-                                                    variant="destructive"
-                                                    disabled={processing}
-                                                >
-                                                    Rechazar
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </Form>
-                            <div>
-                                <h2 className="mb-2 font-medium">
-                                    Cambios recientes
-                                </h2>
-                                {selected.events.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Sin cambios registrados.
-                                    </p>
-                                ) : (
-                                    <ol className="divide-y text-sm">
-                                        {selected.events.map(
-                                            (event, position) => (
-                                                <li
-                                                    key={`${event.created_at}-${event.accion}-${position}`}
-                                                    className="py-2"
-                                                >
-                                                    <strong>
-                                                        {event.accion ===
-                                                        'create'
-                                                            ? 'Cuenta creada'
-                                                            : event.accion ===
-                                                                'edit'
-                                                              ? 'Datos actualizados'
-                                                              : event.accion ===
-                                                                  'change_role'
-                                                                ? 'Rol cambiado'
-                                                                : event.accion ===
-                                                                    'reset_link'
-                                                                  ? 'Enlace de restablecimiento'
-                                                                  : `${statusLabels[event.estado_anterior]} → ${statusLabels[event.estado_nuevo]}`}
-                                                    </strong>
-                                                    <span className="block text-muted-foreground">
-                                                        {event.actor ??
-                                                            'Sistema'}{' '}
-                                                        · {event.created_at}
-                                                    </span>
-                                                    {event.motivo && (
-                                                        <span className="block">
-                                                            {event.motivo}
-                                                        </span>
-                                                    )}
-                                                </li>
-                                            ),
-                                        )}
-                                    </ol>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
             </main>
         </>
     );

@@ -55,7 +55,8 @@ class TramiteDocumentoFinalController extends Controller
                 'asunto' => $ronda->versionBorrador->asunto,
                 'fecha_documento' => $ronda->versionBorrador->fecha_documento->toDateString(),
                 'firmante' => $ronda->versionBorrador->firmante?->name,
-                'requiere_firma_fisica' => $ronda->versionBorrador->plantilla->requiere_firma_fisica,
+                'firma_perfil_registrada' => $ronda->versionBorrador->firmante !== null
+                    && Storage::disk('local')->exists('firmas-perfil/'.$ronda->versionBorrador->firmante->id.'.jpg'),
             ],
         ]);
     }

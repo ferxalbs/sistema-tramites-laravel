@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Printer } from 'lucide-react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import SupportWidget from '@/components/support-widget';
+import HelpTools from '@/components/help-tools';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -9,6 +9,7 @@ type Comprobante = {
     tramite_id: number;
     codigo: string;
     fecha_recepcion: string;
+    fecha_documento: string | null;
     fecha_registro: string | null;
     tipo_tramite: string;
     estado_inicial: string;
@@ -36,13 +37,19 @@ export default function TramiteComprobante({
                     <CardContent className="flex flex-col gap-6">
                         <dl className="grid gap-4 sm:grid-cols-[13rem_1fr]">
                             <dt className="font-medium">
-                                Código de referencia
+                                Código interno del trámite
                             </dt>
                             <dd className="text-lg font-semibold">
                                 {comprobante.codigo}
                             </dd>
                             <dt className="font-medium">Fecha de recepción</dt>
                             <dd>{formatDate(comprobante.fecha_recepcion)}</dd>
+                            {comprobante.fecha_documento && (
+                                <>
+                                    <dt className="font-medium">Fecha del documento (FUT)</dt>
+                                    <dd>{formatDate(comprobante.fecha_documento)}</dd>
+                                </>
+                            )}
                             {comprobante.fecha_registro && (
                                 <>
                                     <dt className="font-medium">
@@ -63,7 +70,7 @@ export default function TramiteComprobante({
                             <dd>{comprobante.destino}</dd>
                             <dt className="font-medium">Interesado</dt>
                             <dd>{comprobante.interesado}</dd>
-                            <dt className="font-medium">Asunto</dt>
+                            <dt className="font-medium">Resumen de la solicitud (sumilla)</dt>
                             <dd>{comprobante.asunto}</dd>
                         </dl>
                         <p className="rounded-xl border bg-muted p-4 font-medium print:bg-transparent">
@@ -91,7 +98,7 @@ export default function TramiteComprobante({
                 </div>
             </main>
             <div className="print:hidden">
-                <SupportWidget />
+                <HelpTools />
             </div>
         </>
     );

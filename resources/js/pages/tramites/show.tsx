@@ -62,7 +62,6 @@ type TramiteDetail = {
     descripcion: string | null;
     prioridad: string;
     fecha_recepcion: string;
-    plazo: { fecha_estimada: string; fecha_maxima: string; dias_restantes: number; alerta: string; etiqueta: string } | null;
     fecha_llegada_oficina: string | null;
     fecha_presentacion_original: string | null;
     numero_expediente_externo: string | null;
@@ -173,9 +172,9 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                             <ArrowLeft />
                         </Button>
                         <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Detalle del trámite</p>
+                            <p className="text-sm text-muted-foreground">Código interno del trámite</p>
                             <h1 className="text-2xl font-semibold tracking-tight">{tramite.codigo}</h1>
-                            <p className="text-sm text-muted-foreground">{tramite.asunto}</p>
+                            <p className="text-sm text-muted-foreground"><span className="font-medium">Sumilla:</span> {tramite.asunto}</p>
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -271,7 +270,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Versiones oficiales anteriores</CardTitle>
-                                    <CardDescription>Los números y archivos históricos se conservan para la auditoría.</CardDescription>
+                                    <CardDescription>Los números y archivos históricos se conservan en el historial del expediente.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {tramite.documentos_finales_anteriores.map((documento) => (
@@ -363,7 +362,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                             </CardHeader>
                             <CardContent className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
                         <Detail label="Persona solicitante" value={tramite.persona_nombre} />
-                        <Detail label="DNI o código" value={tramite.persona_identificador ?? 'No registrado'} />
+                        <Detail label="DNI / documento de identidad" value={tramite.persona_identificador ?? 'No registrado'} />
                         <Detail label="Cuenta asociada" value={tramite.propietario ?? 'Sin cuenta vinculada'} />
                                 <Detail label="Clasificación" value={tramite.clasificacion} />
                                 <Detail label="Programa" value={tramite.programa ?? 'No registrado'} />
@@ -371,10 +370,8 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                 <Detail label="Formato previsto" value={tramite.formato_salida ?? 'Pendiente'} />
                                 {tramite.modalidad_documento && <Detail label="Modalidad" value={tramite.modalidad_documento} />}
                                 <Detail label="Destino" value={`${tramite.destino_tipo}: ${tramite.destino_nombre}`} />
-                                <Detail label="Fecha de recepción" value={formatDate(tramite.fecha_recepcion)} />
-                                {tramite.plazo && <Detail label={tramite.plazo.etiqueta} value={`${formatDate(tramite.plazo.fecha_maxima)} · ${tramite.plazo.alerta === 'completado' ? 'Completado' : tramite.plazo.alerta === 'vencido' ? 'Vencido' : `${tramite.plazo.dias_restantes} días restantes`}`} />}
-                                <Detail label="Llegada a oficina" value={tramite.fecha_llegada_oficina ?? 'No registrada'} />
-                                <Detail label="Presentación original" value={tramite.fecha_presentacion_original ? formatDate(tramite.fecha_presentacion_original) : 'No registrada'} />
+                                <Detail label="Fecha y hora de recepción en Mesa de Partes" value={tramite.fecha_llegada_oficina ?? 'No registrada'} />
+                                <Detail label="Fecha del documento (FUT)" value={tramite.fecha_presentacion_original ? formatDate(tramite.fecha_presentacion_original) : 'No registrada'} />
                                 <Detail label="Referencia física externa" value={tramite.numero_expediente_externo ?? 'No registrada'} />
                                 <Detail label="Área de procedencia" value={tramite.area_procedencia ?? 'No registrada'} />
                                 <Detail label="Persona que entregó" value={tramite.persona_entrega_documento ?? 'No registrada'} />
@@ -382,7 +379,8 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                 <Detail label="Cantidad de folios" value={tramite.folios?.toString() ?? 'No registrado'} />
                                 <Detail label="Recibido por" value={tramite.recibido_por ?? 'Usuario desactivado'} />
                                 <div className="sm:col-span-2">
-                                    <Detail label="Descripción" value={tramite.descripcion || 'Sin descripción'} />
+                                    <Detail label="Resumen de la solicitud (sumilla)" value={tramite.asunto} />
+                                    <Detail label="Fundamentación del pedido / detalle" value={tramite.descripcion || 'Sin descripción'} />
                                     <Detail label="Observación de recepción" value={tramite.observacion_recepcion ?? 'Sin observaciones'} />
                                 </div>
                             </CardContent>
@@ -626,7 +624,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
 
                     <Card className="h-fit">
                         <CardHeader>
-                            <CardTitle>Historial y auditoría</CardTitle>
+                            <CardTitle>Historial del expediente</CardTitle>
                             <CardDescription>Registro de recepción, digitalización y descargas.</CardDescription>
                         </CardHeader>
                         <CardContent>

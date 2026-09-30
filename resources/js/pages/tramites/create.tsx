@@ -34,9 +34,16 @@ type Catalogos = {
 type Props = {
     catalogos: Catalogos;
     ahora: string;
-    estudiantes: Array<{ id: number; name: string }>;
+    estudiantes: Array<{ id: number; name: string; dni: string | null; email: string; celular: string | null; correo_alternativo: string | null }>;
+    docentes: Array<{ id: number; name: string; dni: string | null }>;
     programas: Array<{ id: number; nombre: string }>;
     cargos_institucionales: Array<{ id: number; nombre: string }>;
+    seleccion?: {
+        tipo_documento: string;
+        tipo_nombre: string;
+        clasificacion: string;
+        dni: string;
+    } | null;
     tramite: {
         id: number;
         codigo: string;
@@ -50,6 +57,7 @@ type Props = {
         programa_estudio_id: number | null;
         destino_tipo: string;
         destino_nombre: string;
+        destino_docente_id: number | null;
         asunto: string;
         descripcion: string | null;
         prioridad: string;
@@ -66,18 +74,41 @@ type Props = {
     } | null;
 };
 
-export default function TramiteCreate({ catalogos, ahora, estudiantes, programas, cargos_institucionales, tramite }: Props) {
-    const primeraClasificacion = tramite?.clasificacion ?? Object.keys(catalogos.clasificaciones)[0] ?? 'estudiantil';
-    const tipoInicial = tramite?.tipo_documento ?? Object.keys(catalogos.tipos_documento[primeraClasificacion] ?? {})[0] ?? '';
+function searchPeople<T extends { id: number; name: string; dni: string | null }>(
+    people: T[],
+    query: string,
+    selectedId: string | null,
+): T[] {
+    const text = query.trim().toLocaleLowerCase();
+    const digits = query.replace(/\D/g, '');
+
+    return people.filter((person) =>
+        String(person.id) === selectedId
+        || person.name.toLocaleLowerCase().includes(text)
+        || (digits !== '' && (person.dni ?? '').includes(digits)),
+    );
+}
+
+export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes, programas, cargos_institucionales, tramite, seleccion = null }: Props) {
+    const primeraClasificacion = tramite?.clasificacion ?? seleccion?.clasificacion ?? Object.keys(catalogos.clasificaciones)[0] ?? 'estudiantil';
+    const tipoInicial = tramite?.tipo_documento ?? seleccion?.tipo_documento ?? Object.keys(catalogos.tipos_documento[primeraClasificacion] ?? {})[0] ?? '';
+    const estudianteInicial = estudiantes.find((estudiante) => estudiante.id === tramite?.propietario_id)
+        ?? estudiantes.find((estudiante) => estudiante.dni === seleccion?.dni);
     const [clasificacion, setClasificacion] = useState(primeraClasificacion);
     const [tipoDocumento, setTipoDocumento] = useState(tipoInicial);
     const [formatoSalida, setFormatoSalida] = useState(tramite?.formato_salida ?? catalogos.formatos_sugeridos[tipoInicial] ?? 'pendiente');
     const [modalidadDocumento, setModalidadDocumento] = useState(tramite?.modalidad_documento ?? '');
     const [destinoTipo, setDestinoTipo] = useState(tramite?.destino_tipo ?? 'oficina');
+    const [destinoDocenteId, setDestinoDocenteId] = useState<string | null>(tramite?.destino_docente_id ? String(tramite.destino_docente_id) : null);
     const [prioridad, setPrioridad] = useState(tramite?.prioridad ?? 'normal');
-    const [propietarioId, setPropietarioId] = useState<string | null>(tramite?.propietario_id ? String(tramite.propietario_id) : null);
+    const [propietarioId, setPropietarioId] = useState<string | null>(estudianteInicial ? String(estudianteInicial.id) : null);
+    const [dniEstudiante, setDniEstudiante] = useState(estudianteInicial?.dni ?? seleccion?.dni ?? tramite?.persona_identificador ?? '');
+    const [buscarDocente, setBuscarDocente] = useState('');
     const [documentos, setDocumentos] = useState<Array<{ id: number; categoria: string }>>([]);
     const siguienteDocumentoId = useRef(0);
+    const formatoObligatorio = catalogos.formatos_sugeridos[tipoDocumento];
+    const estudianteSeleccionado = estudiantes.find((estudiante) => String(estudiante.id) === propietarioId) ?? null;
+    const docentesFiltrados = searchPeople(docentes, buscarDocente, destinoDocenteId);
 
     function changeTipoDocumento(nextType: string) {
         setTipoDocumento(nextType);
@@ -91,13 +122,29 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
     function changeClasificacion(value: string | null) {
         const nextClassification = value ?? primeraClasificacion;
         setClasificacion(nextClassification);
+        if (nextClassification !== 'estudiantil') {
+            setPropietarioId(null);
+            setDniEstudiante('');
+        }
         changeTipoDocumento(Object.keys(catalogos.tipos_documento[nextClassification] ?? {})[0] ?? '');
+    }
+
+    function changeDniEstudiante(value: string) {
+        const dni = value.replace(/\D/g, '').slice(0, 8);
+        const match = dni.length === 8 ? estudiantes.find((estudiante) => estudiante.dni === dni) : undefined;
+        setDniEstudiante(dni);
+        setPropietarioId(match ? String(match.id) : null);
     }
 
     function changeFormatoSalida(value: string | null) {
         const nextFormat = value ?? 'pendiente';
         setFormatoSalida(nextFormat);
         if (nextFormat !== 'memorando') setModalidadDocumento('');
+    }
+
+    function changeDestinoTipo(value: string | null) {
+        setDestinoTipo(value ?? 'oficina');
+        setDestinoDocenteId(null);
     }
 
     return (
@@ -111,9 +158,13 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                     </Button>
                     <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">Recepción y digitalización</p>
-                        <h1 className="text-2xl font-semibold tracking-tight">{tramite ? `Editar ${tramite.codigo}` : 'Registrar trámite'}</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">{tramite ? `Editar ${tramite.codigo}` : seleccion ? `Digitalizar: ${seleccion.tipo_nombre}` : 'Registrar trámite'}</h1>
                         <p className="text-sm text-muted-foreground">
-                            {tramite ? 'Corrige los datos de recepción antes de la asignación. El código, el estado, los archivos y el historial se conservan.' : 'Registra los datos de ingreso y los documentos entregados físicamente.'}
+                            {tramite
+                                ? 'Corrige los datos transcritos y de recepción. El código interno, el estado, los archivos y el historial se conservan.'
+                                : seleccion
+                                    ? 'Completa los datos que corresponden a este tipo de solicitud y adjunta el documento recibido.'
+                                    : 'Selecciona el DNI y el tipo de trámite para abrir el formulario de digitalización.'}
                         </p>
                     </div>
                 </header>
@@ -128,40 +179,69 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                         <>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Datos de recepción</CardTitle>
-                                    <CardDescription>Clasifica el ingreso y define a quién se dirige.</CardDescription>
+                                    <CardTitle>{seleccion ? 'Recepción de ' + seleccion.tipo_nombre : 'Datos de recepción'}</CardTitle>
+                                    <CardDescription>{seleccion?.tipo_documento === 'FUT'
+                                        ? 'Transcribe los datos del FUT recibido. La fecha escrita en el FUT y la fecha de recepción en Mesa de Partes son distintas.'
+                                        : seleccion
+                                            ? 'Completa los datos del documento recibido para este tipo de trámite.'
+                                            : 'Registra los datos del ingreso y del documento entregado físicamente.'}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid gap-5 sm:grid-cols-2">
-                                    <FormSelect
-                                        id="clasificacion"
-                                        label="Clasificación"
-                                        name="clasificacion"
-                                        value={clasificacion}
-                                        options={catalogos.clasificaciones}
-                                        error={errors.clasificacion}
-                                        onValueChange={changeClasificacion}
-                                    />
-                                    <div className="grid content-start gap-2">
-                                        <Label htmlFor="propietario_id">Estudiante o egresado relacionado</Label>
-                                        <Select
-                                            items={estudiantes.map((estudiante) => ({ value: String(estudiante.id), label: estudiante.name }))}
-                                            name="propietario_id"
-                                            value={propietarioId}
-                                            onValueChange={setPropietarioId}
-                                            required={clasificacion === 'estudiantil'}
-                                        >
-                                            <SelectTrigger id="propietario_id" className="w-full">
-                                                <SelectValue placeholder="Selecciona una cuenta" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectGroup>
-                                                    {estudiantes.map((estudiante) => <SelectItem key={estudiante.id} value={String(estudiante.id)}>{estudiante.name}</SelectItem>)}
-                                                </SelectGroup>
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-muted-foreground">Obligatorio para los trámites de clasificación estudiantil.{estudiantes.length === 0 ? ' No hay cuentas activas disponibles.' : ''}</p>
-                                        <InputError message={errors.propietario_id} />
-                                    </div>
+                                    {seleccion ? (
+                                        <>
+                                            <input type="hidden" name="clasificacion" value={clasificacion} />
+                                            <input type="hidden" name="tipo_documento" value={tipoDocumento} />
+                                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 sm:col-span-2">
+                                                <div>
+                                                    <p className="text-sm font-medium">Formulario para: {seleccion.tipo_nombre}</p>
+                                                    <p className="text-xs text-muted-foreground">DNI ingresado: {seleccion.dni}</p>
+                                                </div>
+                                                <Button type="button" variant="outline" render={<Link href={TramiteController.create()} />}>Cambiar DNI o tipo</Button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <FormSelect
+                                            id="clasificacion"
+                                            label="Clasificación"
+                                            name="clasificacion"
+                                            value={clasificacion}
+                                            options={catalogos.clasificaciones}
+                                            error={errors.clasificacion}
+                                            onValueChange={changeClasificacion}
+                                        />
+                                    )}
+                                    {clasificacion === 'estudiantil' && <>
+                                        <div className="grid content-start gap-2">
+                                            <Label htmlFor="dni_estudiante">DNI del estudiante o egresado</Label>
+                                            <Input
+                                                id="dni_estudiante"
+                                                value={dniEstudiante}
+                                                onChange={(event) => changeDniEstudiante(event.target.value)}
+                                                placeholder="Ingresa los 8 dígitos del DNI"
+                                                maxLength={8}
+                                                inputMode="numeric"
+                                                pattern="[0-9]{8}"
+                                                required
+                                                readOnly={Boolean(seleccion)}
+                                            />
+                                            <p className="text-xs text-muted-foreground">El DNI vincula el trámite con la cuenta y completa los datos guardados en el perfil.{estudiantes.length === 0 ? ' No hay cuentas activas disponibles.' : ''}</p>
+                                            <InputError message={errors.propietario_id ?? errors.persona_identificador} />
+                                            {clasificacion === 'estudiantil' && <input type="hidden" name="propietario_id" value={estudianteSeleccionado?.id ?? ''} />}
+                                            {clasificacion === 'estudiantil' && <input type="hidden" name="persona_nombre" value={estudianteSeleccionado?.name ?? ''} />}
+                                            {clasificacion === 'estudiantil' && <input type="hidden" name="persona_identificador" value={estudianteSeleccionado?.dni ?? ''} />}
+                                        </div>
+                                        {estudianteSeleccionado ? (
+                                            <div className="grid content-start gap-2 rounded-xl border p-4 text-sm">
+                                                <p className="font-medium">Datos encontrados en el perfil</p>
+                                                <p>{estudianteSeleccionado.name} · DNI {estudianteSeleccionado.dni}</p>
+                                                <p className="text-muted-foreground">Correo institucional: {estudianteSeleccionado.email}</p>
+                                                <p className="text-muted-foreground">Celular: {estudianteSeleccionado.celular || 'No registrado'}</p>
+                                                {estudianteSeleccionado.correo_alternativo && <p className="text-muted-foreground">Correo alternativo: {estudianteSeleccionado.correo_alternativo}</p>}
+                                            </div>
+                                        ) : (
+                                            <p className="self-center text-sm text-muted-foreground">{dniEstudiante.length === 8 ? 'No se encontró una cuenta activa con ese DNI. Registra primero al estudiante.' : 'Al ingresar un DNI registrado aparecerán los datos del perfil.'}</p>
+                                        )}
+                                    </>}
                                     {clasificacion === 'estudiantil' ? (
                                         <p className="self-center text-sm text-muted-foreground">
                                             El programa de estudios se toma del perfil del estudiante seleccionado.
@@ -181,21 +261,27 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                             <InputError message={errors.programa_estudio_id} />
                                         </div>
                                     )}
-                                    <FormSelect
+                                    {!seleccion && <FormSelect
                                         id="tipo_documento"
-                                        label="Tipo de trámite"
+                                        label="Tipo de solicitud recibida"
                                         name="tipo_documento"
                                         value={tipoDocumento}
                                         options={catalogos.tipos_documento[clasificacion] ?? {}}
+                                        description="Seleccione el tipo de solicitud recibida."
                                         error={errors.tipo_documento}
                                         onValueChange={(value) => changeTipoDocumento(value ?? '')}
-                                    />
+                                    />}
                                     <FormSelect
                                         id="formato_salida"
-                                        label="Formato documental previsto"
+                                        label="Documento de respuesta previsto"
                                         name="formato_salida"
                                         value={formatoSalida}
-                                        options={{ pendiente: 'Pendiente', ...catalogos.formatos_salida }}
+                                        options={formatoObligatorio
+                                            ? { [formatoObligatorio]: catalogos.formatos_salida[formatoObligatorio] ?? formatoObligatorio }
+                                            : { pendiente: 'Pendiente de definir', ...catalogos.formatos_salida }}
+                                        description={formatoObligatorio
+                                            ? 'Este tipo de solicitud requiere el documento de respuesta indicado.'
+                                            : 'Elija Constancia si esa será la respuesta; deje Pendiente de definir si aún no se ha decidido.'}
                                         error={errors.formato_salida}
                                         onValueChange={changeFormatoSalida}
                                     />
@@ -215,11 +301,48 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                         value={destinoTipo}
                                         options={catalogos.destinos}
                                         error={errors.destino_tipo}
-                                        onValueChange={(value) => setDestinoTipo(value ?? 'oficina')}
+                                        onValueChange={changeDestinoTipo}
                                     />
-                                    <Field id="destino_nombre" label={destinoTipo === 'docente' ? 'Nombre del docente' : 'Oficina de destino'} error={errors.destino_nombre}>
-                                        <Input id="destino_nombre" name="destino_nombre" defaultValue={tramite?.destino_nombre ?? ''} required maxLength={200} placeholder={destinoTipo === 'docente' ? 'Nombre y apellidos' : 'Ej. Secretaría Académica'} />
-                                    </Field>
+                                    {destinoTipo === 'docente' ? (
+                                        <div className="grid content-start gap-2">
+                                            <Label htmlFor="buscar_docente">Buscar docente por nombre o DNI</Label>
+                                            <Input
+                                                id="buscar_docente"
+                                                type="search"
+                                                value={buscarDocente}
+                                                onChange={(event) => setBuscarDocente(event.target.value)}
+                                                placeholder="Escribe el nombre o DNI"
+                                                maxLength={80}
+                                            />
+                                            <Label htmlFor="destino_docente_id">Docente de destino previsto</Label>
+                                            <Select
+                                                items={docentesFiltrados.map((docente) => ({ value: String(docente.id), label: `${docente.name} · DNI ${docente.dni ?? 'sin registrar'}` }))}
+                                                name="destino_docente_id"
+                                                value={destinoDocenteId}
+                                                onValueChange={setDestinoDocenteId}
+                                                required
+                                            >
+                                                <SelectTrigger id="destino_docente_id" className="w-full">
+                                                    <SelectValue placeholder="Seleccione un docente activo" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        {docentesFiltrados.length === 0
+                                                            ? <SelectItem value="sin-resultados" disabled>No hay docentes con ese nombre o DNI.</SelectItem>
+                                                            : docentesFiltrados.map((docente) => <SelectItem key={docente.id} value={String(docente.id)}>{docente.name} · DNI {docente.dni ?? 'sin registrar'}</SelectItem>)}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-xs text-muted-foreground">La asignación formal del revisor se realiza después de preparar el borrador.{docentes.length === 0 ? ' No hay docentes activos disponibles.' : ''}</p>
+                                            <InputError message={errors.destino_docente_id} />
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="hidden"
+                                            name="destino_nombre"
+                                            value={tramite?.destino_tipo === 'oficina' ? tramite.destino_nombre : ''}
+                                        />
+                                    )}
                                     <FormSelect
                                         id="prioridad"
                                         label="Prioridad"
@@ -229,10 +352,15 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                         error={errors.prioridad}
                                         onValueChange={(value) => setPrioridad(value ?? 'normal')}
                                     />
-                                    <Field id="fecha_llegada_oficina" label="Fecha y hora de llegada a oficina" error={errors.fecha_llegada_oficina}>
+                                    <Field id="fecha_llegada_oficina" label="Fecha y hora de recepción en Mesa de Partes" description="Corresponde al ingreso físico del FUT. Se propone la hora actual; corríjala si registra una recepción anterior." error={errors.fecha_llegada_oficina}>
                                         <Input id="fecha_llegada_oficina" name="fecha_llegada_oficina" type="datetime-local" defaultValue={tramite?.fecha_llegada_oficina ?? ahora} required />
                                     </Field>
-                                    <Field id="fecha_presentacion_original" label="Fecha de presentación original" error={errors.fecha_presentacion_original}>
+                                    <Field
+                                        id="fecha_presentacion_original"
+                                        label={seleccion?.tipo_documento === 'FUT' ? 'Fecha del documento (FUT)' : 'Fecha indicada en el documento (opcional)'}
+                                        description={seleccion?.tipo_documento === 'FUT' ? 'Transcribe la fecha escrita junto a la firma en la parte inferior del FUT.' : 'Registra la fecha impresa o escrita en el documento recibido.'}
+                                        error={errors.fecha_presentacion_original}
+                                    >
                                         <Input id="fecha_presentacion_original" name="fecha_presentacion_original" type="date" defaultValue={tramite?.fecha_presentacion_original ?? ''} />
                                     </Field>
                                     <Field id="numero_expediente_externo" label="Referencia física externa" error={errors.numero_expediente_externo}>
@@ -247,7 +375,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                 </CardContent>
                             </Card>
 
-                            <Card>
+                            {clasificacion !== 'estudiantil' && <Card>
                                 <CardHeader>
                                     <CardTitle>Persona solicitante</CardTitle>
                                     <CardDescription>Datos de la persona que presenta la documentación.</CardDescription>
@@ -256,22 +384,24 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                     <Field id="persona_nombre" label="Nombres y apellidos" error={errors.persona_nombre}>
                                         <Input id="persona_nombre" name="persona_nombre" defaultValue={tramite?.persona_nombre ?? ''} required maxLength={200} autoComplete="name" />
                                     </Field>
-                                    <Field id="persona_identificador" label="DNI o código de estudiante" error={errors.persona_identificador}>
-                                        <Input id="persona_identificador" name="persona_identificador" defaultValue={tramite?.persona_identificador ?? ''} maxLength={50} />
+                                    <Field id="persona_identificador" label="DNI u otro documento de identidad" error={errors.persona_identificador}>
+                                        <Input id="persona_identificador" name="persona_identificador" defaultValue={seleccion?.dni ?? tramite?.persona_identificador ?? ''} maxLength={50} readOnly={Boolean(seleccion)} />
                                     </Field>
                                 </CardContent>
-                            </Card>
+                            </Card>}
 
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Contenido del trámite</CardTitle>
-                                    <CardDescription>El asunto facilita la búsqueda y el seguimiento del expediente.</CardDescription>
+                                    <CardTitle>{seleccion ? 'Solicitud: ' + seleccion.tipo_nombre : 'Contenido del trámite'}</CardTitle>
+                                    <CardDescription>{seleccion?.tipo_documento === 'FUT'
+                                        ? 'Transcribe la sumilla y la fundamentación del pedido tal como aparecen en el FUT.'
+                                        : 'Resume la solicitud recibida y registra debajo su detalle o fundamentación.'}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid gap-5 sm:grid-cols-2">
-                                    <Field id="asunto" label="Asunto" error={errors.asunto} className="sm:col-span-2">
-                                        <Input id="asunto" name="asunto" defaultValue={tramite?.asunto ?? ''} required minLength={3} maxLength={255} placeholder="Describe brevemente el motivo" />
+                                    <Field id="asunto" label={seleccion?.tipo_documento === 'FUT' ? 'Resumen de la solicitud (sumilla)' : 'Resumen de la solicitud'} error={errors.asunto} className="sm:col-span-2">
+                                        <Input id="asunto" name="asunto" defaultValue={tramite?.asunto ?? ''} required minLength={3} maxLength={255} placeholder={seleccion?.tipo_documento === 'FUT' ? 'Ej. Solicito prácticas pre profesionales' : 'Resume brevemente lo solicitado'} />
                                     </Field>
-                                    <Field id="descripcion" label="Descripción" error={errors.descripcion} className="sm:col-span-2">
+                                    <Field id="descripcion" label={seleccion?.tipo_documento === 'FUT' ? 'Fundamentación del pedido / detalle' : 'Detalle de la solicitud recibida'} error={errors.descripcion} className="sm:col-span-2">
                                         <textarea
                                             id="descripcion"
                                             name="descripcion"
@@ -281,7 +411,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                             maxLength={5000}
                                             required
                                             className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-                                            placeholder="Descripción del trámite recibido"
+                                            placeholder={seleccion?.tipo_documento === 'FUT' ? 'Transcribe o resume la fundamentación del pedido del FUT' : 'Transcribe o resume el detalle del documento recibido'}
                                         />
                                     </Field>
                                     <Field id="observacion_recepcion" label="Observación de recepción" error={errors.observacion_recepcion} className="sm:col-span-2">
@@ -374,9 +504,9 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, programas
                                 <Button render={<Link href={tramite ? TramiteController.show({ tramite: tramite.id }) : TramiteController.index()} />} variant="outline">
                                     Cancelar
                                 </Button>
-                                <Button type="submit" disabled={processing}>
+                                <Button type="submit" disabled={processing || Boolean(seleccion && clasificacion === 'estudiantil' && !estudianteSeleccionado)}>
                                     {processing ? <Spinner /> : <FilePlus2 />}
-                                    {tramite ? 'Guardar cambios' : 'Guardar trámite'}
+                                    {tramite ? 'Guardar cambios' : seleccion?.tipo_documento === 'FUT' ? 'Digitalizar FUT' : seleccion ? 'Digitalizar solicitud' : 'Guardar trámite'}
                                 </Button>
                             </div>
                         </>
@@ -391,12 +521,14 @@ function Field({
     id,
     label,
     error,
+    description,
     className = '',
     children,
 }: {
     id: string;
     label: string;
     error?: string;
+    description?: string;
     className?: string;
     children: React.ReactNode;
 }) {
@@ -404,6 +536,7 @@ function Field({
         <div className={`grid content-start gap-2 ${className}`}>
             <Label htmlFor={id}>{label}</Label>
             {children}
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
             <InputError message={error} />
         </div>
     );
@@ -415,6 +548,7 @@ function FormSelect({
     name,
     value,
     options,
+    description,
     error,
     onValueChange,
 }: {
@@ -423,6 +557,7 @@ function FormSelect({
     name: string;
     value: string;
     options: Record<string, string>;
+    description?: string;
     error?: string;
     onValueChange: (value: string | null) => void;
 }) {
@@ -446,6 +581,7 @@ function FormSelect({
                     </SelectGroup>
                 </SelectContent>
             </Select>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
             <InputError message={error} />
         </div>
     );

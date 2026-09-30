@@ -11,7 +11,13 @@ class TramiteClassificationCatalog
      */
     public static function labels(): array
     {
-        return DB::table('clasificaciones_expediente')->pluck('nombre', 'codigo')->all();
+        $labels = DB::table('clasificaciones_expediente')->pluck('nombre', 'codigo')->all();
+
+        if (array_key_exists('institucional', $labels)) {
+            $labels['institucional'] = $labels['administrativo'] ?? 'Administrativo';
+        }
+
+        return $labels;
     }
 
     /**
@@ -20,6 +26,7 @@ class TramiteClassificationCatalog
     public static function activeLabels(): array
     {
         return DB::table('clasificaciones_expediente')->where('activo', true)
+            ->where('codigo', '<>', 'institucional')
             ->orderBy('orden')->pluck('nombre', 'codigo')->all();
     }
 }

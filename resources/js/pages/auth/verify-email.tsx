@@ -10,6 +10,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { markLoggedOut } from '@/lib/auth-history';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
 
@@ -58,6 +59,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                     <TextLink
                         href={logout()}
                         className="mx-auto block text-sm"
+                        onClick={markLoggedOut}
                     >
                         Cerrar sesión
                     </TextLink>

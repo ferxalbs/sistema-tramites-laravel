@@ -16,6 +16,11 @@ class OutputDocumentTypeController extends Controller
         return Inertia::render('formatos-salida', [
             'formatos' => DB::table('tipos_documento_salida')->orderBy('orden')
                 ->get(['id', 'codigo', 'nombre', 'descripcion', 'permite_modalidad_multiple', 'activo']),
+            'plantillasFinales' => DB::table('tramite_plantillas')
+                ->where('activa', true)
+                ->where('estado', 'publicada')
+                ->orderBy('nombre')
+                ->get(['id', 'codigo', 'nombre', 'version', 'tipo_documento_salida', 'modalidad']),
         ]);
     }
 
@@ -30,7 +35,6 @@ class OutputDocumentTypeController extends Controller
         $data = $request->validate([
             'nombre' => ['required', 'string', 'min:2', 'max:120', Rule::unique('tipos_documento_salida', 'nombre')->ignore($format)],
             'descripcion' => ['nullable', 'string', 'max:255'],
-            'activo' => ['required', 'boolean'],
         ]);
 
         DB::transaction(function () use ($request, $format, $data): void {
@@ -45,7 +49,7 @@ class OutputDocumentTypeController extends Controller
                 ->update([
                     'nombre' => $data['nombre'],
                     'descripcion' => $data['descripcion'] ?: null,
-                    'activo' => (bool) $data['activo'],
+                    'activo' => true,
                     'updated_at' => now(),
                 ]);
             abort_unless($changed === 1, 409);
@@ -59,7 +63,7 @@ class OutputDocumentTypeController extends Controller
                 'valor_nuevo' => json_encode([
                     'nombre' => $data['nombre'],
                     'descripcion' => $data['descripcion'] ?: null,
-                    'activo' => (bool) $data['activo'],
+                    'activo' => true,
                 ], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),

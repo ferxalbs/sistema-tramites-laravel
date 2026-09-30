@@ -30,8 +30,6 @@ type Plantilla = {
     nombre: string;
     descripcion: string | null;
     modalidad: string | null;
-    requiere_firma_fisica: boolean;
-    permite_no_firma: boolean;
     campos: CampoPlantilla[];
 };
 
@@ -50,6 +48,7 @@ type StaffUser = {
     name: string;
     rol: string;
     cargo: string;
+    firma_registrada: boolean;
 };
 
 type Recipient = {
@@ -289,12 +288,17 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 />
                                 <FormSelect
                                     id="firmante_id"
-                                    label="Firmante propuesto"
+                                    label="Firmante del PDF"
                                     value={form.data.firmante_id ?? 0}
-                                    options={usuarios.map((usuario) => ({ value: usuario.id, label: `${usuario.name} · ${usuario.cargo}` }))}
+                                    options={usuarios.map((usuario) => ({ value: usuario.id, label: `${usuario.name} · ${usuario.cargo}${usuario.firma_registrada ? '' : ' · falta registrar firma'}` }))}
                                     error={form.errors.firmante_id}
                                     onValueChange={(value) => form.setData('firmante_id', value || null)}
                                 />
+                                <p className="text-sm text-muted-foreground sm:col-span-2">
+                                    {usuarios.find((usuario) => usuario.id === form.data.firmante_id)?.firma_registrada
+                                        ? 'Se colocará la firma guardada en el perfil de la persona seleccionada.'
+                                        : 'La persona seleccionada debe guardar su firma escaneada en Mi perfil antes de emitir el PDF.'}
+                                </p>
                                 <Field id="fecha_documento" label="Fecha del documento" error={form.errors.fecha_documento}>
                                     <Input
                                         id="fecha_documento"
@@ -311,7 +315,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 </Field>
                                 {plantillaActual && (
                                     <p className="text-sm text-muted-foreground sm:col-span-2">
-                                        {plantillaActual.descripcion} {plantillaActual.requiere_firma_fisica ? 'Requiere firma física.' : plantillaActual.permite_no_firma ? 'Puede entregarse sin firma física.' : ''}
+                                        {plantillaActual.descripcion} El PDF incluirá la firma escaneada guardada en el perfil del firmante seleccionado.
                                     </p>
                                 )}
                                 {plantillas.length === 0 && (

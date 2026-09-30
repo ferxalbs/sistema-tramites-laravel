@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\TramiteMedioEntrega;
 use App\Services\Tramites\TramiteClassificationCatalog;
 use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Query\Builder;
@@ -42,7 +43,10 @@ class TramiteReportController extends Controller
                 'tipos' => $this->documentTypes(),
                 'estados' => config('tramites.estados'),
                 'revisores' => DB::table('users')->whereIn('rol', ['docente', 'administrador'])->where('activo', true)->orderBy('name')->get(['id', 'name']),
-                'medios' => DB::table('tramite_medios_entrega')->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
+                'medios' => DB::table('tramite_medios_entrega')
+                    ->whereIn('codigo', TramiteMedioEntrega::CODIGOS_DISPONIBLES)
+                    ->orderBy('nombre')
+                    ->get(['id', 'nombre']),
             ],
             'canExport' => $request->user()->rol === 'administrador',
         ]);

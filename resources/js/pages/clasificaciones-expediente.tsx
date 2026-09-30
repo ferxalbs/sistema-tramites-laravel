@@ -43,9 +43,11 @@ export default function ClasificacionesExpediente({
                     <CardHeader>
                         <CardTitle>Clasificaciones de expedientes</CardTitle>
                         <CardDescription>
-                            Los códigos y el requisito de estudiante se
-                            conservan. Una clasificación inactiva ya no puede
-                            seleccionarse al recibir un expediente.
+                            Estudiantil identifica solicitudes vinculadas a un
+                            estudiante o egresado. Administrativo reúne las
+                            gestiones internas y requerimientos generales. Los
+                            registros de la categoría anterior Institucional se
+                            conservarán bajo Administrativo.
                         </CardDescription>
                     </CardHeader>
                 </Card>

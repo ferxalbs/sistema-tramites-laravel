@@ -48,8 +48,7 @@ class AssistantStudentAccountController extends Controller
                     'id' => $user->id,
                     'nombre' => $user->name,
                     'email' => $user->email,
-                    'dni' => $user->dni === null ? null : str_repeat('•', max(0, mb_strlen($user->dni) - 2)).mb_substr($user->dni, -2),
-                    'codigo' => $user->perfilEstudiante?->codigo_estudiante,
+                    'dni' => $user->dni,
                     'programa' => $user->perfilEstudiante?->programa?->nombre,
                     'condicion' => $user->perfilEstudiante?->condicion_academica,
                     'estado' => $user->estado_cuenta,
@@ -124,7 +123,6 @@ class AssistantStudentAccountController extends Controller
                 'celular' => $user->celular,
                 'email' => $user->email,
                 'correo_alternativo' => $user->correo_alternativo,
-                'codigo_estudiante' => $profile?->codigo_estudiante,
                 'codigo_docente' => null,
                 'programa_estudio_id' => $profile?->programa_estudio_id,
                 'condicion_academica' => $profile?->condicion_academica,
@@ -168,7 +166,7 @@ class AssistantStudentAccountController extends Controller
     private function saveProfile(User $student, array $data): void
     {
         PerfilEstudiante::query()->updateOrCreate(['user_id' => $student->id], [
-            'codigo_estudiante' => $data['codigo_estudiante'],
+            'codigo_estudiante' => $data['dni'],
             'programa_estudio_id' => $data['programa_estudio_id'],
             'condicion_academica' => $data['condicion_academica'],
             'ciclo_actual' => $data['condicion_academica'] === 'Estudiante' ? ($data['ciclo_actual'] ?? null) : null,

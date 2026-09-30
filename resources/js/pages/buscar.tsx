@@ -3,10 +3,12 @@ import { Search } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
+import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { index as adminUsersIndex } from '@/routes/admin/users';
+import { edit as assistantStudentEdit } from '@/routes/assistant/students';
 import { index as searchIndex } from '@/routes/search';
 
 type Expediente = {
@@ -29,6 +31,7 @@ type Props = {
     query: string;
     status: 'empty' | 'short' | 'too_long' | 'ok';
     reviewer: boolean;
+    student: boolean;
     administrator: boolean;
     results: {
         expedientes: Expediente[];
@@ -37,7 +40,7 @@ type Props = {
     };
 };
 
-export default function Buscar({ query, status, reviewer, administrator, results }: Props) {
+export default function Buscar({ query, status, reviewer, student, administrator, results }: Props) {
     const [text, setText] = useState(query);
 
     function submit(event: FormEvent<HTMLFormElement>) {
@@ -81,7 +84,7 @@ export default function Buscar({ query, status, reviewer, administrator, results
                                 onChange={(event) =>
                                     setText(event.target.value)
                                 }
-                                placeholder="Código, referencia física, asunto, persona o documento"
+                                placeholder="Código, DNI, referencia física, asunto, persona o documento"
                                 className="flex-1"
                             />
                             <Button type="submit">
@@ -118,7 +121,9 @@ export default function Buscar({ query, status, reviewer, administrator, results
                                                                       expediente.id,
                                                               },
                                                           )
-                                                        : TramiteController.show(
+                                                        : student
+                                                          ? TramiteEstudianteController.show({ tramite: expediente.id })
+                                                          : TramiteController.show(
                                                               {
                                                                   tramite:
                                                                       expediente.id,
@@ -138,7 +143,7 @@ export default function Buscar({ query, status, reviewer, administrator, results
                                 </ul>
                             </CardContent>
                         </Card>
-                        {!reviewer && (
+                        {!reviewer && !student && (
                             <>
                                 <Card>
                                     <CardHeader>
@@ -153,7 +158,7 @@ export default function Buscar({ query, status, reviewer, administrator, results
                                                 >
                                                     {administrator ? (
                                                         <Link className="font-medium text-primary hover:underline" href={adminUsersIndex({ query: { selected: person.id } })}>{person.name}</Link>
-                                                    ) : <p className="font-medium">{person.name}</p>}
+                                                    ) : <Link className="font-medium text-primary hover:underline" href={assistantStudentEdit({ user: person.id })}>{person.name}</Link>}
                                                     <p className="text-sm text-muted-foreground">
                                                         {person.rol}
                                                     </p>

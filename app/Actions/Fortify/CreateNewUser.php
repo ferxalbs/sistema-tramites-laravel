@@ -53,7 +53,7 @@ class CreateNewUser implements CreatesNewUsers
             ],
             'programa_estudio_id' => ['required', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
             'condicion_academica' => ['required', Rule::in(['Estudiante', 'Egresado'])],
-            'ciclo_actual' => [Rule::requiredIf(($input['condicion_academica'] ?? '') === 'Estudiante'), 'nullable', 'integer', 'between:1,10'],
+            'ciclo_actual' => [Rule::requiredIf(($input['condicion_academica'] ?? '') === 'Estudiante'), 'nullable', 'integer', 'between:1,6'],
             'anio_egreso' => [Rule::requiredIf(($input['condicion_academica'] ?? '') === 'Egresado'), 'nullable', 'integer', 'between:1950,'.now()->year],
             'direccion_residencia' => ['nullable', 'string', 'max:255'],
             'acepta_terminos' => ['accepted'],

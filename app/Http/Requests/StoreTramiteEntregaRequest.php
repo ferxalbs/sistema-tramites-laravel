@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Models\TramiteMedioEntrega;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,7 +28,7 @@ class StoreTramiteEntregaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'medio_entrega_id' => ['required', 'integer', Rule::exists('tramite_medios_entrega', 'id')->where('activo', true)],
+            'medio_entrega_id' => ['required', 'integer', Rule::exists('tramite_medios_entrega', 'id')->where(fn ($query) => $query->whereIn('codigo', TramiteMedioEntrega::CODIGOS_DISPONIBLES))],
             'receptor_nombre' => ['required', 'string', 'min:3', 'max:160'],
             'receptor_documento' => ['nullable', 'string', 'max:30'],
             'receptor_tipo' => ['required', 'string', Rule::in([

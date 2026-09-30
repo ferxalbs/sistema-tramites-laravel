@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import AppLogoIcon from '@/components/app-logo-icon';
-import SupportWidget from '@/components/support-widget';
+import HelpTools from '@/components/help-tools';
 import { home } from '@/routes';
 
 export default function AuthLayout({
@@ -40,7 +40,7 @@ export default function AuthLayout({
                 </div>
             </div>
 
-            <SupportWidget />
+            <HelpTools />
         </div>
     );
 }

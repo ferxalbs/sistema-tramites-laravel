@@ -113,7 +113,7 @@ export default function TramitesIndex({ tramites, filters, estados, resumen }: P
                                     className="pl-9"
                                     value={query}
                                     onChange={(event) => setQuery(event.target.value)}
-                                    placeholder="Código, referencia física, persona o asunto"
+                                    placeholder="Código, referencia física, persona o sumilla"
                                 />
                             </div>
 
@@ -155,9 +155,9 @@ export default function TramitesIndex({ tramites, filters, estados, resumen }: P
                                 <table className="w-full min-w-[48rem] text-left text-sm">
                                     <thead className="border-b text-xs text-muted-foreground">
                                         <tr>
-                                            <th className="px-3 py-3 font-medium">Código</th>
+                                            <th className="px-3 py-3 font-medium">Código interno</th>
                                             <th className="px-3 py-3 font-medium">Persona solicitante</th>
-                                            <th className="px-3 py-3 font-medium">Asunto</th>
+                                            <th className="px-3 py-3 font-medium">Resumen / sumilla</th>
                                             <th className="px-3 py-3 font-medium">Tipo</th>
                                             <th className="px-3 py-3 font-medium">Recepción</th>
                                             <th className="px-3 py-3 font-medium">Estado</th>

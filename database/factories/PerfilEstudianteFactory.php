@@ -24,7 +24,7 @@ class PerfilEstudianteFactory extends Factory
             'programa_estudio_id' => ProgramaEstudio::factory(),
             'codigo_estudiante' => null,
             'condicion_academica' => 'Estudiante',
-            'ciclo_actual' => fake()->numberBetween(1, 10),
+            'ciclo_actual' => fake()->numberBetween(1, 6),
             'anio_egreso' => null,
             'direccion_residencia' => null,
         ];

@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'programa_estudio_id',
     'destino_tipo',
     'destino_nombre',
+    'destino_docente_id',
     'asunto',
     'descripcion',
     'prioridad',

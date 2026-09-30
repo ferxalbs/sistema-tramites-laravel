@@ -57,7 +57,7 @@ class SaveTramiteDraft
                     throw ValidationException::withMessages(['plantilla_id' => 'La plantilla de Memorando no tiene modalidad válida.']);
                 }
             } elseif ($plantilla->modalidad !== null) {
-                throw ValidationException::withMessages(['plantilla_id' => 'La plantilla de Informe no admite modalidad.']);
+                throw ValidationException::withMessages(['plantilla_id' => 'Esta plantilla no admite modalidad.']);
             }
 
             $estadoActual = DB::table('tramites')->where('id', $tramite->id)->value('estado');
@@ -397,7 +397,7 @@ class SaveTramiteDraft
         $estudiante = DB::table('users')->where('id', $tramite->getAttribute('propietario_id'))
             ->where('rol', 'estudiante')->first(['id', 'name', 'dni']);
         $perfil = $estudiante === null ? null : DB::table('perfiles_estudiante')
-            ->where('user_id', $estudiante->id)->first(['codigo_estudiante', 'ciclo_actual', 'anio_egreso']);
+            ->where('user_id', $estudiante->id)->first(['ciclo_actual', 'anio_egreso']);
         $programa = DB::table('programas_estudio')->where('id', $tramite->getAttribute('programa_estudio_id'))
             ->value('nombre');
         $usuarios = DB::table('users as usuario')
@@ -419,7 +419,7 @@ class SaveTramiteDraft
         foreach ([
             'Estudiante' => $estudiante === null ? null : $estudiante->name,
             'DNI' => $estudiante === null ? null : $estudiante->dni,
-            'Código' => $perfil === null ? null : $perfil->codigo_estudiante,
+            'Código' => $estudiante === null ? null : $estudiante->dni,
             'Ciclo' => $perfil === null ? null : $perfil->ciclo_actual,
             'Año de egreso' => $perfil === null ? null : $perfil->anio_egreso,
         ] as $etiqueta => $valor) {
@@ -437,7 +437,7 @@ class SaveTramiteDraft
             'PROGRAMA_ESTUDIO' => (string) ($programa ?? ''),
             'ESTUDIANTE_NOMBRE' => (string) ($estudiante === null ? '' : $estudiante->name),
             'DNI' => (string) ($estudiante === null ? '' : $estudiante->dni),
-            'CODIGO_ESTUDIANTE' => (string) ($perfil === null ? '' : $perfil->codigo_estudiante),
+            'CODIGO_ESTUDIANTE' => (string) ($estudiante === null ? '' : $estudiante->dni),
             'CICLO' => (string) ($perfil === null ? '' : $perfil->ciclo_actual),
             'ANIO_EGRESO' => (string) ($perfil === null ? '' : $perfil->anio_egreso),
             'DESTINATARIO_NOMBRE' => $destinatario === null ? '' : $nombre($destinatario),

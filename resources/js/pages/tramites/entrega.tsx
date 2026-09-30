@@ -22,7 +22,7 @@ type EvidenceType = {
 
 type Props = {
     tramite: { id: number; codigo: string; asunto: string; estado: string; estado_label: string };
-    documento: { id: number; numero: string; requiere_firma: boolean; permite_no_firma: boolean } | null;
+    documento: { id: number; numero: string; requiere_firma: boolean; firma_perfil_incluida: boolean; permite_no_firma: boolean } | null;
     firma: {
         no_requiere_firma: boolean;
         fecha_firma: string | null;
@@ -99,7 +99,9 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                             <div className="rounded-xl border p-4 text-sm">
                                 <p className="font-medium">Documento oficial {documento.numero}</p>
                                 <p className="mt-1 text-muted-foreground">
-                                    Firma física {documento.requiere_firma ? 'requerida' : 'no requerida'}.
+                                    {documento.firma_perfil_incluida
+                                        ? 'La firma escaneada del firmante está incluida en el PDF.'
+                                        : `Firma física ${documento.requiere_firma ? 'requerida' : 'no requerida'}.`}
                                 </p>
                             </div>
                         ) : (
@@ -161,7 +163,13 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
 
                         {firma && (
                             <div className="rounded-xl border bg-muted/20 p-4 text-sm">
-                                <p className="font-medium">{firma.no_requiere_firma ? 'La firma física no aplica.' : 'Firma registrada.'}</p>
+                                <p className="font-medium">
+                                    {documento?.firma_perfil_incluida
+                                        ? 'La firma escaneada del perfil está incluida en el PDF.'
+                                        : firma.no_requiere_firma
+                                          ? 'La firma física no aplica.'
+                                          : 'Firma registrada.'}
+                                </p>
                                 {firma.fecha_firma && <p className="mt-1 text-muted-foreground">{formatDateTime(firma.fecha_firma)}</p>}
                                 {firma.observacion && <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{firma.observacion}</p>}
                                 {firma.url_descarga && (

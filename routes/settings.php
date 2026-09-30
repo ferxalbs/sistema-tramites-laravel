@@ -10,6 +10,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('settings/profile/signature', [ProfileController::class, 'uploadSignature'])->name('profile.signature');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

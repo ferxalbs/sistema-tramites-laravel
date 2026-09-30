@@ -1,7 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    AlertCircle,
-    AlertTriangle,
     ArrowRight,
     Bell,
     CheckCircle2,
@@ -74,8 +72,6 @@ type Props = {
     summary: {
         total: number;
         cerrados: number;
-        proximos: number;
-        vencidos: number;
         horas_promedio_atencion: number | null;
     };
     states: StateCount[];
@@ -344,7 +340,7 @@ export default function Dashboard({
 
                 {/* Metrics Section */}
                 <section
-                    className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                    className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
                     aria-label="Indicadores de expedientes"
                 >
                     <Metric
@@ -366,18 +362,6 @@ export default function Dashboard({
                         description="Finalizados o atendidos"
                     />
                     <Metric
-                        label="Por vencer"
-                        value={summary.proximos}
-                        icon={AlertCircle}
-                        description="Plazos próximos a vencer"
-                    />
-                    <Metric
-                        label="Vencidos"
-                        value={summary.vencidos}
-                        icon={AlertTriangle}
-                        description="Excedieron plazo estimado"
-                    />
-                    <Metric
                         label="Tiempo medio"
                         value={
                             summary.horas_promedio_atencion === null
@@ -394,10 +378,6 @@ export default function Dashboard({
                         description="Mensajes sin leer"
                     />
                 </section>
-
-                <p className="text-xs text-muted-foreground">
-                    Los indicadores de vencimiento corresponden a plazos estimados referenciales conforme a normativa.
-                </p>
 
                 {/* State Distribution & Recent Activity */}
                 <div className="grid gap-6 lg:grid-cols-2">

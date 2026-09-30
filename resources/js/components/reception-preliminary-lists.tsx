@@ -39,17 +39,17 @@ const sections: Array<{ kind: Kind; title: string; description: string }> = [
     {
         kind: 'personas_relacionadas',
         title: 'Personas relacionadas',
-        description: 'Registra a las personas vinculadas al expediente.',
+        description: 'Otras personas vinculadas al expediente, además del solicitante.',
     },
     {
         kind: 'destinatarios',
         title: 'Destinatarios preliminares',
-        description: 'El primer destinatario será el principal.',
+        description: 'Personas a quienes podría dirigirse la respuesta. Se confirmarán al preparar el borrador.',
     },
     {
         kind: 'personas_mencionadas',
         title: 'Personas mencionadas',
-        description: 'Registra otras personas citadas en el documento.',
+        description: 'Otras personas citadas en el documento recibido.',
     },
 ];
 
@@ -84,6 +84,18 @@ export default function ReceptionPreliminaryLists({
             id: nextId.current++,
         })),
     }));
+    const [expanded, setExpanded] = useState<Record<Kind, boolean>>(() => ({
+        personas_relacionadas: initial.personas_relacionadas.length > 0,
+        destinatarios: initial.destinatarios.length > 0,
+        personas_mencionadas: initial.personas_mencionadas.length > 0,
+    }));
+    const required: Record<Kind, boolean> = {
+        personas_relacionadas: requisitos.personas_relacionadas,
+        destinatarios: requisitos.destinatarios_multiples,
+        personas_mencionadas: false,
+    };
+    const hasError = (kind: Kind) => Object.keys(errors).some((key) => key === kind || key.startsWith(`${kind}.`));
+    const isOpen = (kind: Kind) => required[kind] || hasError(kind) || rows[kind].length > 0 || expanded[kind];
 
     function add(kind: Kind) {
         setRows((current) => ({
@@ -120,19 +132,23 @@ export default function ReceptionPreliminaryLists({
 
     return sections.map(({ kind, title, description }) => (
         <Card key={kind}>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>
-                    {description}
-                    {kind === 'personas_relacionadas' &&
-                        requisitos.personas_relacionadas &&
-                        ' Se exige al menos una.'}
-                    {kind === 'destinatarios' &&
-                        requisitos.destinatarios_multiples &&
-                        ' Se exigen al menos dos.'}
-                </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                    <CardTitle>{title} {required[kind] ? '(obligatorio para este tipo)' : '(opcional)'}</CardTitle>
+                    {isOpen(kind) && <CardDescription>
+                        {description}
+                        {kind === 'personas_relacionadas' && requisitos.personas_relacionadas && ' Se exige al menos una.'}
+                        {kind === 'destinatarios' && requisitos.destinatarios_multiples && ' Se exigen al menos dos.'}
+                        {!required[kind] && ' Puede dejarse vacío.'}
+                    </CardDescription>}
+                </div>
+                {!required[kind] && !hasError(kind) && rows[kind].length === 0 && (
+                    <Button type="button" variant="outline" size="sm" aria-expanded={isOpen(kind)} onClick={() => setExpanded((current) => ({ ...current, [kind]: !current[kind] }))}>
+                        {isOpen(kind) ? 'Ocultar' : 'Mostrar'}
+                    </Button>
+                )}
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className={isOpen(kind) ? 'space-y-4' : 'hidden'}>
                 {rows[kind].map((entry, index) => {
                     const prefix = `${kind}[${index}]`;
                     const errorPrefix = `${kind}.${index}`;
