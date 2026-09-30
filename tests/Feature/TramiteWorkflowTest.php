@@ -443,7 +443,10 @@ test('template fields are versioned and all active values enter immutable draft 
         'lugar' => 'Lima', 'asunto' => 'Informe de prueba',
         'contenido_principal' => 'Contenido de prueba local.', 'preparar' => false,
         'destinatarios' => [['nombres' => 'Ana', 'apellidos' => 'Ruiz', 'cargo' => 'Coordinadora', 'principal' => true]],
-        'personas_mencionadas' => [['nombres' => 'José', 'apellidos' => 'Torres', 'cargo' => 'Secretario']],
+        'personas_mencionadas' => [
+            ['nombres' => 'José', 'apellidos' => 'Torres', 'cargo' => 'Secretario', 'dni' => '87654321'],
+            ['nombres' => 'Ana', 'apellidos' => 'Sin DNI', 'cargo' => 'Invitada'],
+        ],
         'campos' => ['TURNO' => 'Mañana', 'ENCABEZADO_INSTITUCIONAL' => 'Instituto local'],
     ];
     $this->actingAs($assistant)->get(route('tramites.borradores.create', $tramite))->assertOk()
@@ -462,6 +465,10 @@ test('template fields are versioned and all active values enter immutable draft 
     $this->post(route('tramites.borradores.store', $tramite), [
         ...$payload, 'campos' => ['ESTUDIANTE_NOMBRE' => 'Falsificado'],
     ])->assertSessionHasErrors('campos');
+    $this->post(route('tramites.borradores.store', $tramite), [
+        ...$payload,
+        'personas_mencionadas' => [['nombres' => 'José', 'dni' => '123']],
+    ])->assertSessionHasErrors('personas_mencionadas.0.dni');
     $this->post(route('tramites.borradores.store', $tramite), $payload)
         ->assertRedirect(route('tramites.show', $tramite));
     $draft = $tramite->borradores()->sole();
@@ -469,6 +476,10 @@ test('template fields are versioned and all active values enter immutable draft 
         ->join('tramite_plantilla_campos as field', 'field.id', '=', 'value.campo_id')
         ->where('value.borrador_id', $draft->id)->pluck('value.valor', 'field.clave_variable');
     expect($draft->contenido_renderizado)->toContain('Mañana')
+        ->and($draft->personas_mencionadas)->toBe([
+            ['nombres' => 'José', 'apellidos' => 'Torres', 'cargo' => 'Secretario', 'dni' => '87654321'],
+            ['nombres' => 'Ana', 'apellidos' => 'Sin DNI', 'cargo' => 'Invitada', 'dni' => null],
+        ])
         ->and($values)->toHaveCount(26)
         ->and($values['TURNO'])->toBe('Mañana')
         ->and($values['ESTUDIANTE_NOMBRE'])->toBe('María Estudiante')
@@ -479,7 +490,7 @@ test('template fields are versioned and all active values enter immutable draft 
         ->and($values['DESTINATARIO_NOMBRE'])->toBe('Ana Ruiz')
         ->and($values['DESTINATARIO_CARGO'])->toBe('Coordinadora')
         ->and($values['LISTA_DESTINATARIOS'])->toBe('Ana Ruiz — Coordinadora')
-        ->and($values['LISTA_PERSONAS_MENCIONADAS'])->toBe('José Torres — Secretario')
+        ->and($values['LISTA_PERSONAS_MENCIONADAS'])->toBe('José Torres — Secretario DNI: 87654321; Ana Sin DNI — Invitada')
         ->and($values['REMITENTE_CARGO'])->toBe('Director General')
         ->and($values['FIRMANTE_CARGO'])->toBe('Docente')
         ->and($values['LUGAR_FECHA'])->toContain('Lima, ')
@@ -513,10 +524,15 @@ test('template fields are versioned and all active values enter immutable draft 
         ->assertInertia(fn (Assert $page) => $page->component('tramites/borrador-preview')
             ->where('borrador.version', 1)
             ->where('borrador.actual', false)
+            ->where('borrador.puede_pdf', true)
             ->where('borrador.contenido', $draft->contenido_renderizado));
     $otherTramite = Tramite::factory()->create(['estado' => 'digitalizado']);
     $this->get(route('tramites.borradores.show', [$otherTramite, $draft]))->assertNotFound();
     $this->actingAs($admin)->get($previewUrl)->assertOk();
+    $draft->update(['contenido_plantilla_snapshot' => null, 'contenido_renderizado' => null]);
+    $this->actingAs($assistant)->get($previewUrl)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('borrador.puede_pdf', false));
+    $this->get(route('tramites.borradores.pdf', [$tramite, $draft]))->assertStatus(409);
     $this->actingAs($admin)->patch(route('admin.templates.fields.update', [$version, DB::table('tramite_plantilla_campos')
         ->where('plantilla_id', $version->id)->where('clave_variable', 'TURNO')->value('id')]), $changes)
         ->assertStatus(409);
@@ -1684,6 +1700,38 @@ test('official document issuance consumes failed numbers and verifies the privat
         $rondaId = $ronda->id;
         $this->actingAs($assistant);
 
+        $seriesBeforeDraftPreview = DB::table('tramite_series_documentales')->count();
+        $seriesCountersBeforeDraftPreview = DB::table('tramite_series_documentales')
+            ->pluck('ultimo_correlativo', 'id')->all();
+        $numbersBeforeDraftPreview = DB::table('tramite_numeraciones_documentales')->count();
+        $finalsBeforeDraftPreview = DB::table('tramite_documentos_finales')->count();
+        $eventsBeforeDraftPreview = DB::table('tramite_eventos')->where('tramite_id', $tramiteId)->count();
+        $filesBeforeDraftPreview = Storage::disk('local')->allFiles();
+        $draftPreview = $this->get(route('tramites.borradores.pdf', [$tramiteId, $borradorId]))
+            ->assertOk();
+        $marcaVistaPrevia = (string) iconv('UTF-8', 'Windows-1252//TRANSLIT', 'Borrador sin numeración oficial');
+        expect($draftPreview->headers->get('Content-Type'))->toContain('application/pdf')
+            ->and($draftPreview->headers->get('Content-Disposition'))->toContain('inline;')
+            ->and($draftPreview->headers->get('Cache-Control'))->toContain('private')
+            ->and($draftPreview->headers->get('Cache-Control'))->toContain('no-store')
+            ->and($draftPreview->getContent())->toStartWith('%PDF-')
+            ->and($draftPreview->getContent())->toContain('%%EOF')
+            ->and($draftPreview->getContent())->toContain($marcaVistaPrevia)
+            ->and(DB::table('tramite_series_documentales')->count())->toBe($seriesBeforeDraftPreview)
+            ->and(DB::table('tramite_series_documentales')->pluck('ultimo_correlativo', 'id')->all())
+            ->toBe($seriesCountersBeforeDraftPreview)
+            ->and(DB::table('tramite_numeraciones_documentales')->count())->toBe($numbersBeforeDraftPreview)
+            ->and(DB::table('tramite_documentos_finales')->count())->toBe($finalsBeforeDraftPreview)
+            ->and(DB::table('tramite_eventos')->where('tramite_id', $tramiteId)->count())->toBe($eventsBeforeDraftPreview)
+            ->and(Storage::disk('local')->allFiles())->toBe($filesBeforeDraftPreview);
+        $this->actingAs($student)
+            ->get(route('tramites.borradores.pdf', [$tramiteId, $borradorId]))
+            ->assertForbidden();
+        $this->actingAs($assistant);
+        $otherTramite = Tramite::factory()->create();
+        $this->get(route('tramites.borradores.pdf', [$otherTramite, $borradorId]))
+            ->assertNotFound();
+
         $this->get(route('tramites.documento-final.preview', $tramiteId))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -2166,7 +2214,7 @@ test('administrator annuls a pending delivery and reopens a closed case without 
 });
 
 /** @return array{User, Tramite} */
-function createApprovedTramiteForNumberingTest(): array
+function createApprovedTramiteForNumberingTest(string $tipoDocumentoSalida = 'informe', ?string $modalidad = null): array
 {
     Storage::fake('local');
     config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
@@ -2188,7 +2236,13 @@ function createApprovedTramiteForNumberingTest(): array
     imagedestroy($signature);
     Storage::disk('local')->put('firmas-perfil/'.$reviewer->id.'.jpg', (string) $signatureBytes);
     $tramite = Tramite::factory()->create(['estado' => 'aprobado', 'recibido_por' => $assistant->id]);
-    $plantilla = TramitePlantilla::factory()->create(['tipo_documento_salida' => 'informe', 'modalidad' => 'unica']);
+    $plantilla = TramitePlantilla::factory()->create([
+        'tipo_documento_salida' => $tipoDocumentoSalida,
+        'modalidad' => $modalidad ?? 'unica',
+        'nombre' => $tipoDocumentoSalida === 'memorando'
+            ? ($modalidad === 'multiple' ? 'MEMORANDO MULTIPLE' : 'MEMORANDO')
+            : 'INFORME',
+    ]);
     $borrador = TramiteBorrador::factory()->create([
         'tramite_id' => $tramite->id,
         'plantilla_id' => $plantilla->id,
@@ -2214,6 +2268,27 @@ function createApprovedTramiteForNumberingTest(): array
 
     return [$assistant, $tramite];
 }
+
+test('simple and multiple memorandum series keep distinct configured numbers', function () {
+    [$simpleAssistant, $simpleTramite] = createApprovedTramiteForNumberingTest('memorando', 'simple');
+    $this->actingAs($simpleAssistant)
+        ->post(route('tramites.documento-final.emit', $simpleTramite), ['confirmar' => true])
+        ->assertRedirect(route('tramites.show', $simpleTramite));
+    $simpleNumber = TramiteDocumentoFinal::query()->where('tramite_id', $simpleTramite->id)->sole()->numero_documento;
+
+    [$multipleAssistant, $multipleTramite] = createApprovedTramiteForNumberingTest('memorando', 'multiple');
+    $this->actingAs($multipleAssistant)
+        ->post(route('tramites.documento-final.emit', $multipleTramite), ['confirmar' => true])
+        ->assertRedirect(route('tramites.show', $multipleTramite));
+    $multipleNumber = TramiteDocumentoFinal::query()->where('tramite_id', $multipleTramite->id)->sole()->numero_documento;
+    $anio = now()->format('Y');
+
+    expect($simpleNumber)->toBe('001-DSI-HACH-IESTP”MSC”-'.$anio)
+        ->and($multipleNumber)->toBe('001/DSI/HACH/IESTP “MSC”-'.$anio)
+        ->and($multipleNumber)->not->toBe($simpleNumber)
+        ->and(TramiteDocumentoFinal::query()->where('numero_documento', $simpleNumber)->count())->toBe(1)
+        ->and(TramiteDocumentoFinal::query()->where('numero_documento', $multipleNumber)->count())->toBe(1);
+});
 
 test('administrator substitutes an issued document without reusing its number or exposing its private reason', function () {
     [$assistant, $tramite] = createApprovedTramiteForNumberingTest();
@@ -3186,6 +3261,87 @@ test('official PDF draws a QR for the configured public verification URL and omi
         ->not->toBe($pdfConOtraUrl['bytes']);
     expect(substr_count($pdf['bytes'], ' re f'))->toBe($modulosOscuros + 1);
     expect($pdfSinUrlPublica['bytes'])->not->toContain('463 62 82 82 re f');
+});
+
+test('memorandum layout follows the canonical output type when its template is renamed', function () {
+    $pdf = app(PdfDocumentGenerator::class)->generate([
+        'institucion' => 'Instituto Seoane',
+        'tipo_documento' => 'Autorización de ingreso',
+        'tipo_documento_salida' => 'memorando',
+        'modalidad_documento' => 'multiple',
+        'numero' => '005 / DSI / HACH / IESTP “MSC”-2026',
+        'codigo_expediente' => 'EXP-TIPO-000001',
+        'fecha_documento' => '28/05/2026',
+        'lugar' => 'Lima',
+        'asunto' => 'Comunicación institucional',
+        'destinatarios' => ['Área académica', 'Área administrativa'],
+        'remitente' => 'Gestión documentaria',
+        'contenido_principal' => 'Contenido del memorando.',
+        'personas' => [],
+        'firmante' => 'Dirección académica',
+        'codigo_verificacion' => '',
+    ]);
+
+    $titulo = (string) iconv('UTF-8', 'Windows-1252//TRANSLIT', 'MEMORANDO MÚLTIPLE');
+
+    expect($pdf['bytes'])->toContain($titulo);
+});
+
+test('long memorandum keeps its closing and signature on the final page', function () {
+    $documento = [
+        'institucion' => 'Instituto Seoane',
+        'tipo_documento' => 'MEMORANDO MULTIPLE',
+        'numero' => '005 / DSI / HACH / IESTP “MSC”-2026',
+        'codigo_expediente' => 'EXP-LARGO-000001',
+        'fecha_documento' => '28/05/2026',
+        'lugar' => 'San Juan de Lurigancho',
+        'asunto' => 'Justificación por tardanza',
+        'destinatarios' => ['Docente 1', 'Docente 2', 'Docente 3'],
+        'remitente_nombre' => 'Henry Arteaga Chauca',
+        'remitente_cargo' => 'Coordinador Academico',
+        'introduccion' => str_repeat('Texto extenso de justificación para comprobar la paginación del memorando. ', 80),
+        'contenido_principal' => str_repeat('El contenido debe conservar el orden y permitir la lectura completa del expediente. ', 80),
+        'cierre' => 'Agradeciendo la atención prestada, quedo de ustedes.',
+        'personas' => [],
+        'personas_detalle' => array_map(static fn (int $indice): array => [
+            'nombres' => 'Persona '.$indice,
+            'apellidos' => 'Mencionada',
+            'cargo' => 'Docente de prueba',
+            'dni' => $indice < 10 ? '1000000'.$indice : null,
+        ], range(1, 20)),
+        'firmante_nombre' => 'Henry Arteaga Chauca',
+        'firmante_cargo' => 'Coordinador Academico',
+        'codigo_verificacion' => '',
+    ];
+    $pdf = app(PdfDocumentGenerator::class)->generate($documento);
+    $pdfConCodigo = app(PdfDocumentGenerator::class)->generate([
+        ...$documento,
+        'codigo_verificacion' => 'AAAA-BBBB-CCCC-DDDD',
+    ]);
+
+    preg_match_all('/\/Contents (\d+) 0 R/', $pdf['bytes'], $referencias);
+    $ultimoContenido = end($referencias[1]);
+    $ultimoObjeto = is_string($ultimoContenido)
+        ? preg_quote($ultimoContenido, '/')
+        : '';
+    preg_match('/'.$ultimoObjeto.' 0 obj\n<< \/Length \d+ >>\nstream\n(.*?)\nendstream/s', $pdf['bytes'], $coincidencia);
+    preg_match_all('/\d+ 0 obj\n<< \/Length \d+ >>\nstream\n(.*?)\nendstream/s', $pdf['bytes'], $streams);
+    preg_match('/BT \/F1 10 Tf 1 0 0 1 [0-9.]+ ([0-9.]+) Tm \(Atentamente\)/', $coincidencia[1] ?? '', $atentamente);
+    preg_match('/BT \/F1 9 Tf 1 0 0 1 [0-9.]+ ([0-9.]+) Tm \(____/', $coincidencia[1] ?? '', $lineaFirma);
+    $marcaVistaPrevia = (string) iconv('UTF-8', 'Windows-1252//TRANSLIT', 'Borrador sin numeración oficial');
+
+    expect($pdf['paginas'])->toBeGreaterThan(1)
+        ->and($pdfConCodigo['paginas'])->toBe($pdf['paginas'])
+        ->and($pdf['bytes'])->toStartWith('%PDF-')
+        ->and($pdf['bytes'])->toContain('%%EOF')
+        ->and($pdf['bytes'])->toContain($marcaVistaPrevia)
+        ->and($coincidencia[1] ?? '')->toContain('Atentamente')
+        ->toContain('Henry Arteaga Chauca')
+        ->toContain('Coordinador Academico')
+        ->and(array_filter($streams[1] ?? [], static fn (string $stream): bool => str_contains($stream, 'Atentamente')))
+        ->toHaveCount(1)
+        ->and((float) ($atentamente[1] ?? 0))->toBeGreaterThan(200)
+        ->and((float) ($lineaFirma[1] ?? 0))->toBeGreaterThan(156);
 });
 
 test('public document verification normalizes valid codes and exposes only approved metadata', function () {

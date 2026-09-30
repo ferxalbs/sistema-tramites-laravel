@@ -230,7 +230,7 @@ class SaveTramiteDraft
     /**
      * @param  array<string, mixed>  $datos
      * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, correo: ?string, principal: bool}>  $destinatarios
-     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string}>  $personas
+     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, dni: ?string}>  $personas
      * @param  array<int, array{id: int, nombre: string, categoria: string, version: int}>  $adjuntos
      * @param  array<int, array{id: int, clave: string, valor: string}>  $campos
      */
@@ -299,7 +299,7 @@ class SaveTramiteDraft
     /**
      * @param  array<string, mixed>  $datos
      * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, correo: ?string, principal: bool}>  $destinatarios
-     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string}>  $personas
+     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, dni: ?string}>  $personas
      * @param  array<int, array{id: int, nombre: string, categoria: string, version: int}>  $adjuntos
      * @param  array<int, array{id: int, clave: string, valor: string}>  $campos
      */
@@ -328,7 +328,7 @@ class SaveTramiteDraft
     /**
      * @param  array<string, mixed>  $datos
      * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, correo: ?string, principal: bool}>  $destinatarios
-     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string}>  $personas
+     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, dni: ?string}>  $personas
      * @param  array<int, array{id: int, nombre: string, categoria: string, version: int}>  $adjuntos
      * @param  array<string, mixed>  $entrada
      * @return array<int, array{id: int, clave: string, valor: string}>
@@ -388,7 +388,7 @@ class SaveTramiteDraft
     /**
      * @param  array<string, mixed>  $datos
      * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, correo: ?string, principal: bool}>  $destinatarios
-     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string}>  $personas
+     * @param  array<int, array{nombres: string, apellidos: ?string, cargo: ?string, dni: ?string}>  $personas
      * @param  array<int, array{id: int, nombre: string, categoria: string, version: int}>  $adjuntos
      * @return array<string, string>
      */
@@ -443,7 +443,13 @@ class SaveTramiteDraft
             'DESTINATARIO_NOMBRE' => $destinatario === null ? '' : $nombre($destinatario),
             'DESTINATARIO_CARGO' => (string) ($destinatario['cargo'] ?? ''),
             'LISTA_DESTINATARIOS' => implode('; ', array_map($nombreConCargo, $destinatarios)),
-            'LISTA_PERSONAS_MENCIONADAS' => implode('; ', array_map($nombreConCargo, $personas)),
+            'LISTA_PERSONAS_MENCIONADAS' => implode('; ', array_map(
+                fn (array $persona): string => trim(implode(' ', array_filter([
+                    $nombreConCargo($persona),
+                    isset($persona['dni']) && $persona['dni'] !== '' ? 'DNI: '.$persona['dni'] : null,
+                ]))),
+                $personas,
+            )),
             'DOCUMENTOS_ADJUNTOS' => implode('; ', array_map(static fn (array $adjunto): string => $adjunto['nombre']
                 .' — '.str_replace('_', ' ', $adjunto['categoria']).' · versión '.$adjunto['version'], $adjuntos)),
             'DATOS_ESTUDIANTE_OPCIONALES' => implode('; ', $academicos),
@@ -583,7 +589,7 @@ class SaveTramiteDraft
     }
 
     /**
-     * @return array<int, array{nombres: string, apellidos: ?string, cargo: ?string}>
+     * @return array<int, array{nombres: string, apellidos: ?string, cargo: ?string, dni: ?string}>
      */
     private function personasMencionadas(mixed $personas): array
     {
@@ -595,6 +601,7 @@ class SaveTramiteDraft
             'nombres' => trim(strip_tags((string) ($persona['nombres'] ?? ''))),
             'apellidos' => $this->textoOpcional($persona['apellidos'] ?? null),
             'cargo' => $this->textoOpcional($persona['cargo'] ?? null),
+            'dni' => $this->dniOpcional($persona['dni'] ?? null),
         ])->filter(fn (array $persona): bool => $persona['nombres'] !== '')->values()->all();
     }
 
@@ -631,5 +638,12 @@ class SaveTramiteDraft
         $texto = trim(strip_tags((string) ($valor ?? '')));
 
         return $texto === '' ? null : $texto;
+    }
+
+    private function dniOpcional(mixed $valor): ?string
+    {
+        $dni = preg_replace('/\D+/', '', (string) ($valor ?? '')) ?? '';
+
+        return $dni === '' ? null : mb_substr($dni, 0, 8);
     }
 }

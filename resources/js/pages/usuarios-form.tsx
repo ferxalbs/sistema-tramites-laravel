@@ -15,6 +15,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import {
     Select,
@@ -777,13 +778,12 @@ function AccountActions({
                                     <input type="hidden" name="accion" value="deactivate" />
                                     <label className="grid gap-1 text-sm" htmlFor="motivo-desactivacion">
                                         Motivo de desactivación
-                                        <textarea
+                                        <Textarea
                                             id="motivo-desactivacion"
                                             name="motivo"
                                             required
                                             maxLength={500}
                                             rows={3}
-                                            className="w-full rounded-xl border border-input bg-background p-3"
                                         />
                                     </label>
                                     <InputError message={errors.motivo || errors.accion} />
@@ -806,13 +806,12 @@ function AccountActions({
                                     <input type="hidden" name="accion" value="reject" />
                                     <label className="grid gap-1 text-sm" htmlFor="motivo-rechazo">
                                         Motivo de rechazo
-                                        <textarea
+                                        <Textarea
                                             id="motivo-rechazo"
                                             name="motivo"
                                             required
                                             maxLength={500}
                                             rows={3}
-                                            className="w-full rounded-xl border border-input bg-background p-3"
                                         />
                                     </label>
                                     <InputError message={errors.motivo || errors.accion} />

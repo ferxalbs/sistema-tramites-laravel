@@ -22,6 +22,7 @@ type Props = {
         creador: string | null;
         created_at: string | null;
         contenido: string | null;
+        puede_pdf: boolean;
     };
 };
 
@@ -68,10 +69,15 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                         <p className="font-medium">
                             BORRADOR SIN NUMERACIÓN OFICIAL
                         </p>
-                        {borrador.contenido ? (
-                            <p className="break-words whitespace-pre-wrap">
-                                {borrador.contenido}
-                            </p>
+                        {borrador.puede_pdf ? (
+                            <iframe
+                                title="Vista previa PDF del borrador guardado"
+                                src={`/tramites/${tramite.id}/borradores/${borrador.id}/pdf`}
+                                sandbox="allow-same-origin"
+                                className="h-[720px] w-full rounded-md border bg-muted"
+                            />
+                        ) : borrador.contenido ? (
+                            <p className="break-words whitespace-pre-wrap">{borrador.contenido}</p>
                         ) : (
                             <p>
                                 Esta versión histórica no tiene texto de vista
@@ -79,8 +85,9 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                             </p>
                         )}
                         <p className="text-sm text-muted-foreground">
-                            Vista previa provisional. No constituye PDF, firma,
-                            aprobación ni numeración oficial.
+                            {borrador.puede_pdf
+                                ? 'Vista previa PDF provisional. No constituye firma, aprobación ni numeración oficial.'
+                                : 'Vista previa provisional. No constituye PDF, firma, aprobación ni numeración oficial.'}
                         </p>
                     </CardContent>
                 </Card>

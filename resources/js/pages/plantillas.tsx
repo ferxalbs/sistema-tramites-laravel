@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -283,7 +284,7 @@ function NuevaPlantillaCard({
                                         Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
                                     </span>
                                 </div>
-                                <textarea
+                                <Textarea
                                     id="contenido-nuevo"
                                     name="contenido"
                                     rows={6}
@@ -292,7 +293,6 @@ function NuevaPlantillaCard({
                                     defaultValue={
                                         '<article><h1>{{NUMERO_DOCUMENTO_PREVIO}}</h1><p>{{CONTENIDO_PRINCIPAL}}</p></article>'
                                     }
-                                    className="w-full rounded-lg border border-input bg-muted/20 p-3 font-mono text-xs leading-relaxed text-foreground transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 />
                                 <InputError message={errors.contenido} />
                             </div>
@@ -523,13 +523,12 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                                 Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
                                             </span>
                                         </div>
-                                        <textarea
+                                        <Textarea
                                             id={`contenido-${plantilla.id}`}
                                             name="contenido"
                                             defaultValue={plantilla.contenido}
                                             maxLength={60000}
                                             rows={8}
-                                            className="w-full rounded-lg border border-input bg-background p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                             required
                                         />
                                         <InputError message={errors.contenido} />

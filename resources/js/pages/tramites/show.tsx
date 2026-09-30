@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 type TramiteDocument = {
     id: number;
@@ -321,14 +322,13 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                         <>
                                                             <div className="grid gap-2">
                                                                 <Label htmlFor="motivo_finalizacion">Motivo para cancelar</Label>
-                                                                <textarea
+                                                                <Textarea
                                                                     id="motivo_finalizacion"
                                                                     name="motivo_finalizacion"
                                                                     required
                                                                     minLength={8}
                                                                     maxLength={1000}
                                                                     rows={2}
-                                                                    className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                                                 />
                                                                 <InputError message={errors.motivo_finalizacion} />
                                                             </div>
@@ -558,7 +558,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                 <Input id="documento-subsanacion" name="documento" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
                                                 <InputError message={errors.documento} />
                                                 <Label htmlFor="observacion-subsanacion">Detalle de la subsanación recibida</Label>
-                                                <textarea id="observacion-subsanacion" name="observacion" required minLength={3} maxLength={2000} rows={3} className="w-full rounded-xl border border-input bg-background p-3 text-sm" />
+                                                <Textarea id="observacion-subsanacion" name="observacion" required minLength={3} maxLength={2000} rows={3} />
                                                 <InputError message={errors.observacion} />
                                                 <Button type="submit" disabled={processing}>Registrar subsanación</Button>
                                             </>

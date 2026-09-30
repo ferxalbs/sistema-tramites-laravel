@@ -9,10 +9,13 @@ use App\Models\TramiteAsignacion;
 use App\Models\TramiteBorrador;
 use App\Models\TramitePlantilla;
 use App\Models\TramiteRondaRevision;
+use App\Models\User;
+use App\Services\Tramites\GenerateTramiteFinalDocument;
 use App\Services\Tramites\PrepareTramiteForAssignment;
 use App\Services\Tramites\SaveTramiteDraft;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -36,8 +39,28 @@ class TramiteBorradorController extends Controller
                 'creador' => $borrador->creador()->value('name'),
                 'created_at' => $borrador->created_at?->toIso8601String(),
                 'contenido' => $borrador->contenido_renderizado,
+                'puede_pdf' => $borrador->contenido_plantilla_snapshot !== null
+                    && $borrador->contenido_renderizado !== null,
             ],
         ]);
+    }
+
+    public function pdf(Request $request, Tramite $tramite, TramiteBorrador $borrador, GenerateTramiteFinalDocument $generate): Response
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 401);
+        abort_unless($borrador->contenido_plantilla_snapshot !== null && $borrador->contenido_renderizado !== null, 409);
+
+        $pdf = $generate->preview($tramite, $borrador, $actor);
+        $response = response($pdf['bytes'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="borrador-'.$tramite->codigo.'-v'.$borrador->version.'.pdf"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+        $response->setPrivate();
+        $response->headers->addCacheControlDirective('no-store');
+
+        return $response;
     }
 
     public function create(Tramite $tramite): InertiaResponse
@@ -71,6 +94,7 @@ class TramiteBorradorController extends Controller
                 ])->all(),
             'usuarios' => $this->usuariosAutorizados(),
             'borrador' => $borrador === null ? null : [
+                'id' => $borrador->id,
                 'plantilla_id' => $borrador->plantilla_id,
                 'remitente_id' => $borrador->remitente_id,
                 'firmante_id' => $borrador->firmante_id,
@@ -157,6 +181,7 @@ class TramiteBorradorController extends Controller
             'plantillas' => $plantillas,
             'usuarios' => $this->usuariosAutorizados(),
             'borrador' => [
+                'id' => $borrador->id,
                 'plantilla_id' => $borrador->plantilla_id,
                 'remitente_id' => $borrador->remitente_id,
                 'firmante_id' => $borrador->firmante_id,

@@ -18,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 
 type Catalogos = {
     clasificaciones: Record<string, string>;
@@ -427,7 +428,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         <Input id="asunto" name="asunto" defaultValue={tramite?.asunto ?? ''} required minLength={3} maxLength={255} placeholder={esDocumentoInstitucional ? 'Ej. Informe de actividades del área' : seleccion?.tipo_documento === 'FUT' ? 'Ej. Solicito prácticas pre profesionales' : 'Resume brevemente lo solicitado'} />
                                     </Field>
                                     <Field id="descripcion" label={esDocumentoInstitucional ? 'Contenido del documento' : seleccion?.tipo_documento === 'FUT' ? 'Fundamentación del pedido / detalle' : 'Detalle de la solicitud recibida'} error={errors.descripcion} className="sm:col-span-2">
-                                        <textarea
+                                        <Textarea
                                             id="descripcion"
                                             name="descripcion"
                                             defaultValue={tramite?.descripcion ?? ''}
@@ -435,18 +436,16 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             minLength={3}
                                             maxLength={5000}
                                             required
-                                            className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                             placeholder={esDocumentoInstitucional ? 'Escribe el contenido principal del informe o memorando' : seleccion?.tipo_documento === 'FUT' ? 'Transcribe o resume la fundamentación del pedido del FUT' : 'Transcribe o resume el detalle del documento recibido'}
                                         />
                                     </Field>
                                     <Field id="observacion_recepcion" label="Observación de recepción" error={errors.observacion_recepcion} className="sm:col-span-2">
-                                        <textarea
+                                        <Textarea
                                             id="observacion_recepcion"
                                             name="observacion_recepcion"
                                             defaultValue={tramite?.observacion_recepcion ?? ''}
                                             rows={3}
                                             maxLength={2000}
-                                            className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                         />
                                     </Field>
                                     <Field id="folios" label="Cantidad de folios" error={errors.folios}>

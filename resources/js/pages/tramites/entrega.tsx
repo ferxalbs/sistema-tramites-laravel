@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 
 type EvidenceType = {
     id: number;
@@ -324,10 +325,10 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                                 {({ errors, processing }) => (
                                     <div className="space-y-4">
                                         <Field id="resumen" label="Resumen de cierre" error={errors.resumen}>
-                                            <textarea id="resumen" name="resumen" required minLength={10} maxLength={2000} rows={4} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
+                                            <Textarea id="resumen" name="resumen" required minLength={10} maxLength={2000} rows={4} />
                                         </Field>
                                         <Field id="observacion-cierre" label="Observación (opcional)" error={errors.observacion}>
-                                            <textarea id="observacion-cierre" name="observacion" maxLength={2000} rows={2} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
+                                            <Textarea id="observacion-cierre" name="observacion" maxLength={2000} rows={2} />
                                         </Field>
                                         <InputError message={errors.cierre} />
                                         <Button type="submit" disabled={processing}>

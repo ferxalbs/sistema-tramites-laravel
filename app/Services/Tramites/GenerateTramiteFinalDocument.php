@@ -7,6 +7,7 @@ use App\Models\TramiteBorrador;
 use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEvento;
 use App\Models\TramiteNumeracionDocumental;
+use App\Models\TramitePlantilla;
 use App\Models\TramiteRondaRevision;
 use App\Models\TramiteSerieDocumental;
 use App\Models\User;
@@ -151,6 +152,50 @@ class GenerateTramiteFinalDocument
     }
 
     /**
+     * Render an existing draft for review without reserving a document number,
+     * creating a history record, or changing any workflow state.
+     *
+     * @return array{bytes: string, paginas: int}
+     */
+    public function preview(Tramite $tramite, TramiteBorrador $borrador, User $actor): array
+    {
+        abort_unless($actor->activo && in_array($actor->rol, ['asistente', 'administrador'], true), 403);
+        abort_unless((int) $borrador->tramite_id === (int) $tramite->id, 404);
+
+        $borrador->loadMissing(['plantilla', 'remitente', 'firmante']);
+        $plantilla = $borrador->plantilla;
+        abort_unless($plantilla instanceof TramitePlantilla, 409);
+
+        $remitente = $borrador->remitente ?? $actor;
+        $firmante = $borrador->firmante ?? $actor;
+        $rutaFirma = 'firmas-perfil/'.$firmante->id.'.jpg';
+        $firmaImagen = Storage::disk('local')->exists($rutaFirma)
+            ? Storage::disk('local')->get($rutaFirma)
+            : null;
+        $snapshot = $this->crearSnapshot(
+            $tramite,
+            $borrador,
+            null,
+            $remitente,
+            $firmante,
+            'VISTA PREVIA (SIN NUMERAR)',
+            '',
+            hash('sha256', $firmaImagen ?? ''),
+            false,
+        );
+        $pdf = $this->pdfDocumentGenerator->generate([
+            ...$snapshot,
+            'firma_imagen' => $firmaImagen,
+        ]);
+
+        if (strlen($pdf['bytes']) < 500 || ! str_starts_with($pdf['bytes'], '%PDF-') || ! str_contains($pdf['bytes'], '%%EOF')) {
+            throw new RuntimeException('El generador no produjo un PDF válido para la vista previa.');
+        }
+
+        return $pdf;
+    }
+
+    /**
      * @return array{
      *     tramite_id: int,
      *     documento_id: int,
@@ -276,7 +321,7 @@ class GenerateTramiteFinalDocument
             }
 
             $correlativo = (int) $secuencia->ultimo_correlativo;
-            $numero = $serie->prefijo.'-'.$anio.'-'.str_pad((string) $correlativo, 6, '0', STR_PAD_LEFT);
+            $numero = $this->formatearNumero($serie, $configuracion, $anio, $correlativo);
             $codigoVerificacion = implode('-', str_split(Str::upper(bin2hex(random_bytes(8))), 4));
             $snapshot = $this->crearSnapshot($registro, $borrador, $ronda, $remitente, $firmante, $numero, $codigoVerificacion, hash('sha256', $firmaImagen));
 
@@ -342,16 +387,25 @@ class GenerateTramiteFinalDocument
      * @return array{
      *     institucion: string,
      *     tipo_documento: string,
+     *     tipo_documento_salida: string,
+     *     modalidad_documento: ?string,
      *     numero: string,
      *     codigo_expediente: string,
      *     fecha_documento: string,
+     *     lugar?: string,
      *     asunto: string,
      *     destinatarios: list<string>,
+     *     destinatarios_detalle?: list<array{nombres: string, apellidos: ?string, cargo: ?string, correo: ?string, principal: bool}>,
+     *     remitente_nombre?: string,
+     *     remitente_cargo?: ?string,
      *     remitente: string,
      *     introduccion: ?string,
      *     contenido_principal: ?string,
      *     cierre: ?string,
      *     personas: list<string>,
+     *     personas_detalle?: list<array{nombres: string, apellidos: ?string, cargo: ?string, dni: ?string}>,
+     *     firmante_nombre?: string,
+     *     firmante_cargo?: ?string,
      *     firmante: string,
      *     firmante_id: int,
      *     firma_perfil_sha256: string,
@@ -361,10 +415,12 @@ class GenerateTramiteFinalDocument
      *     codigo_verificacion: string,
      *     version_borrador: int,
      *     requiere_firma_fisica: bool,
-     *     plantilla: string
+     *     plantilla: string,
+     *     personas_titulo: string,
+     *     es_vista_previa: bool
      * }
      */
-    private function crearSnapshot(Tramite $tramite, TramiteBorrador $borrador, TramiteRondaRevision $ronda, User $remitente, User $firmante, string $numero, string $codigoVerificacion, string $firmaHash): array
+    private function crearSnapshot(Tramite $tramite, TramiteBorrador $borrador, ?TramiteRondaRevision $ronda, User $remitente, User $firmante, string $numero, string $codigoVerificacion, string $firmaHash, bool $requiereDestinatarios = true): array
     {
         $destinatarios = array_values(array_filter(array_map(
             static fn (array $destinatario): string => trim(implode(' ', array_filter([
@@ -375,8 +431,12 @@ class GenerateTramiteFinalDocument
             $borrador->destinatarios ?? [],
         )));
 
-        if ($destinatarios === []) {
+        if ($destinatarios === [] && $requiereDestinatarios) {
             throw ValidationException::withMessages(['documento' => 'El borrador no contiene destinatarios para el documento oficial.']);
+        }
+
+        if ($destinatarios === []) {
+            $destinatarios = ['Destinatario pendiente'];
         }
 
         $personas = array_values(array_filter(array_map(
@@ -384,9 +444,44 @@ class GenerateTramiteFinalDocument
                 $persona['nombres'] ?? null,
                 $persona['apellidos'] ?? null,
                 $persona['cargo'] ?? null,
+                isset($persona['dni']) && $persona['dni'] !== '' ? 'DNI: '.$persona['dni'] : null,
             ]))),
             $borrador->personas_mencionadas ?? [],
         )));
+        $destinatariosDetalle = array_map(
+            static fn (array $destinatario): array => [
+                'nombres' => trim((string) ($destinatario['nombres'] ?? '')),
+                'apellidos' => isset($destinatario['apellidos']) ? trim((string) $destinatario['apellidos']) ?: null : null,
+                'cargo' => isset($destinatario['cargo']) ? trim((string) $destinatario['cargo']) ?: null : null,
+                'correo' => isset($destinatario['correo']) ? trim((string) $destinatario['correo']) ?: null : null,
+                'principal' => (bool) ($destinatario['principal'] ?? false),
+            ],
+            $borrador->destinatarios ?? [],
+        );
+        $destinatariosDetalle = array_values(array_filter(
+            $destinatariosDetalle,
+            static fn (array $destinatario): bool => $destinatario['nombres'] !== '',
+        ));
+        $personasDetalle = array_map(
+            static fn (array $persona): array => [
+                'nombres' => trim((string) ($persona['nombres'] ?? '')),
+                'apellidos' => isset($persona['apellidos']) ? trim((string) $persona['apellidos']) ?: null : null,
+                'cargo' => isset($persona['cargo']) ? trim((string) $persona['cargo']) ?: null : null,
+                'dni' => isset($persona['dni']) ? trim((string) $persona['dni']) ?: null : null,
+            ],
+            $borrador->personas_mencionadas ?? [],
+        );
+        $personasDetalle = array_values(array_filter(
+            $personasDetalle,
+            static fn (array $persona): bool => $persona['nombres'] !== '',
+        ));
+        $cargos = DB::table('cargos_institucionales')
+            ->whereIn('id', array_filter([$remitente->cargo_institucional_id, $firmante->cargo_institucional_id]))
+            ->pluck('nombre', 'id');
+        $remitenteNombre = trim($remitente->name);
+        $firmanteNombre = trim($firmante->name);
+        $remitenteCargo = $cargos->get($remitente->cargo_institucional_id);
+        $firmanteCargo = $cargos->get($firmante->cargo_institucional_id);
         $roles = [
             'administrador' => 'Administración',
             'asistente' => 'Asistente de oficina',
@@ -396,28 +491,41 @@ class GenerateTramiteFinalDocument
         return [
             'institucion' => (string) config('app.name', 'Sistema de Gestión Documentaria'),
             'tipo_documento' => $borrador->plantilla->nombre,
+            'tipo_documento_salida' => $borrador->plantilla->tipo_documento_salida,
+            'modalidad_documento' => $borrador->plantilla->modalidad,
             'numero' => $numero,
             'codigo_expediente' => $tramite->codigo,
             'fecha_documento' => $borrador->fecha_documento->format('d/m/Y'),
+            'lugar' => $borrador->lugar,
             'asunto' => $borrador->asunto,
             'destinatarios' => $destinatarios,
-            'remitente' => $remitente->name.' · '.($roles[$remitente->rol] ?? $remitente->rol),
+            'destinatarios_detalle' => $destinatariosDetalle,
+            'remitente_nombre' => $remitenteNombre,
+            'remitente_cargo' => $remitenteCargo,
+            'remitente' => $remitenteNombre.' · '.($roles[$remitente->rol] ?? $remitente->rol),
             'introduccion' => $borrador->introduccion,
             'contenido_principal' => $borrador->contenido_principal,
             'cierre' => $borrador->cierre,
             'personas' => $personas,
-            'firmante' => $firmante->name.' · '.($roles[$firmante->rol] ?? $firmante->rol),
+            'personas_detalle' => $personasDetalle,
+            'firmante_nombre' => $firmanteNombre,
+            'firmante_cargo' => $firmanteCargo,
+            'firmante' => $firmanteNombre.' · '.($roles[$firmante->rol] ?? $firmante->rol),
             'firmante_id' => (int) $firmante->id,
             'firma_perfil_sha256' => $firmaHash,
-            'decision' => $ronda->estado,
-            'conclusion' => $ronda->conclusion,
-            'comentario_publico' => $ronda->comentario_publico,
+            'decision' => $ronda?->estado ?? 'previsualizacion',
+            'conclusion' => $ronda?->conclusion,
+            'comentario_publico' => $ronda?->comentario_publico,
             'codigo_verificacion' => $codigoVerificacion,
             'version_borrador' => (int) $borrador->version,
             'borrador_renderizado_sha256' => $borrador->contenido_renderizado === null
                 ? null : hash('sha256', $borrador->contenido_renderizado),
             'requiere_firma_fisica' => false,
             'plantilla' => $borrador->plantilla->nombre,
+            'personas_titulo' => str_contains(mb_strtolower($borrador->asunto), 'ingres')
+                ? 'Las personas que ingresarán son:'
+                : 'Personas relacionadas:',
+            'es_vista_previa' => $ronda === null,
         ];
     }
 
@@ -426,6 +534,32 @@ class GenerateTramiteFinalDocument
         $nombreSeguro = Str::slug($codigoExpediente.'-'.$numero).'-'.Str::lower(Str::random(12)).'.pdf';
 
         return 'documentos-finales/'.now()->format('Y').'/'.$nombreSeguro;
+    }
+
+    /**
+     * Keep the legacy prefix-year-correlative format as the fallback for
+     * existing and custom series while allowing new institutional documents
+     * to use a configured number format.
+     *
+     * @param  array<string, mixed>  $configuracion
+     */
+    private function formatearNumero(object $serie, array $configuracion, int $anio, int $correlativo): string
+    {
+        $formato = $configuracion['numero_formato'] ?? null;
+
+        if (! is_string($formato) || trim($formato) === '') {
+            return $serie->prefijo.'-'.$anio.'-'.str_pad((string) $correlativo, 6, '0', STR_PAD_LEFT);
+        }
+
+        $relleno = max(1, (int) ($configuracion['correlativo_relleno'] ?? 6));
+        $valorCorrelativo = str_pad((string) $correlativo, $relleno, '0', STR_PAD_LEFT);
+
+        return trim(strtr($formato, [
+            '{prefijo}' => (string) $serie->prefijo,
+            '{correlativo}' => $valorCorrelativo,
+            '{anio}' => (string) $anio,
+            '{codigo_institucional}' => trim((string) ($configuracion['codigo_institucional'] ?? '')),
+        ]));
     }
 
     private function limpiarArchivo(?string $ruta): void

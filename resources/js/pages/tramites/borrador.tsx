@@ -3,11 +3,14 @@ import { ArrowLeft, Eye, FilePlus2, Save, Send } from 'lucide-react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import InputError from '@/components/input-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -63,9 +66,11 @@ type MentionedPerson = {
     nombres: string;
     apellidos: string;
     cargo: string;
+    dni: string;
 };
 
 type ExistingDraft = {
+    id: number;
     plantilla_id: number;
     remitente_id: number | null;
     firmante_id: number | null;
@@ -156,7 +161,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
         destinatarios: borrador?.destinatarios?.length
             ? borrador.destinatarios
             : [{ nombres: '', apellidos: '', cargo: '', correo: '', principal: true }],
-        personas_mencionadas: borrador?.personas_mencionadas ?? [],
+        personas_mencionadas: borrador?.personas_mencionadas?.map((persona) => ({ ...persona, dni: persona.dni ?? '' })) ?? [],
         adjuntos: borrador?.adjuntos ?? [],
         preparar: false,
         confirmar_fecha_anterior: false,
@@ -166,10 +171,6 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
     });
 
     const plantillaActual = plantillas.find((plantilla) => plantilla.id === form.data.plantilla_id);
-    const destinatariosTexto = form.data.destinatarios
-        .map((destinatario) => `${destinatario.nombres} ${destinatario.apellidos}`.trim())
-        .filter(Boolean)
-        .join(', ');
     const fechaAnterior = form.data.fecha_documento < tramite.fecha_recepcion;
     const erroresRespuesta = form.errors as Record<string, string | undefined>;
     const storeUrl = TramiteBorradorController.store.url({ tramite: tramite.id });
@@ -208,7 +209,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                         <Button render={<Link href={TramiteController.show({ tramite: tramite.id })} />} variant="outline" size="icon" aria-label="Volver al trámite">
                             <ArrowLeft />
                         </Button>
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                             <p className="text-sm text-muted-foreground">{tramite.codigo} · {modo === 'corregir' ? 'Corrección de revisión' : 'Preparación documental'}</p>
                             <h1 className="text-2xl font-semibold tracking-tight">
                                 {modo === 'corregir' ? `Corregir y reenviar desde la versión ${borrador?.version ?? ''}` : borrador ? `Nueva versión del borrador ${borrador.version + 1}` : 'Preparar borrador'}
@@ -220,7 +221,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
 
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,1fr)]">
                     <form
-                        className="space-y-5"
+                        className="flex flex-col gap-5"
                         onSubmit={(event) => {
                             event.preventDefault();
                             guardar(false);
@@ -232,20 +233,19 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     <CardTitle>Observaciones del revisor</CardTitle>
                                     <CardDescription>{resumen_observacion}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="flex flex-col gap-4">
                                     {observaciones.map((observacion) => (
-                                        <div key={observacion.id} className="space-y-2 rounded-xl border p-4">
+                                        <div key={observacion.id} className="flex flex-col gap-2 rounded-xl border p-4">
                                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{observacion.categoria}{observacion.seccion ? ` · ${observacion.seccion}` : ''}{observacion.obligatoria ? ' · respuesta obligatoria' : ''}</p>
                                             <h3 className="font-medium">{observacion.titulo}</h3>
                                             <p className="whitespace-pre-wrap text-sm text-muted-foreground">{observacion.descripcion}</p>
                                             <Field id={`respuesta-${observacion.id}`} label="Respuesta a la observación" error={erroresRespuesta[`respuestas.${observacion.id}`]}>
-                                                <textarea
+                                                <Textarea
                                                     id={`respuesta-${observacion.id}`}
                                                     rows={3}
                                                     minLength={observacion.obligatoria ? 5 : undefined}
                                                     required={observacion.obligatoria}
                                                     maxLength={2000}
-                                                    className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                                     value={form.data.respuestas[observacion.id] ?? ''}
                                                     onChange={(event) => form.setData('respuestas', { ...form.data.respuestas, [observacion.id]: event.target.value })}
                                                 />
@@ -329,7 +329,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardTitle>Destinatarios</CardTitle>
                                 <CardDescription>El memorando múltiple requiere al menos dos destinatarios y uno principal.</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-5">
+                            <CardContent className="flex flex-col gap-5">
                                 {form.data.destinatarios.map((destinatario, indice) => (
                                     <div key={indice} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
                                         <Field id={`destinatario-${indice}-nombres`} label="Nombres" error={form.errors[`destinatarios.${indice}.nombres`]}>
@@ -365,14 +365,13 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                                 onChange={(event) => actualizarDestinatario(indice, 'correo', event.target.value)}
                                             />
                                         </Field>
-                                        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                                            <input
-                                                type="checkbox"
+                                        <Label className="sm:col-span-2">
+                                            <Checkbox
                                                 checked={destinatario.principal}
-                                                onChange={(event) => actualizarDestinatario(indice, 'principal', event.target.checked)}
+                                                onCheckedChange={(checked) => actualizarDestinatario(indice, 'principal', checked === true)}
                                             />
                                             Destinatario principal
-                                        </label>
+                                        </Label>
                                     </div>
                                 ))}
                                 <InputError message={form.errors.destinatarios} />
@@ -406,45 +405,44 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     onChange={(clave, valor) => form.setData('campos', { ...form.data.campos, [clave]: valor })}
                                 />
                                 <Field id="introduccion" label="Introducción" error={form.errors.introduccion}>
-                                    <textarea
+                                    <Textarea
                                         id="introduccion"
                                         rows={3}
                                         maxLength={5000}
-                                        className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                         value={form.data.introduccion}
                                         onChange={(event) => form.setData('introduccion', event.target.value)}
                                     />
                                 </Field>
                                 <Field id="contenido_principal" label="Contenido principal" error={form.errors.contenido_principal}>
-                                    <textarea
+                                    <Textarea
                                         id="contenido_principal"
                                         rows={8}
                                         maxLength={20000}
-                                        className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                         value={form.data.contenido_principal}
                                         onChange={(event) => form.setData('contenido_principal', event.target.value)}
                                     />
                                     <p className="text-xs text-muted-foreground">Al marcar como preparado, escribe al menos 20 caracteres.</p>
                                 </Field>
                                 <Field id="cierre" label="Cierre" error={form.errors.cierre}>
-                                    <textarea
+                                    <Textarea
                                         id="cierre"
                                         rows={3}
                                         maxLength={5000}
-                                        className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                                         value={form.data.cierre}
                                         onChange={(event) => form.setData('cierre', event.target.value)}
                                     />
                                 </Field>
                                 {fechaAnterior && (
-                                    <label className="flex items-start gap-2 rounded-xl border border-amber-500/30 p-3 text-sm">
-                                        <input
-                                            type="checkbox"
+                                    <Alert>
+                                        <Checkbox
+                                            id="confirmar-fecha-anterior"
                                             checked={form.data.confirmar_fecha_anterior}
-                                            onChange={(event) => form.setData('confirmar_fecha_anterior', event.target.checked)}
+                                            onCheckedChange={(checked) => form.setData('confirmar_fecha_anterior', checked === true)}
                                         />
-                                        Confirmo que la fecha del documento es anterior a la recepción.
-                                    </label>
+                                        <AlertDescription>
+                                            <Label htmlFor="confirmar-fecha-anterior">Confirmo que la fecha del documento es anterior a la recepción.</Label>
+                                        </AlertDescription>
+                                    </Alert>
                                 )}
                                 <InputError message={form.errors.confirmar_fecha_anterior} />
                             </CardContent>
@@ -458,7 +456,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 </CardHeader>
                                 <CardContent>
                                     <Field id="resumen_correccion" label="Resumen" error={form.errors.resumen_correccion}>
-                                        <textarea id="resumen_correccion" required minLength={8} maxLength={2000} rows={4} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" value={form.data.resumen_correccion} onChange={(event) => form.setData('resumen_correccion', event.target.value)} />
+                                        <Textarea id="resumen_correccion" required minLength={8} maxLength={2000} rows={4} value={form.data.resumen_correccion} onChange={(event) => form.setData('resumen_correccion', event.target.value)} />
                                     </Field>
                                 </CardContent>
                             </Card>
@@ -469,9 +467,9 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardTitle>Personas mencionadas</CardTitle>
                                 <CardDescription>Registra a las personas que aparecerán en el documento.</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="flex flex-col gap-4">
                                 {form.data.personas_mencionadas.map((persona, indice) => (
-                                    <div key={indice} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-3">
+                                    <div key={indice} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-4">
                                         <Field id={`persona-${indice}-nombres`} label="Nombres" error={form.errors[`personas_mencionadas.${indice}.nombres`]}>
                                             <Input
                                                 id={`persona-${indice}-nombres`}
@@ -496,6 +494,15 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                                 onChange={(event) => actualizarPersonaMencionada(indice, 'cargo', event.target.value)}
                                             />
                                         </Field>
+                                        <Field id={`persona-${indice}-dni`} label="DNI (opcional)" error={form.errors[`personas_mencionadas.${indice}.dni`]}>
+                                            <Input
+                                                id={`persona-${indice}-dni`}
+                                                inputMode="numeric"
+                                                maxLength={8}
+                                                value={persona.dni}
+                                                onChange={(event) => actualizarPersonaMencionada(indice, 'dni', event.target.value.replace(/\D/g, '').slice(0, 8))}
+                                            />
+                                        </Field>
                                     </div>
                                 ))}
                                 <InputError message={form.errors.personas_mencionadas} />
@@ -505,7 +512,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     disabled={form.data.personas_mencionadas.length >= 20}
                                     onClick={() => form.setData('personas_mencionadas', [
                                         ...form.data.personas_mencionadas,
-                                        { nombres: '', apellidos: '', cargo: '' },
+                                        { nombres: '', apellidos: '', cargo: '', dni: '' },
                                     ])}
                                 >
                                     <FilePlus2 />
@@ -520,16 +527,15 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     <CardTitle>Documentos adjuntos</CardTitle>
                                     <CardDescription>Selecciona los archivos del expediente que se mencionarán en el borrador.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
+                                <CardContent className="flex flex-col gap-3">
                                     {archivos.map((archivo) => (
-                                        <label key={archivo.id} className="flex items-center gap-3 text-sm">
-                                            <input
-                                                type="checkbox"
+                                        <Label key={archivo.id}>
+                                            <Checkbox
                                                 checked={form.data.adjuntos.includes(archivo.id)}
-                                                onChange={(event) => alternarAdjunto(archivo.id, event.target.checked)}
+                                                onCheckedChange={(checked) => alternarAdjunto(archivo.id, checked === true)}
                                             />
                                             <span>{archivo.nombre} · versión {archivo.version}</span>
-                                        </label>
+                                        </Label>
                                     ))}
                                     <InputError message={form.errors.adjuntos} />
                                 </CardContent>
@@ -560,22 +566,26 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                         </div>
                     </form>
 
-                    <aside className="space-y-5">
+                    <aside className="flex flex-col gap-5">
                         <Card className="h-fit">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><Eye className="size-4" /> Vista previa</CardTitle>
-                                <CardDescription>Borrador sin numeración oficial</CardDescription>
+                                <CardDescription>PDF institucional sin reservar numeración oficial</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <p className="font-semibold">{plantillaActual?.nombre ?? 'Sin plantilla seleccionada'}</p>
-                                <p><span className="font-medium">A:</span> {destinatariosTexto || 'Destinatario pendiente'}</p>
-                                <p><span className="font-medium">De:</span> {usuarios.find((usuario) => usuario.id === form.data.remitente_id)?.name ?? 'Remitente pendiente'}</p>
-                                <p><span className="font-medium">Asunto:</span> {form.data.asunto || 'Sin asunto'}</p>
-                                <p><span className="font-medium">Fecha:</span> {form.data.lugar}, {formatDate(form.data.fecha_documento)}</p>
-                                <p className="whitespace-pre-wrap">{form.data.introduccion}</p>
-                                <p className="whitespace-pre-wrap">{form.data.contenido_principal || 'El contenido principal aparecerá aquí.'}</p>
-                                <p className="whitespace-pre-wrap">{form.data.cierre}</p>
-                                <p className="border-t pt-3 font-medium">{usuarios.find((usuario) => usuario.id === form.data.firmante_id)?.name ?? 'Firmante pendiente'}</p>
+                            <CardContent className="flex flex-col gap-4">
+                                {borrador?.id ? (
+                                    <iframe
+                                        title="Vista previa PDF del borrador"
+                                        src={`/tramites/${tramite.id}/borradores/${borrador.id}/pdf`}
+                                        sandbox="allow-same-origin"
+                                        className="h-[720px] w-full rounded-md border bg-muted"
+                                    />
+                                ) : (
+                                    <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                                        <p>Guarda el borrador para generar una vista previa PDF con el encabezado institucional.</p>
+                                        <p>Los cambios sin guardar se mantienen en el formulario y no reservan numeración oficial.</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
@@ -586,7 +596,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     <CardDescription>Las versiones anteriores se conservan al guardar cambios.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <ol className="space-y-3">
+                                    <ol className="flex flex-col gap-3">
                                         {versiones.map((version) => (
                                             <li key={version.id} className="flex items-start justify-between gap-3 text-sm">
                                                 <div>
@@ -621,11 +631,10 @@ function EditableTemplateFields({ campos, valores, errores, onChange }: {
     return campos.map((campo) => (
         <Field key={campo.clave} id={`campo-${campo.clave}`} label={campo.etiqueta} error={errores[`campos.${campo.clave}`]}>
             {['texto_largo', 'texto_enriquecido'].includes(campo.tipo) ? (
-                <textarea
+                <Textarea
                     id={`campo-${campo.clave}`}
                     rows={3}
                     maxLength={campo.maximo}
-                    className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                     value={valores[campo.clave] ?? ''}
                     onChange={(event) => onChange(campo.clave, event.target.value)}
                 />
@@ -698,14 +707,6 @@ function FormSelect({
             <InputError message={error} />
         </div>
     );
-}
-
-function formatDate(value: string): string {
-    if (!value) {
-        return '';
-    }
-
-    return new Intl.DateTimeFormat('es-PE', { dateStyle: 'long' }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 }
 
 function formatDateTime(value: string): string {

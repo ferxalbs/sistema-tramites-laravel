@@ -82,32 +82,17 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  array{
-     *     institucion: string,
-     *     tipo_documento: string,
-     *     numero: string,
-     *     codigo_expediente: string,
-     *     fecha_documento: string,
-     *     asunto: string,
-     *     destinatarios: list<string>,
-     *     remitente: string,
-     *     introduccion: ?string,
-     *     contenido_principal: ?string,
-     *     cierre: ?string,
-     *     personas: list<string>,
-     *     firmante: string,
-     *     firma_imagen?: string,
-     *     decision: string,
-     *     conclusion: ?string,
-     *     comentario_publico: ?string,
-     *     codigo_verificacion: string,
-     *     version_borrador: int
-     * }  $documento
+     * @param  array<string, mixed>  $documento
      * @return array{bytes: string, paginas: int}
      */
     public function generate(array $documento): array
     {
-        $firmaImagen = $documento['firma_imagen'] ?? null;
+        $firmaImagen = is_string($documento['firma_imagen'] ?? null) ? $documento['firma_imagen'] : null;
+
+        if ($this->esMemorando($documento)) {
+            return $this->generarMemorando($documento, $firmaImagen);
+        }
+
         $lineas = [];
         $this->agregarParrafo($lineas, $documento['institucion'], 10, true, 4, true);
         $this->agregarParrafo($lineas, 'GESTIÓN DOCUMENTARIA INSTITUCIONAL', 9, false, 18, true);
@@ -159,6 +144,330 @@ class PdfDocumentGenerator
             'bytes' => $this->construirPdf($paginas, $documento['numero'], $documento['institucion'], $qr, $firmaImagen),
             'paginas' => count($paginas),
         ];
+    }
+
+    private function esMemorando(array $documento): bool
+    {
+        return mb_strtolower((string) ($documento['tipo_documento_salida'] ?? '')) === 'memorando'
+            || str_contains(mb_strtolower((string) ($documento['tipo_documento'] ?? '')), 'memorando');
+    }
+
+    /**
+     * Render the institutional memorandum layout while keeping the legacy
+     * renderer for other output document types.
+     *
+     * @param  array<string, mixed>  $documento
+     * @return array{bytes: string, paginas: int}
+     */
+    private function generarMemorando(array $documento, ?string $firmaImagen): array
+    {
+        $items = [];
+        $numero = trim((string) ($documento['numero'] ?? ''));
+        $tipo = mb_strtoupper(trim((string) ($documento['tipo_documento'] ?? 'MEMORANDO')));
+        $modalidad = mb_strtolower(trim((string) ($documento['modalidad_documento'] ?? '')));
+        $titulo = $modalidad === 'multiple' || str_contains($tipo, 'MULTIPLE') || str_contains($tipo, 'MÚLTIPLE')
+            ? 'MEMORANDO MÚLTIPLE'
+            : 'MEMORANDUM';
+        $this->agregarMemoTexto($items, $titulo.' Nº '.$numero, 13, true, true, 8, 495, true);
+
+        $destinatariosDetalle = is_array($documento['destinatarios_detalle'] ?? null)
+            ? $documento['destinatarios_detalle']
+            : [];
+        $destinatarios = $destinatariosDetalle === []
+            ? array_values(array_filter(array_map('strval', (array) ($documento['destinatarios'] ?? []))))
+            : array_values(array_filter(array_map(
+                fn (array $destinatario): string => trim(implode(' ', array_filter([
+                    $destinatario['nombres'] ?? null,
+                    $destinatario['apellidos'] ?? null,
+                    $destinatario['cargo'] ?? null,
+                ]))),
+                $destinatariosDetalle,
+            )));
+        $remitente = trim((string) ($documento['remitente_nombre'] ?? $documento['remitente'] ?? ''));
+        $remitenteCargo = trim((string) ($documento['remitente_cargo'] ?? ''));
+        if ($destinatariosDetalle !== []) {
+            foreach ($destinatariosDetalle as $indice => $destinatario) {
+                $this->agregarMemoPersonaCampo($items, $indice === 0 ? 'A' : '', $destinatario);
+            }
+            $items[] = ['tipo' => 'espacio', 'alto' => 8];
+        } else {
+            $this->agregarMemoCampo($items, 'A', implode('; ', $destinatarios), 8, true);
+        }
+        $this->agregarMemoPersonaCampo($items, 'De', [
+            'nombres' => $remitente,
+            'apellidos' => null,
+            'cargo' => $remitenteCargo,
+        ]);
+        $this->agregarMemoCampo($items, 'Asunto', (string) ($documento['asunto'] ?? ''), 8, true);
+        $this->agregarMemoCampo($items, 'Fecha', $this->fechaMemorando($documento), 12);
+        $items[] = ['tipo' => 'linea', 'alto' => 16];
+
+        foreach ([$documento['introduccion'] ?? null, $documento['contenido_principal'] ?? null] as $contenido) {
+            foreach ($this->separarTexto((string) ($contenido ?? '')) as $parrafo) {
+                $this->agregarMemoTexto($items, $parrafo, 10, false, false, 8, 495, false, 13);
+            }
+        }
+
+        $personasDetalle = is_array($documento['personas_detalle'] ?? null)
+            ? $documento['personas_detalle']
+            : [];
+        $personas = $personasDetalle === []
+            ? array_values(array_filter(array_map('strval', (array) ($documento['personas'] ?? []))))
+            : array_values(array_filter(array_map(
+                static fn (array $persona): string => trim(implode(' ', array_filter([
+                    $persona['nombres'] ?? null,
+                    $persona['apellidos'] ?? null,
+                    $persona['cargo'] ?? null,
+                    ! empty($persona['dni']) ? 'DNI: '.$persona['dni'] : null,
+                ]))),
+                $personasDetalle,
+            )));
+
+        if ($personas !== []) {
+            $this->agregarMemoTexto(
+                $items,
+                (string) ($documento['personas_titulo'] ?? 'Personas mencionadas:'),
+                10,
+                false,
+                false,
+                6,
+                495,
+                false,
+                13,
+            );
+            $this->agregarMemoColumnas($items, $personasDetalle === [] ? $personas : $personasDetalle, 8);
+        }
+
+        $items[] = ['tipo' => 'empujar_cierre', 'alto' => 0];
+        foreach ($this->separarTexto((string) ($documento['cierre'] ?? '')) as $parrafo) {
+            $this->agregarMemoTexto($items, $parrafo, 10, false, true, 8, 495, false, 13);
+        }
+
+        $this->agregarMemoTexto($items, 'Atentamente', 10, false, true, 5, 495, false, 13);
+        $items[] = ['tipo' => 'firma', 'alto' => 52];
+        $firmante = trim((string) ($documento['firmante_nombre'] ?? $documento['firmante'] ?? ''));
+        $firmanteCargo = trim((string) ($documento['firmante_cargo'] ?? ''));
+        $this->agregarMemoTexto($items, '________________________________________', 9, false, true, 2, 250, false, 12);
+        $this->agregarMemoTexto($items, $firmante, 9, true, true, 1, 250, false, 12);
+        if ($firmanteCargo !== '') {
+            $this->agregarMemoTexto($items, $firmanteCargo, 8, false, true, 0, 250, false, 11);
+        }
+
+        $codigo = (string) ($documento['codigo_verificacion'] ?? '');
+        $qr = $this->matrizVerificacion($codigo);
+        $paginas = $this->distribuirMemorando(
+            $items,
+            (string) ($documento['codigo_expediente'] ?? ''),
+            $codigo,
+            true,
+        );
+        $encabezado = $this->leerEncabezadoInstitucional();
+
+        return [
+            'bytes' => $this->construirPdfMemorando($paginas, $numero, (string) ($documento['institucion'] ?? ''), $qr, $firmaImagen, $encabezado),
+            'paginas' => count($paginas),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     */
+    private function agregarMemoTexto(array &$items, string $texto, int $tamano, bool $negrita, bool $centrado, int $espacio, int $anchoPuntos, bool $subrayado = false, int $altoLinea = 13): void
+    {
+        $texto = trim($this->textoPlano($texto));
+
+        if ($texto === '') {
+            return;
+        }
+
+        foreach ($this->ajustarMemoLinea($texto, $tamano, $anchoPuntos, $negrita) as $linea) {
+            $items[] = [
+                'tipo' => 'texto',
+                'texto' => $linea,
+                'tamano' => $tamano,
+                'negrita' => $negrita,
+                'centrado' => $centrado,
+                'subrayado' => $subrayado,
+                'alto' => $altoLinea,
+            ];
+        }
+
+        if ($espacio > 0) {
+            $items[] = ['tipo' => 'espacio', 'alto' => $espacio];
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     */
+    private function agregarMemoCampo(array &$items, string $etiqueta, string $valor, int $espacio, bool $valorNegrita = false): void
+    {
+        $lineas = $this->ajustarMemoLinea(trim($this->textoPlano($valor)), 9, 405);
+
+        if ($lineas === []) {
+            $lineas = [''];
+        }
+
+        foreach ($lineas as $indice => $linea) {
+            $items[] = [
+                'tipo' => 'campo',
+                'etiqueta' => $indice === 0 ? $etiqueta : '',
+                'texto' => $linea,
+                'valor_negrita' => $valorNegrita,
+                'alto' => 14,
+            ];
+        }
+
+        $items[] = ['tipo' => 'espacio', 'alto' => $espacio];
+    }
+
+    /**
+     * @param  array<string, mixed>  $persona
+     */
+    private function agregarMemoPersonaCampo(array &$items, string $etiqueta, array $persona): void
+    {
+        $nombre = trim(implode(' ', array_filter([
+            $persona['nombres'] ?? null,
+            $persona['apellidos'] ?? null,
+        ])));
+        $cargo = trim((string) ($persona['cargo'] ?? ''));
+
+        if ($nombre !== '') {
+            $this->agregarMemoCampo($items, $etiqueta, $nombre, 0, true);
+        }
+
+        if ($cargo !== '') {
+            $this->agregarMemoCampo($items, '', $cargo, 8);
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @param  list<string|array<string, mixed>>  $personas
+     */
+    private function agregarMemoColumnas(array &$items, array $personas, int $espacio): void
+    {
+        foreach ($personas as $persona) {
+            if (is_array($persona)) {
+                $izquierda = $this->ajustarMemoLinea(trim(implode(' ', array_filter([
+                    $persona['nombres'] ?? null,
+                    $persona['apellidos'] ?? null,
+                ]))), 8, 180);
+                $derecha = $this->ajustarMemoLinea(trim(implode(' · ', array_filter([
+                    $persona['cargo'] ?? null,
+                    ! empty($persona['dni']) ? 'DNI: '.$persona['dni'] : null,
+                ]))), 8, 235);
+            } else {
+                $izquierda = $this->ajustarMemoLinea($this->textoPlano($persona), 8, 180);
+                $derecha = [];
+            }
+
+            $items[] = [
+                'tipo' => 'columnas',
+                'izquierda' => $izquierda,
+                'derecha' => $derecha,
+                'alto' => max(count($izquierda), count($derecha), 1) * 12,
+            ];
+        }
+
+        if ($espacio > 0) {
+            $items[] = ['tipo' => 'espacio', 'alto' => $espacio];
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<list<array<string, mixed>>>
+     */
+    private function distribuirMemorando(array $items, string $expediente, string $codigo, bool $conQr): array
+    {
+        $paginas = [[]];
+        $pagina = 0;
+        $y = 728.0;
+        $limite = $conQr ? 156.0 : 68.0;
+
+        foreach ($items as $indice => $item) {
+            $tipo = (string) ($item['tipo'] ?? 'texto');
+            $alto = (float) ($item['alto'] ?? 13);
+
+            if ($tipo === 'empujar_cierre') {
+                // Keep the user closing and signature block together near the footer.
+                $altoBloque = 0.0;
+
+                foreach (array_slice($items, $indice + 1) as $restante) {
+                    $altoBloque += (float) ($restante['alto'] ?? 13);
+                }
+
+                if ($y - $altoBloque < $limite) {
+                    $paginas[] = [];
+                    $pagina++;
+                    $y = 728.0;
+                }
+
+                $y = min($y, max(275.0, $limite + $altoBloque));
+
+                continue;
+            }
+
+            if ($y - $alto < $limite) {
+                $paginas[] = [];
+                $pagina++;
+                $y = 728.0;
+            }
+
+            $item['y'] = $y;
+            $paginas[$pagina][] = $item;
+            $y -= $alto;
+        }
+
+        foreach ($paginas as $indice => &$lineas) {
+            $codigoTexto = trim($codigo) === ''
+                ? 'Borrador sin numeración oficial'
+                : 'Código de verificación '.$codigo;
+            $lineas[] = [
+                'tipo' => 'pie',
+                'texto' => $expediente.' · '.$codigoTexto.' · Página '.($indice + 1).' de '.count($paginas),
+                'y' => 38.0,
+                'alto' => 0,
+            ];
+        }
+        unset($lineas);
+
+        return $paginas;
+    }
+
+    private function fechaMemorando(array $documento): string
+    {
+        $fecha = trim((string) ($documento['fecha_documento'] ?? ''));
+        $partes = preg_split('~[-/]~', $fecha) ?: [];
+
+        if (count($partes) !== 3) {
+            return trim(implode(', ', array_filter([(string) ($documento['lugar'] ?? ''), $fecha])));
+        }
+
+        if (strlen($partes[0]) === 4) {
+            [$anio, $mes, $dia] = $partes;
+        } else {
+            [$dia, $mes, $anio] = $partes;
+        }
+
+        $meses = [1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        $fechaTexto = (int) $dia.' de '.($meses[(int) $mes] ?? $mes).' de '.$anio;
+
+        return trim(implode(', ', array_filter([(string) ($documento['lugar'] ?? ''), $fechaTexto])));
+    }
+
+    private function leerEncabezadoInstitucional(): ?string
+    {
+        $ruta = base_path('resources/images/institucion/encabezado-institucional.jpg');
+
+        if (! is_file($ruta)) {
+            return null;
+        }
+
+        $bytes = file_get_contents($ruta);
+
+        return is_string($bytes) && $bytes !== '' ? $bytes : null;
     }
 
     /**
@@ -245,6 +554,102 @@ class PdfDocumentGenerator
         }
 
         return $lineas;
+    }
+
+    /**
+     * Wrap memorandum text using the standard Helvetica glyph widths in PDF points.
+     * Character counts are insufficient for wide glyphs such as W and M.
+     *
+     * @return list<string>
+     */
+    private function ajustarMemoLinea(string $texto, int $tamano, float $anchoMaximo, bool $negrita = false): array
+    {
+        $texto = trim(preg_replace('/\s+/u', ' ', $this->textoPlano($texto)) ?? '');
+
+        if ($texto === '') {
+            return [''];
+        }
+
+        $lineas = [];
+        $linea = '';
+
+        foreach (preg_split('/\s+/u', $texto) ?: [] as $palabra) {
+            if ($linea !== '' && $this->anchoMemoTextoPuntos($linea.' '.$palabra, $tamano, $negrita) > $anchoMaximo) {
+                $lineas[] = $linea;
+                $linea = '';
+            }
+
+            if ($this->anchoMemoTextoPuntos($palabra, $tamano, $negrita) <= $anchoMaximo) {
+                $linea = $linea === '' ? $palabra : $linea.' '.$palabra;
+
+                continue;
+            }
+
+            if ($linea !== '') {
+                $lineas[] = $linea;
+                $linea = '';
+            }
+
+            foreach (mb_str_split($palabra) as $caracter) {
+                if ($linea !== '' && $this->anchoMemoTextoPuntos($linea.$caracter, $tamano, $negrita) > $anchoMaximo) {
+                    $lineas[] = $linea;
+                    $linea = '';
+                }
+
+                $linea .= $caracter;
+            }
+        }
+
+        if ($linea !== '') {
+            $lineas[] = $linea;
+        }
+
+        return $lineas;
+    }
+
+    private function anchoMemoTextoPuntos(string $texto, int $tamano, bool $negrita = false): float
+    {
+        $unidades = 0;
+        $metricas = $this->metricasMemo();
+
+        foreach (mb_str_split($texto) as $caracter) {
+            $base = $caracter;
+
+            if (! isset($metricas[$base])) {
+                $transliterado = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $caracter);
+                $base = is_string($transliterado) && $transliterado !== ''
+                    ? mb_substr($transliterado, 0, 1)
+                    : '?';
+            }
+
+            $unidades += $metricas[$base] ?? 600;
+        }
+
+        return $unidades * ($tamano / 1000) * ($negrita ? 1.03 : 1.0);
+    }
+
+    /** @return array<string, int> */
+    private function metricasMemo(): array
+    {
+        static $metricas = [
+            ' ' => 278, '!' => 278, '"' => 355, '#' => 556, '$' => 556, '%' => 889, '&' => 667,
+            "'" => 191, '(' => 333, ')' => 333, '*' => 389, '+' => 584, ',' => 278, '-' => 333,
+            '.' => 278, '/' => 278, '0' => 556, '1' => 556, '2' => 556, '3' => 556, '4' => 556,
+            '5' => 556, '6' => 556, '7' => 556, '8' => 556, '9' => 556, ':' => 278, ';' => 278,
+            '<' => 584, '=' => 584, '>' => 584, '?' => 556, '@' => 1015, 'A' => 667, 'B' => 667,
+            'C' => 722, 'D' => 722, 'E' => 667, 'F' => 611, 'G' => 778, 'H' => 722, 'I' => 278,
+            'J' => 500, 'K' => 667, 'L' => 556, 'M' => 833, 'N' => 722, 'O' => 778, 'P' => 667,
+            'Q' => 778, 'R' => 722, 'S' => 667, 'T' => 611, 'U' => 722, 'V' => 667, 'W' => 944,
+            'X' => 667, 'Y' => 667, 'Z' => 611, '[' => 278, '\\' => 278, ']' => 278, '^' => 469,
+            '_' => 556, '`' => 333, 'a' => 556, 'b' => 556, 'c' => 500, 'd' => 556, 'e' => 556,
+            'f' => 278, 'g' => 556, 'h' => 556, 'i' => 222, 'j' => 222, 'k' => 500, 'l' => 222,
+            'm' => 833, 'n' => 556, 'o' => 556, 'p' => 556, 'q' => 556, 'r' => 333, 's' => 500,
+            't' => 278, 'u' => 556, 'v' => 500, 'w' => 722, 'x' => 500, 'y' => 500, 'z' => 500,
+            '{' => 334, '|' => 260, '}' => 334, '~' => 584, '—' => 1000, '–' => 500, '“' => 444,
+            '”' => 444, '¿' => 556, '¡' => 278,
+        ];
+
+        return $metricas;
     }
 
     /**
@@ -458,6 +863,174 @@ class PdfDocumentGenerator
         }
 
         return $contenido."Q\n";
+    }
+
+    /**
+     * @param  list<list<array<string, mixed>>>  $paginas
+     */
+    private function construirPdfMemorando(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr, ?string $firmaImagen, ?string $encabezado): string
+    {
+        $objetos = [
+            1 => '<< /Type /Catalog /Pages 2 0 R >>',
+            3 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+            4 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+        ];
+        $idsPaginas = [];
+        $idEncabezado = null;
+        $idFirma = null;
+
+        if ($encabezado !== null) {
+            $medidas = @getimagesizefromstring($encabezado);
+
+            if (is_array($medidas) && ($medidas[2] ?? null) === IMAGETYPE_JPEG) {
+                $idEncabezado = 5;
+                $objetos[$idEncabezado] = '<< /Type /XObject /Subtype /Image /Width '.(int) $medidas[0].' /Height '.(int) $medidas[1]
+                    .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($encabezado)." >>\nstream\n"
+                    .$encabezado."\nendstream";
+            }
+        }
+
+        if ($firmaImagen !== null) {
+            $medidas = @getimagesizefromstring($firmaImagen);
+
+            if (! is_array($medidas) || ($medidas[2] ?? null) !== IMAGETYPE_JPEG) {
+                throw new RuntimeException('La firma del perfil no está en un formato de imagen válido.');
+            }
+
+            $idFirma = $idEncabezado === null ? 5 : 6;
+            $objetos[$idFirma] = '<< /Type /XObject /Subtype /Image /Width '.(int) $medidas[0].' /Height '.(int) $medidas[1]
+                .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($firmaImagen)." >>\nstream\n"
+                .$firmaImagen."\nendstream";
+        }
+
+        $primerIdPagina = max(5, ($idEncabezado ?? 4) + 1, ($idFirma ?? 4) + 1);
+
+        foreach ($paginas as $indice => $lineas) {
+            $idPagina = $primerIdPagina + ($indice * 2);
+            $idContenido = $idPagina + 1;
+            $idsPaginas[] = $idPagina.' 0 R';
+            $contenido = $this->contenidoPaginaMemorando($lineas, $qr, $idEncabezado !== null, $idFirma !== null);
+            $xobjects = [];
+
+            if ($idEncabezado !== null) {
+                $xobjects[] = '/Encabezado '.$idEncabezado.' 0 R';
+            }
+
+            if ($idFirma !== null) {
+                $xobjects[] = '/Firma '.$idFirma.' 0 R';
+            }
+
+            $recursosImagen = $xobjects === [] ? '' : ' /XObject << '.implode(' ', $xobjects).' >>';
+            $objetos[$idPagina] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>'.$recursosImagen.' >> /Contents '.$idContenido.' 0 R >>';
+            $objetos[$idContenido] = '<< /Length '.strlen($contenido)." >>\nstream\n".$contenido."\nendstream";
+        }
+
+        $objetos[2] = '<< /Type /Pages /Kids ['.implode(' ', $idsPaginas).'] /Count '.count($paginas).' >>';
+        $idInfo = $primerIdPagina + (count($paginas) * 2);
+        $objetos[$idInfo] = '<< /Title '.$this->pdfTexto($numero).' /Author '.$this->pdfTexto($institucion).' /Creator '.$this->pdfTexto('Sistema de Gestión Documentaria Laravel').' >>';
+        ksort($objetos);
+
+        $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+        $desplazamientos = [0];
+
+        foreach ($objetos as $id => $objeto) {
+            $desplazamientos[$id] = strlen($pdf);
+            $pdf .= $id." 0 obj\n".$objeto."\nendobj\n";
+        }
+
+        $inicioXref = strlen($pdf);
+        $cantidadObjetos = max(array_keys($objetos)) + 1;
+        $pdf .= "xref\n0 ".$cantidadObjetos."\n0000000000 65535 f \n";
+
+        for ($id = 1; $id < $cantidadObjetos; $id++) {
+            $pdf .= str_pad((string) ($desplazamientos[$id] ?? 0), 10, '0', STR_PAD_LEFT)." 00000 n \n";
+        }
+
+        return $pdf."trailer\n<< /Size ".$cantidadObjetos.' /Root 1 0 R /Info '.$idInfo." 0 R >>\nstartxref\n".$inicioXref."\n%%EOF";
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lineas
+     */
+    private function contenidoPaginaMemorando(array $lineas, ?ByteMatrix $qr, bool $tieneEncabezado, bool $tieneFirma): string
+    {
+        $contenido = "0.15 0.15 0.15 rg\n";
+
+        if ($tieneEncabezado) {
+            $contenido .= "q 495 0 0 46 50 784 cm /Encabezado Do Q\n";
+        }
+
+        foreach ($lineas as $linea) {
+            $tipo = (string) ($linea['tipo'] ?? 'texto');
+            $y = (float) ($linea['y'] ?? 0);
+
+            if ($tipo === 'pie') {
+                $contenido .= "q 0.65 0.65 0.65 RG 0.5 w 50 54 m 545 54 l S Q\n";
+                $contenido .= 'BT /F1 7 Tf 1 0 0 1 50 38 Tm '.$this->pdfTexto((string) ($linea['texto'] ?? ''))." Tj ET\n";
+
+                continue;
+            }
+
+            if ($tipo === 'linea') {
+                $contenido .= 'q 0.30 0.30 0.30 RG 0.7 w 50 '.number_format($y, 2, '.', '').' m 545 '.number_format($y, 2, '.', '')." l S Q\n";
+
+                continue;
+            }
+
+            if ($tipo === 'columnas') {
+                $izquierda = $linea['izquierda'] ?? [];
+                $derecha = $linea['derecha'] ?? [];
+
+                foreach ($izquierda as $indice => $texto) {
+                    $contenido .= 'BT /F1 8 Tf 1 0 0 1 105 '.number_format($y - ($indice * 12), 2, '.', '').' Tm '.$this->pdfTexto((string) $texto)." Tj ET\n";
+                }
+
+                foreach ($derecha as $indice => $texto) {
+                    $contenido .= 'BT /F1 8 Tf 1 0 0 1 300 '.number_format($y - ($indice * 12), 2, '.', '').' Tm '.$this->pdfTexto((string) $texto)." Tj ET\n";
+                }
+
+                continue;
+            }
+
+            if ($tipo === 'firma') {
+                if ($tieneFirma) {
+                    $contenido .= 'q 150 0 0 52 223 '.number_format($y - 4, 2, '.', '')." cm /Firma Do Q\n";
+                }
+
+                continue;
+            }
+
+            if ($tipo === 'campo') {
+                $etiqueta = (string) ($linea['etiqueta'] ?? '');
+                $texto = (string) ($linea['texto'] ?? '');
+                $contenido .= 'BT /F2 9 Tf 1 0 0 1 58 '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($etiqueta)." Tj ET\n";
+                $prefijo = $etiqueta === '' ? '  ' : ': ';
+                $fuenteValor = ($linea['valor_negrita'] ?? false) ? 'F2' : 'F1';
+                $contenido .= 'BT /'.$fuenteValor.' 9 Tf 1 0 0 1 136 '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($prefijo.$texto)." Tj ET\n";
+
+                continue;
+            }
+
+            $texto = (string) ($linea['texto'] ?? '');
+            $tamano = (int) ($linea['tamano'] ?? 10);
+            $fuente = ($linea['negrita'] ?? false) ? 'F2' : 'F1';
+            $centrado = (bool) ($linea['centrado'] ?? false);
+            $x = $centrado
+                ? max(50, (595 - $this->anchoMemoTextoPuntos($texto, $tamano, (bool) ($linea['negrita'] ?? false))) / 2)
+                : 50;
+            $contenido .= 'BT /'.$fuente.' '.$tamano.' Tf 1 0 0 1 '.number_format($x, 2, '.', '').' '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($texto)." Tj ET\n";
+
+            if (($linea['subrayado'] ?? false) === true) {
+                $ancho = max(20, $this->anchoMemoTextoPuntos($texto, $tamano, (bool) ($linea['negrita'] ?? false)));
+                $contenido .= 'q 0.15 0.15 0.15 RG 0.6 w '.number_format($x, 2, '.', '').' '.number_format($y - 2, 2, '.', '').' m '.number_format($x + $ancho, 2, '.', '').' '.number_format($y - 2, 2, '.', '')." l S Q\n";
+            }
+        }
+
+        if ($qr !== null) {
+            $contenido .= $this->contenidoQr($qr);
+        }
+
+        return $contenido;
     }
 
     private function pdfTexto(string $texto): string

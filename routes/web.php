@@ -86,6 +86,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('tramites.borradores.create');
         Route::get('tramites/{tramite}/borradores/{borrador}', [TramiteBorradorController::class, 'show'])
             ->whereNumber('borrador')->name('tramites.borradores.show');
+        Route::get('tramites/{tramite}/borradores/{borrador}/pdf', [TramiteBorradorController::class, 'pdf'])
+            ->whereNumber('borrador')->name('tramites.borradores.pdf');
         Route::post('tramites/{tramite}/borradores', [TramiteBorradorController::class, 'store'])
             ->name('tramites.borradores.store');
         Route::post('tramites/{tramite}/preparar-asignacion', [TramiteBorradorController::class, 'prepareAssignment'])

@@ -4,11 +4,13 @@ import { useState } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import InputError from '@/components/input-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 
 type Reviewer = { id: number; name: string; dni: string | null; rol: string; carga_activa: number };
 type Props = {
@@ -70,9 +72,11 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                 </header>
 
                 {modo === 'reasignar' && asignacion && (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
-                        Asignación actual: <strong>{asignacion.destino === 'docente' ? 'Docente' : 'Oficina'} · {asignacion.revisor}</strong>. La revisión todavía no ha iniciado.
-                    </div>
+                    <Alert>
+                        <AlertDescription>
+                            Asignación actual: <strong>{asignacion.destino === 'docente' ? 'Docente' : 'Oficina'} · {asignacion.revisor}</strong>. La revisión todavía no ha iniciado.
+                        </AlertDescription>
+                    </Alert>
                 )}
 
                 <Card>
@@ -129,9 +133,8 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                             </div>
                             {modo === 'reasignar' && (
                                 <Field id="motivo_reasignacion" label="Justificación de reasignación" error={form.errors.motivo_reasignacion}>
-                                    <textarea
+                                    <Textarea
                                         id="motivo_reasignacion"
-                                        className="min-h-24 w-full resize-y rounded-2xl border border-input bg-background px-3 py-2 text-sm"
                                         minLength={8}
                                         maxLength={1000}
                                         required
@@ -155,9 +158,8 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                                 <Input id="fecha_esperada" type="date" value={form.data.fecha_esperada} onChange={(event) => form.setData('fecha_esperada', event.target.value)} />
                             </Field>
                             <Field id="instrucciones_revision" label="Instrucciones para la revisión" error={form.errors.instrucciones_revision}>
-                                <textarea
+                                <Textarea
                                     id="instrucciones_revision"
-                                    className="min-h-24 w-full resize-y rounded-2xl border border-input bg-background px-3 py-2 text-sm"
                                     maxLength={2000}
                                     value={form.data.instrucciones_revision}
                                     onChange={(event) => form.setData('instrucciones_revision', event.target.value)}

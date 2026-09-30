@@ -11,9 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 type Recipient = { nombres: string; apellidos: string | null; cargo: string | null; correo: string | null; principal: boolean };
-type MentionedPerson = { nombres: string; apellidos: string | null; cargo: string | null };
+type MentionedPerson = { nombres: string; apellidos: string | null; cargo: string | null; dni?: string | null };
 type ObservationDraft = {
     categoria: string;
     titulo: string;
@@ -168,7 +169,7 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-medium">Personas mencionadas</h3>
                                         <ul className="list-inside list-disc text-sm text-muted-foreground">
-                                            {borrador.personas_mencionadas.map((person, index) => <li key={`${person.nombres}-${index}`}>{person.nombres} {person.apellidos ?? ''}{person.cargo ? ` · ${person.cargo}` : ''}</li>)}
+                                            {borrador.personas_mencionadas.map((person) => <li key={[person.nombres, person.apellidos ?? '', person.cargo ?? '', person.dni ?? ''].join('|')}>{person.nombres} {person.apellidos ?? ''}{person.cargo ? ` · ${person.cargo}` : ''}{person.dni ? ` · DNI ${person.dni}` : ''}</li>)}
                                         </ul>
                                     </div>
                                 )}
@@ -258,7 +259,7 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                 <CardContent>
                                     <form className="space-y-5" onSubmit={enviarObservaciones}>
                                         <Field id="resumen" label="Resumen de la observación" error={observationForm.errors.resumen}>
-                                            <textarea id="resumen" required minLength={8} maxLength={2000} rows={3} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" value={observationForm.data.resumen} onChange={(event) => observationForm.setData('resumen', event.target.value)} />
+                                            <Textarea id="resumen" required minLength={8} maxLength={2000} rows={3} value={observationForm.data.resumen} onChange={(event) => observationForm.setData('resumen', event.target.value)} />
                                         </Field>
                                         {observationForm.data.observaciones.map((observacion, index) => (
                                             <article key={index} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
@@ -275,7 +276,7 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                                     <Input id={`observacion-${index}-seccion`} value={observacion.seccion} maxLength={160} onChange={(event) => actualizarObservacion(index, 'seccion', event.target.value)} />
                                                 </Field>
                                                 <Field id={`observacion-${index}-descripcion`} label="Descripción" error={observationForm.errors[`observaciones.${index}.descripcion`]}>
-                                                    <textarea id={`observacion-${index}-descripcion`} required minLength={5} maxLength={5000} rows={3} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" value={observacion.descripcion} onChange={(event) => actualizarObservacion(index, 'descripcion', event.target.value)} />
+                                                    <Textarea id={`observacion-${index}-descripcion`} required minLength={5} maxLength={5000} rows={3} value={observacion.descripcion} onChange={(event) => actualizarObservacion(index, 'descripcion', event.target.value)} />
                                                 </Field>
                                                 <label className="flex items-center gap-2 text-sm">
                                                     <input type="checkbox" checked={observacion.obligatoria} onChange={(event) => actualizarObservacion(index, 'obligatoria', event.target.checked)} />
@@ -329,10 +330,10 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                             <>
                                                 <input type="hidden" name="decision" value="aprobar" />
                                                 <Field id="conclusion-aprobacion" label="Conclusión para aprobar" error={errors.conclusion}>
-                                                    <textarea id="conclusion-aprobacion" name="conclusion" required minLength={8} maxLength={4000} rows={3} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
+                                                    <Textarea id="conclusion-aprobacion" name="conclusion" required minLength={8} maxLength={4000} rows={3} />
                                                 </Field>
                                                 <Field id="comentario-publico-aprobacion" label="Mensaje para el estudiante (opcional)" error={errors.comentario_publico}>
-                                                    <textarea id="comentario-publico-aprobacion" name="comentario_publico" maxLength={4000} rows={2} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
+                                                    <Textarea id="comentario-publico-aprobacion" name="comentario_publico" maxLength={4000} rows={2} />
                                                 </Field>
                                                 <Button type="submit" disabled={processing} className="w-full">{processing ? <Spinner /> : null} Aprobar trámite</Button>
                                             </>
@@ -344,10 +345,10 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                             <>
                                                 <input type="hidden" name="decision" value="rechazar" />
                                                 <Field id="fundamento-rechazo" label="Fundamento del rechazo" error={errors.conclusion}>
-                                                    <textarea id="fundamento-rechazo" name="conclusion" required minLength={8} maxLength={4000} rows={3} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
+                                                    <Textarea id="fundamento-rechazo" name="conclusion" required minLength={8} maxLength={4000} rows={3} />
                                                 </Field>
                                                 <Field id="comentario-publico-rechazo" label="Comentario público" error={errors.comentario_publico}>
-                                                    <textarea id="comentario-publico-rechazo" name="comentario_publico" required minLength={8} maxLength={4000} rows={3} className="w-full resize-y rounded-2xl border border-transparent bg-input/50 px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
+                                                    <Textarea id="comentario-publico-rechazo" name="comentario_publico" required minLength={8} maxLength={4000} rows={3} />
                                                 </Field>
                                                 <Button type="submit" variant="destructive" disabled={processing} className="w-full">{processing ? <Spinner /> : null} Rechazar trámite</Button>
                                             </>
