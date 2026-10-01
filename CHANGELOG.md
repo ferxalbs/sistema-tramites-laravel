@@ -1,15 +1,26 @@
 # Changelog
 
-Registro de cambios del Sistema de Trámites. Actualizado el **30 de septiembre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
+Registro de cambios del Sistema de Trámites. Actualizado el **1 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. Distingue el código publicado de los cambios locales todavía no publicados. No contiene contraseñas, claves SMTP ni tokens.
 
-## Estado actual — 2026-09-30
+## Estado actual — 2026-10-01
 
-- La última versión funcional comprobada es [`190669b`](https://github.com/ferxalbs/sistema-tramites-laravel/commit/190669b9eff5864c6b3fbcb9e997568e716eba0e). Incluye también [`339e515`](https://github.com/ferxalbs/sistema-tramites-laravel/commit/339e515095d4b2bc802edb96e121e055c170d62f).
-- Al revisar el repositorio el 30 de septiembre, `HEAD` y `origin/main` coincidían en `190669b`, sin archivos ni commits pendientes. Esa comprobación corresponde al estado anterior a esta actualización del changelog.
+- `HEAD` y `origin/main` coinciden en [`7b41f14`](https://github.com/ferxalbs/sistema-tramites-laravel/commit/7b41f1403e89a3029a72813f9491680b86bcedf2), que añade la vista previa PDF privada de borradores, el generador documental actualizado y el componente `Textarea`.
+- El árbol de trabajo contiene ajustes locales de PDF, formularios y pruebas posteriores a `7b41f14`. Esos ajustes todavía no constituyen una versión publicada; esta sección registra sus verificaciones locales sin presentarlos como un despliegue.
 - La migración de Informe y Memorandos se aplicó correctamente en la base SQLite local. Su aplicación en la base de producción todavía no se ha verificado.
 - El código está publicado en GitHub. La actualización efectiva y el funcionamiento de esa versión en Railway siguen pendientes de comprobación.
-- La última suite completa local, ejecutada el 29 de septiembre con PHP 8.5, terminó con **157 pruebas: 151 aprobadas, 6 omitidas, 3056 aserciones y 2 avisos sin detalle**. Pasaron `pnpm types:check`, `pnpm build`, la revisión de sintaxis de los PHP modificados y `git diff --check`.
-- Las seis pruebas omitidas corresponden a integración remota. Las pruebas locales no demuestran por sí solas el funcionamiento completo de producción.
+- La suite completa local se ejecutó con `PAO_DISABLE=1 PATH=/Users/fer/.config/herd-lite/bin:$PATH vendor/bin/pest --display-warnings --display-deprecations --compact` y terminó con **154 pruebas aprobadas, 6 omitidas, 3102 aserciones y 17.58 segundos**. Las seis omitidas son pruebas de integración remota condicionadas a `TURSO_TEST_*`, porque no había credenciales remotas desechables.
+- El mismo recorrido deja dos imports inefectivos preexistentes de `RuntimeException`, en `tests/Feature/TramiteWorkflowTest.php:34` y `tests/Feature/Database/TursoConnectionTest.php:12`; no se atribuyen a los cambios locales. `pnpm run types:check`, `pnpm run build` y la comprobación específica de recepción (10 pruebas, 428 aserciones) pasaron. React Doctor conserva 65 avisos de complejidad ya existentes, concentrados en `tramites/borrador.tsx` (150) y `tramites/create.tsx` (101).
+- Las pruebas locales no demuestran por sí solas el funcionamiento completo de producción.
+
+## 2026-09-30 a 2026-10-01 — Auditoría local de PDF, memorandos y catálogos
+
+- El formato canónico `tipo_documento_salida` determina si el generador usa el diseño de Memorando; el nombre de la plantilla solo se usa como compatibilidad cuando falta ese campo. La modalidad canónica determina Memorando simple o múltiple. La prueba local también cubre una plantilla renombrada y evita que un tipo `informe` se renderice como Memorando.
+- El Memorando simple usa el encabezado institucional PNG `resources/images/institucion/encabezado-institucional.png` (SHA-256 `312b97ffc2e808582374668aedcd8ee3129f98c446f1bf7220dce6c0a0b6c56d`); el múltiple usa el escudo JPEG `resources/images/institucion/encabezado-memorando-multiple.jpeg` (SHA-256 `6e54e877c56408f4e507b339db7088b6894ed54be8b09215c8f28ba628c97a73`) y tres líneas institucionales seleccionables. La estructura actual conserva `A`, `De`, nombres, cargos, asunto, fecha, separador, cierre, firma y paginación larga; la equivalencia visual completa con los Word originales todavía no está certificada.
+- El PDF usa las fuentes Type 1 Helvetica y Helvetica-Bold. La medición de Helvetica normal está implementada y la de negrita conserva aproximaciones; no se afirma identidad tipográfica con los originales. La reserva del pie deja el espacio del QR en la previsualización y la emisión: el test de Memorando largo conserva la misma cantidad de páginas con código válido o sin él.
+- La previsualización de borradores es privada, no almacena número oficial ni muta numeración, expedientes, eventos o archivos. La URL pública definitiva y la lectura independiente del QR todavía no están verificadas en Railway.
+- La auditoría funcional confirmó que `JUSTIFICACION_TARDANZA` sigue siendo un catálogo provisional sin lógica específica para el destinatario de primera hora; no existe un tipo o flujo `INASISTENCIA`. `CONSTANCIA_PRACTICA` permanece como catálogo demostrativo y no tiene reglas específicas de viabilidad, aforo, supervisor o aprobación de prácticas.
+- `CONSTANCIA_MODALIDAD_TITULACION` sí existe como catálogo y plantilla publicada. La prueba de borrador conserva texto renderizado con estudiante, DNI y programa de estudios; la generación final actualmente guarda solo `borrador_renderizado_sha256` en el snapshot y no incorpora el cuerpo renderizado completo al PDF. La extensión del snapshot y la corrección de esa pérdida siguen pendientes.
+- El servidor local de prueba quedó preparado en `http://127.0.0.1:18080` con base desechable, almacenamiento privado y cuatro usuarios ficticios; `/login` respondió 200. El recorrido completo mediante navegador todavía no se certifica.
 
 ## 2026-09-29 — Registro de Informe y Memorandos (`190669b`)
 
@@ -92,15 +103,16 @@ Estos cambios están en los commits posteriores a `8c44879` y anteriores a `339e
 - **Interfaz:** ajustes de componentes Base UI/shadcn, menús, páginas de autenticación y organización de los paneles.
 - El detalle de alcance, evidencias y limitaciones de estas etapas está en [docs/MIGRACION_PARIDAD.md](docs/MIGRACION_PARIDAD.md).
 
-## Pendientes al 2026-09-30
+## Pendientes al 2026-10-01
 
 ### Funcionamiento publicado y datos reales
 
-- [ ] Verificar que Railway haya desplegado `190669b`, que arranque correctamente y que se pueda iniciar sesión en la versión publicada.
+- [ ] Verificar que Railway haya desplegado `7b41f14` y, después de integrar los ajustes locales auditados, que el servicio arranque correctamente y permita iniciar sesión en la versión publicada.
 - [ ] Comprobar las migraciones nuevas en la base de producción, especialmente `2026_09_29_071000_add_internal_document_registration_types.php`. Su ejecución demostrada en esta sesión fue en SQLite local, no en Turso de producción.
 - [ ] Verificar que firmas, adjuntos y PDF privados persistan después de reinicios y despliegues del servicio.
 - [ ] Recorrer en producción, con cuentas autorizadas y datos institucionales controlados, el flujo de cada rol: alta/edición, búsqueda por DNI, solicitud, Informe y Memorandos, revisión, firma, emisión, descarga, entrega y cierre.
 - [ ] Probar el QR con un lector independiente y la URL pública definitiva; comprobar los permisos de descarga y los efectos de anulación o sustitución en el entorno publicado.
+- [ ] Completar la prueba de navegador local en `http://127.0.0.1:18080`. La base, el almacenamiento privado, cuatro usuarios ficticios y la respuesta 200 de `/login` ya están preparados; falta certificar el recorrido completo en navegador.
 - [ ] Completar la integración remota de Turso: transacciones de negocio, rollback, numeración concurrente, timeouts y respuestas de escritura de resultado ambiguo. Las seis pruebas remotas omitidas siguen sin aportar evidencia nueva.
 
 ### Correo: reservado para una sesión futura por solicitud del usuario
@@ -114,8 +126,10 @@ Estos cambios están en los commits posteriores a `8c44879` y anteriores a `339e
 ### Solicitudes y limitaciones aún abiertas
 
 - [ ] Completar la unificación del identificador docente con el DNI: la búsqueda por DNI está incorporada, pero `codigo_docente` todavía admite un valor opcional independiente. El código estudiantil sí quedó sincronizado.
-- [ ] Revisar la maquetación final de los PDF frente a los modelos institucionales, incluidas las constancias proporcionadas. El historial de plantillas y el contenido están implementados; la equivalencia visual completa no está certificada.
+- [ ] Completar la maquetación comparativa de los PDF frente a los Word institucionales. Los encabezados exactos ya están identificados por hash y la estructura de Memorando está cubierta por pruebas locales, pero la equivalencia visual completa y la identidad tipográfica no están certificadas.
+- [ ] Hacer que la emisión de la constancia de titulación consuma el cuerpo completo de `contenido_renderizado` y ampliar el snapshot para conservarlo; actualmente solo se conserva su hash y el PDF final puede perder ese cuerpo.
 - [ ] Revisar las diferencias de presentación de plantillas respecto del sistema de origen: el renderizado conserva texto escapado, pero no toda su presentación HTML limitada. No reconstruir versiones antiguas sin instantánea a partir de datos actuales.
+- [ ] Implementar y validar la lógica institucional que todavía no existe para destinatario de primera hora de tardanzas, inasistencias a todos los docentes correspondientes y revisión de viabilidad, aforo, supervisor, aprobación y constancia de prácticas.
 - [ ] Clasificar los avisos de pruebas y los diagnósticos históricos de PHPStan/React Doctor que permanecen en páginas y servicios grandes. La última verificación de TypeScript pasó.
 - [ ] Revisar los imports Radix/Base UI antes de retirar dependencias; evaluar la dependencia `turso/libsql` y su requisito de FFI, aunque el adaptador HTTP propio no lo use directamente.
 

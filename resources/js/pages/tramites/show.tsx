@@ -1,16 +1,16 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, ClipboardCheck, Download, FileCheck2, FilePlus2, FileText, Pencil, Printer, Send } from 'lucide-react';
+import { Children, cloneElement, isValidElement, type ReactElement } from 'react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEntregaController from '@/actions/App/Http/Controllers/TramiteEntregaController';
 import TramiteDocumentoFinalController from '@/actions/App/Http/Controllers/TramiteDocumentoFinalController';
 import TramiteStatusBadge from '@/components/tramite-status-badge';
-import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field as ShadcnField, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -251,15 +251,17 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                     <Form {...TramiteDocumentoFinalController.annul.form({ tramite: tramite.id, documento: tramite.documento_final.id })}>
                                         {({ errors, processing }) => (
                                             <CardFooter className="flex flex-col items-stretch gap-3 border-t pt-4">
-                                                <p className="text-sm text-muted-foreground">Anular o autorizar una sustitución conserva el PDF y consume definitivamente este número.</p>
-                                                <Label htmlFor="motivo-documento-final">Motivo administrativo</Label>
-                                                <Input id="motivo-documento-final" name="motivo" required minLength={10} maxLength={1000} aria-invalid={Boolean(errors.motivo)} />
-                                                <InputError message={errors.motivo} />
-                                                <InputError message={errors.accion} />
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Button type="submit" name="accion" value="anular" variant="destructive" disabled={processing}>Anular documento</Button>
-                                                    <Button type="submit" name="accion" value="sustituir" variant="outline" disabled={processing}>Autorizar sustitución</Button>
-                                                </div>
+                                                <FieldGroup className="gap-3">
+                                                    <p className="text-sm text-muted-foreground">Anular o autorizar una sustitución conserva el PDF y consume definitivamente este número.</p>
+                                                    <Field id="motivo-documento-final" label="Motivo administrativo" error={errors.motivo}>
+                                                        <Input id="motivo-documento-final" name="motivo" required minLength={10} maxLength={1000} />
+                                                    </Field>
+                                                    <FieldError id="accion-documento-final-error">{errors.accion}</FieldError>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Button type="submit" name="accion" value="anular" variant="destructive" disabled={processing}>Anular documento</Button>
+                                                        <Button type="submit" name="accion" value="sustituir" variant="outline" disabled={processing}>Autorizar sustitución</Button>
+                                                    </div>
+                                                </FieldGroup>
                                             </CardFooter>
                                         )}
                                     </Form>
@@ -316,12 +318,11 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                     action={TramiteAsignacionController.cancel.url({ tramite: tramite.id })}
                                                     method="post"
                                                     options={{ preserveScroll: true }}
-                                                    className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-[1fr_auto] sm:items-end"
+                                                    className="mt-4"
                                                 >
                                                     {({ errors, processing }) => (
-                                                        <>
-                                                            <div className="grid gap-2">
-                                                                <Label htmlFor="motivo_finalizacion">Motivo para cancelar</Label>
+                                                        <FieldGroup className="grid gap-3 border-t pt-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                                                            <Field id="motivo_finalizacion" label="Motivo para cancelar" error={errors.motivo_finalizacion}>
                                                                 <Textarea
                                                                     id="motivo_finalizacion"
                                                                     name="motivo_finalizacion"
@@ -330,10 +331,9 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                                     maxLength={1000}
                                                                     rows={2}
                                                                 />
-                                                                <InputError message={errors.motivo_finalizacion} />
-                                                            </div>
+                                                            </Field>
                                                             <Button type="submit" variant="outline" disabled={processing}>Cancelar asignación</Button>
-                                                        </>
+                                                        </FieldGroup>
                                                     )}
                                                 </Form>
                                             )}
@@ -506,23 +506,26 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                         method="post"
                                         options={{ preserveScroll: true }}
                                         resetOnSuccess
-                                        className="grid gap-3 sm:grid-cols-[12rem_minmax(12rem,1fr)_auto] sm:items-end"
                                     >
                                         {({ errors, processing }) => (
-                                            <>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="categoria-documento">Categoría</Label>
+                                            <FieldGroup className="grid gap-3 sm:grid-cols-[12rem_minmax(12rem,1fr)_auto] sm:items-end">
+                                                <ShadcnField data-invalid={errors.categoria ? true : undefined}>
+                                                    <FieldLabel htmlFor="categoria-documento">Categoría</FieldLabel>
                                                     <Select name="categoria" defaultValue={tramite.documentos.length === 0 ? 'documento_original' : 'documento_escaneado'}>
-                                                        <SelectTrigger id="categoria-documento" className="w-full"><SelectValue /></SelectTrigger>
+                                                        <SelectTrigger
+                                                            id="categoria-documento"
+                                                            className="w-full"
+                                                            aria-describedby={errors.categoria ? 'categoria-documento-error' : undefined}
+                                                            aria-invalid={errors.categoria ? true : undefined}
+                                                        ><SelectValue /></SelectTrigger>
                                                         <SelectContent><SelectGroup>
                                                             <SelectItem value="documento_original">Documento original</SelectItem>
                                                             <SelectItem value="documento_escaneado">Documento escaneado</SelectItem>
                                                         </SelectGroup></SelectContent>
                                                     </Select>
-                                                    <InputError message={errors.categoria} />
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="documento-digitalizado">Documento recibido</Label>
+                                                    <FieldError id="categoria-documento-error">{errors.categoria}</FieldError>
+                                                </ShadcnField>
+                                                <Field id="documento-digitalizado" label="Documento recibido" error={errors.documento}>
                                                     <Input
                                                         id="documento-digitalizado"
                                                         name="documento"
@@ -531,13 +534,12 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                         accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                                                     />
                                                     <p className="text-xs text-muted-foreground">PDF, JPG o PNG; máximo 10 MB.</p>
-                                                    <InputError message={errors.documento} />
-                                                </div>
+                                                </Field>
                                                 <Button type="submit" disabled={processing}>
                                                     {processing ? <Spinner /> : <FileText />}
                                                     {tramite.estado === 'recibido_oficina' ? 'Digitalizar' : 'Agregar'}
                                                 </Button>
-                                            </>
+                                            </FieldGroup>
                                         )}
                                     </Form>
                                 </CardContent>
@@ -551,17 +553,17 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                     <CardDescription>Adjunta el documento corregido recibido en Mesa de Partes. El estado seguirá Observado.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <Form action={TramiteController.correct.url({ tramite: tramite.id })} method="post" resetOnSuccess options={{ preserveScroll: true }} className="grid gap-3">
+                                    <Form action={TramiteController.correct.url({ tramite: tramite.id })} method="post" resetOnSuccess options={{ preserveScroll: true }}>
                                         {({ errors, processing }) => (
-                                            <>
-                                                <Label htmlFor="documento-subsanacion">Documento corregido</Label>
-                                                <Input id="documento-subsanacion" name="documento" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
-                                                <InputError message={errors.documento} />
-                                                <Label htmlFor="observacion-subsanacion">Detalle de la subsanación recibida</Label>
-                                                <Textarea id="observacion-subsanacion" name="observacion" required minLength={3} maxLength={2000} rows={3} />
-                                                <InputError message={errors.observacion} />
+                                            <FieldGroup className="gap-3">
+                                                <Field id="documento-subsanacion" label="Documento corregido" error={errors.documento}>
+                                                    <Input id="documento-subsanacion" name="documento" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
+                                                </Field>
+                                                <Field id="observacion-subsanacion" label="Detalle de la subsanación recibida" error={errors.observacion}>
+                                                    <Textarea id="observacion-subsanacion" name="observacion" required minLength={3} maxLength={2000} rows={3} />
+                                                </Field>
                                                 <Button type="submit" disabled={processing}>Registrar subsanación</Button>
-                                            </>
+                                            </FieldGroup>
                                         )}
                                     </Form>
                                 </CardContent>
@@ -604,11 +606,9 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                     <Form action={TramiteController.replace.url({ tramite: tramite.id, documento: documento.id })} method="post" resetOnSuccess options={{ preserveScroll: true }} className="flex flex-wrap items-end gap-2">
                                                         {({ errors, processing }) => (
                                                             <>
-                                                                <div className="grid gap-1">
-                                                                    <Label htmlFor={`reemplazo-${documento.id}`}>Nueva versión</Label>
+                                                                <Field id={`reemplazo-${documento.id}`} label="Nueva versión" error={errors.documento}>
                                                                     <Input id={`reemplazo-${documento.id}`} name="documento" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
-                                                                    <InputError message={errors.documento} />
-                                                                </div>
+                                                                </Field>
                                                                 <Button type="submit" variant="outline" disabled={processing}>Reemplazar</Button>
                                                             </>
                                                         )}
@@ -644,6 +644,30 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                 </div>
             </main>
         </>
+    );
+}
+
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': invalid ? errorId : undefined,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
+    return (
+        <ShadcnField data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 

@@ -1,7 +1,13 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import {
+    Children,
+    cloneElement,
+    isValidElement,
+    useState,
+    type ReactElement,
+    type ReactNode,
+} from 'react';
 import { Badge } from '@/components/ui/badge';
-import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,8 +19,13 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Field as ShadcnField,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import {
@@ -150,10 +161,11 @@ export default function UsuariosForm({
                     >
                         {({ errors, processing }) => (
                             <>
-                                <CardContent className="grid gap-5">
+                                <CardContent>
+                                    <FieldGroup className="gap-5">
                                     {!assistant && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="rol">Rol de acceso</Label>
+                                        <ShadcnField className="gap-2" data-invalid={errors.rol ? true : undefined}>
+                                            <FieldLabel htmlFor="rol">Rol de acceso</FieldLabel>
                                             <Select
                                                 name="rol"
                                                 items={roles}
@@ -165,7 +177,11 @@ export default function UsuariosForm({
                                                 }
                                                 required
                                             >
-                                                <SelectTrigger id="rol">
+                                                <SelectTrigger
+                                                    id="rol"
+                                                    aria-describedby={errors.rol ? 'rol-error' : undefined}
+                                                    aria-invalid={errors.rol ? true : undefined}
+                                                >
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -183,20 +199,17 @@ export default function UsuariosForm({
                                                     </SelectGroup>
                                                 </SelectContent>
                                             </Select>
-                                            <InputError message={errors.rol} />
+                                            <FieldError id="rol-error">{errors.rol}</FieldError>
                                             {role === 'estudiante' && (
                                                 <p className="text-sm text-muted-foreground">
                                                     El acceso estudiantil sirve para ambas situaciones; abajo elige si esta persona es Estudiante o Egresado.
                                                 </p>
                                             )}
-                                        </div>
+                                        </ShadcnField>
                                     )}
 
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="nombres">
-                                                Nombres
-                                            </Label>
+                                    <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                                        <Field id="nombres" label="Nombres" error={errors.nombres}>
                                             <Input
                                                 id="nombres"
                                                 name="nombres"
@@ -206,14 +219,8 @@ export default function UsuariosForm({
                                                 maxLength={120}
                                                 required
                                             />
-                                            <InputError
-                                                message={errors.nombres}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="apellidos">
-                                                Apellidos
-                                            </Label>
+                                        </Field>
+                                        <Field id="apellidos" label="Apellidos" error={errors.apellidos}>
                                             <Input
                                                 id="apellidos"
                                                 name="apellidos"
@@ -223,12 +230,8 @@ export default function UsuariosForm({
                                                 maxLength={120}
                                                 required
                                             />
-                                            <InputError
-                                                message={errors.apellidos}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="dni">DNI</Label>
+                                        </Field>
+                                        <Field id="dni" label="DNI" error={errors.dni}>
                                             <Input
                                                 id="dni"
                                                 name="dni"
@@ -238,12 +241,8 @@ export default function UsuariosForm({
                                                 maxLength={8}
                                                 required
                                             />
-                                            <InputError message={errors.dni} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="celular">
-                                                Número de celular
-                                            </Label>
+                                        </Field>
+                                        <Field id="celular" label="Número de celular" error={errors.celular}>
                                             <Input
                                                 id="celular"
                                                 name="celular"
@@ -253,14 +252,8 @@ export default function UsuariosForm({
                                                 maxLength={20}
                                                 required
                                             />
-                                            <InputError
-                                                message={errors.celular}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="email">
-                                                Correo institucional
-                                            </Label>
+                                        </Field>
+                                        <Field id="email" label="Correo institucional" error={errors.email}>
                                             <Input
                                                 id="email"
                                                 name="email"
@@ -269,14 +262,8 @@ export default function UsuariosForm({
                                                 maxLength={190}
                                                 required
                                             />
-                                            <InputError
-                                                message={errors.email}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="correo_alternativo">
-                                                Correo alternativo (opcional)
-                                            </Label>
+                                        </Field>
+                                        <Field id="correo_alternativo" label="Correo alternativo (opcional)" error={errors.correo_alternativo}>
                                             <Input
                                                 id="correo_alternativo"
                                                 name="correo_alternativo"
@@ -287,20 +274,15 @@ export default function UsuariosForm({
                                                 }
                                                 maxLength={190}
                                             />
-                                            <InputError
-                                                message={
-                                                    errors.correo_alternativo
-                                                }
-                                            />
-                                        </div>
-                                    </div>
+                                        </Field>
+                                    </FieldGroup>
 
                                     {(role === 'estudiante' ||
                                         role === 'docente') && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="programa_estudio_id">
+                                        <ShadcnField className="gap-2" data-invalid={errors.programa_estudio_id ? true : undefined}>
+                                            <FieldLabel htmlFor="programa_estudio_id">
                                                 Programa de estudios
-                                            </Label>
+                                            </FieldLabel>
                                             <Select
                                                 name="programa_estudio_id"
                                                 items={programas.map(
@@ -313,7 +295,11 @@ export default function UsuariosForm({
                                                 onValueChange={setProgram}
                                                 required
                                             >
-                                                <SelectTrigger id="programa_estudio_id">
+                                                <SelectTrigger
+                                                    id="programa_estudio_id"
+                                                    aria-describedby={errors.programa_estudio_id ? 'programa_estudio_id-error' : undefined}
+                                                    aria-invalid={errors.programa_estudio_id ? true : undefined}
+                                                >
                                                     <SelectValue placeholder="Seleccione un programa" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -337,11 +323,7 @@ export default function UsuariosForm({
                                                     </SelectGroup>
                                                 </SelectContent>
                                             </Select>
-                                            <InputError
-                                                message={
-                                                    errors.programa_estudio_id
-                                                }
-                                            />
+                                            <FieldError id="programa_estudio_id-error">{errors.programa_estudio_id}</FieldError>
                                             {programas.length === 0 && (
                                                 <p className="text-sm text-destructive">
                                                     No hay programas de estudios
@@ -350,14 +332,14 @@ export default function UsuariosForm({
                                                     cuentas.
                                                 </p>
                                             )}
-                                        </div>
+                                        </ShadcnField>
                                     )}
 
                                     {!assistant && role !== 'estudiante' && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="cargo_institucional_id">
+                                        <ShadcnField className="gap-2" data-invalid={errors.cargo_institucional_id ? true : undefined}>
+                                            <FieldLabel htmlFor="cargo_institucional_id">
                                                 Cargo institucional
-                                            </Label>
+                                            </FieldLabel>
                                             <Select
                                                 name="cargo_institucional_id"
                                                 defaultValue={
@@ -378,7 +360,11 @@ export default function UsuariosForm({
                                                     })),
                                                 ]}
                                             >
-                                                <SelectTrigger id="cargo_institucional_id">
+                                                <SelectTrigger
+                                                    id="cargo_institucional_id"
+                                                    aria-describedby={errors.cargo_institucional_id ? 'cargo_institucional_id-error' : undefined}
+                                                    aria-invalid={errors.cargo_institucional_id ? true : undefined}
+                                                >
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -399,24 +385,20 @@ export default function UsuariosForm({
                                                     </SelectGroup>
                                                 </SelectContent>
                                             </Select>
-                                            <InputError
-                                                message={
-                                                    errors.cargo_institucional_id
-                                                }
-                                            />
-                                        </div>
+                                            <FieldError id="cargo_institucional_id-error">{errors.cargo_institucional_id}</FieldError>
+                                        </ShadcnField>
                                     )}
 
                                     {role === 'estudiante' && (
-                                        <div className="grid gap-4 sm:grid-cols-2">
+                                        <FieldGroup className="grid gap-4 sm:grid-cols-2">
                                             <div className="rounded-xl border bg-muted/30 p-3 text-sm sm:col-span-2">
                                                 El DNI registrado arriba también
                                                 será el código del estudiante.
                                             </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="condicion_academica">
+                                            <ShadcnField className="gap-2" data-invalid={errors.condicion_academica ? true : undefined}>
+                                                <FieldLabel htmlFor="condicion_academica">
                                                     Situación académica
-                                                </Label>
+                                                </FieldLabel>
                                                 <Select
                                                     name="condicion_academica"
                                                     items={[
@@ -438,7 +420,11 @@ export default function UsuariosForm({
                                                     }
                                                     required
                                                 >
-                                                    <SelectTrigger id="condicion_academica">
+                                                    <SelectTrigger
+                                                        id="condicion_academica"
+                                                        aria-describedby={errors.condicion_academica ? 'condicion_academica-error' : undefined}
+                                                        aria-invalid={errors.condicion_academica ? true : undefined}
+                                                    >
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -452,20 +438,13 @@ export default function UsuariosForm({
                                                         </SelectGroup>
                                                     </SelectContent>
                                                 </Select>
-                                                <InputError
-                                                    message={
-                                                        errors.condicion_academica
-                                                    }
-                                                />
+                                                <FieldError id="condicion_academica-error">{errors.condicion_academica}</FieldError>
                                                 <p className="text-sm text-muted-foreground">
                                                     Selecciona una sola opción: Estudiante o Egresado.
                                                 </p>
-                                            </div>
+                                            </ShadcnField>
                                             {condition === 'Estudiante' ? (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="ciclo_actual">
-                                                        Ciclo actual
-                                                    </Label>
+                                                <Field id="ciclo_actual" label="Ciclo actual" error={errors.ciclo_actual}>
                                                     <Input
                                                         id="ciclo_actual"
                                                         name="ciclo_actual"
@@ -478,17 +457,9 @@ export default function UsuariosForm({
                                                         }
                                                         required
                                                     />
-                                                    <InputError
-                                                        message={
-                                                            errors.ciclo_actual
-                                                        }
-                                                    />
-                                                </div>
+                                                </Field>
                                             ) : (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="anio_egreso">
-                                                        Año de egreso
-                                                    </Label>
+                                                <Field id="anio_egreso" label="Año de egreso" error={errors.anio_egreso}>
                                                     <Input
                                                         id="anio_egreso"
                                                         name="anio_egreso"
@@ -501,17 +472,9 @@ export default function UsuariosForm({
                                                         }
                                                         required
                                                     />
-                                                    <InputError
-                                                        message={
-                                                            errors.anio_egreso
-                                                        }
-                                                    />
-                                                </div>
+                                                </Field>
                                             )}
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="direccion_residencia">
-                                                    Dirección (opcional)
-                                                </Label>
+                                            <Field id="direccion_residencia" label="Dirección (opcional)" error={errors.direccion_residencia}>
                                                 <Input
                                                     id="direccion_residencia"
                                                     name="direccion_residencia"
@@ -521,21 +484,13 @@ export default function UsuariosForm({
                                                     }
                                                     maxLength={255}
                                                 />
-                                                <InputError
-                                                    message={
-                                                        errors.direccion_residencia
-                                                    }
-                                                />
-                                            </div>
-                                        </div>
+                                            </Field>
+                                        </FieldGroup>
                                     )}
 
                                     {role === 'docente' && (
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="codigo_docente">
-                                                    Código docente (opcional)
-                                                </Label>
+                                        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                                            <Field id="codigo_docente" label="Código docente (opcional)" error={errors.codigo_docente}>
                                                 <Input
                                                     id="codigo_docente"
                                                     name="codigo_docente"
@@ -545,16 +500,8 @@ export default function UsuariosForm({
                                                     }
                                                     maxLength={40}
                                                 />
-                                                <InputError
-                                                    message={
-                                                        errors.codigo_docente
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="especialidad">
-                                                    Especialidad (opcional)
-                                                </Label>
+                                            </Field>
+                                            <Field id="especialidad" label="Especialidad (opcional)" error={errors.especialidad}>
                                                 <Input
                                                     id="especialidad"
                                                     name="especialidad"
@@ -563,16 +510,8 @@ export default function UsuariosForm({
                                                     }
                                                     maxLength={160}
                                                 />
-                                                <InputError
-                                                    message={
-                                                        errors.especialidad
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="condicion_laboral">
-                                                    Condición laboral (opcional)
-                                                </Label>
+                                            </Field>
+                                            <Field id="condicion_laboral" label="Condición laboral (opcional)" error={errors.condicion_laboral}>
                                                 <Input
                                                     id="condicion_laboral"
                                                     name="condicion_laboral"
@@ -582,21 +521,13 @@ export default function UsuariosForm({
                                                     }
                                                     maxLength={100}
                                                 />
-                                                <InputError
-                                                    message={
-                                                        errors.condicion_laboral
-                                                    }
-                                                />
-                                            </div>
-                                        </div>
+                                            </Field>
+                                        </FieldGroup>
                                     )}
 
                                     {!user && (
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="password">
-                                                    Contraseña temporal
-                                                </Label>
+                                        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                                            <Field id="password" label="Contraseña temporal" error={errors.password}>
                                                 <PasswordInput
                                                     id="password"
                                                     name="password"
@@ -607,14 +538,8 @@ export default function UsuariosForm({
                                                     }
                                                     required
                                                 />
-                                                <InputError
-                                                    message={errors.password}
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="password_confirmation">
-                                                    Confirmar contraseña
-                                                </Label>
+                                            </Field>
+                                            <Field id="password_confirmation" label="Confirmar contraseña" error={errors.password_confirmation}>
                                                 <PasswordInput
                                                     id="password_confirmation"
                                                     name="password_confirmation"
@@ -625,52 +550,46 @@ export default function UsuariosForm({
                                                     }
                                                     required
                                                 />
-                                                <InputError
-                                                    message={
-                                                        errors.password_confirmation
-                                                    }
-                                                />
-                                            </div>
+                                            </Field>
                                             {!assistant && (
-                                                <div className="flex items-center gap-2 sm:col-span-2">
+                                                <ShadcnField orientation="horizontal" className="sm:col-span-2">
                                                     <Checkbox
                                                         id="activar_inmediatamente"
                                                         name="activar_inmediatamente"
                                                         value="1"
                                                         defaultChecked
                                                     />
-                                                    <Label htmlFor="activar_inmediatamente">
+                                                    <FieldLabel htmlFor="activar_inmediatamente">
                                                         Crear activa y
                                                         verificada
                                                         administrativamente
-                                                    </Label>
-                                                </div>
+                                                    </FieldLabel>
+                                                </ShadcnField>
                                             )}
-                                        </div>
+                                        </FieldGroup>
                                     )}
 
                                     {role === 'administrador' &&
                                         user?.rol !== 'administrador' && (
-                                            <div className="grid gap-2">
+                                            <ShadcnField data-invalid={errors.confirmar_administrador ? true : undefined}>
                                                 <div className="flex items-center gap-2">
                                                     <Checkbox
                                                         id="confirmar_administrador"
                                                         name="confirmar_administrador"
                                                         value="1"
                                                         required
+                                                        aria-describedby={errors.confirmar_administrador ? 'confirmar_administrador-error' : undefined}
+                                                        aria-invalid={errors.confirmar_administrador ? true : undefined}
                                                     />
-                                                    <Label htmlFor="confirmar_administrador">
+                                                    <FieldLabel htmlFor="confirmar_administrador">
                                                         Confirmo la asignación
                                                         del rol Administrador
-                                                    </Label>
+                                                    </FieldLabel>
                                                 </div>
-                                                <InputError
-                                                    message={
-                                                        errors.confirmar_administrador
-                                                    }
-                                                />
-                                            </div>
+                                                <FieldError id="confirmar_administrador-error">{errors.confirmar_administrador}</FieldError>
+                                            </ShadcnField>
                                         )}
+                                    </FieldGroup>
                                 </CardContent>
                                 <CardFooter className="flex flex-col items-start gap-3">
                                     {Object.keys(errors).length > 0 && (
@@ -718,6 +637,47 @@ export default function UsuariosForm({
     );
 }
 
+function Field({
+    id,
+    label,
+    error,
+    children,
+}: {
+    id: string;
+    label: ReactNode;
+    error?: string;
+    children: ReactNode;
+}) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(
+            child as ReactElement<{
+                id?: string;
+                'aria-describedby'?: string;
+                'aria-invalid'?: boolean;
+            }>,
+            {
+                id,
+                'aria-describedby': invalid ? errorId : undefined,
+                'aria-invalid': invalid ? true : undefined,
+            },
+        );
+    });
+
+    return (
+        <ShadcnField className="gap-2" data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
+    );
+}
+
 function AccountActions({
     user,
     viewerId,
@@ -761,7 +721,7 @@ function AccountActions({
                                     <Button type="submit" disabled={processing}>
                                         Activar cuenta
                                     </Button>
-                                    <InputError message={errors.accion} />
+                                    <FieldError id="activar-cuenta-error">{errors.accion}</FieldError>
                                 </div>
                             )}
                         </Form>
@@ -776,8 +736,7 @@ function AccountActions({
                             {({ errors, processing }) => (
                                 <div className="space-y-2">
                                     <input type="hidden" name="accion" value="deactivate" />
-                                    <label className="grid gap-1 text-sm" htmlFor="motivo-desactivacion">
-                                        Motivo de desactivación
+                                    <Field id="motivo-desactivacion" label="Motivo de desactivación" error={errors.motivo || errors.accion}>
                                         <Textarea
                                             id="motivo-desactivacion"
                                             name="motivo"
@@ -785,8 +744,7 @@ function AccountActions({
                                             maxLength={500}
                                             rows={3}
                                         />
-                                    </label>
-                                    <InputError message={errors.motivo || errors.accion} />
+                                    </Field>
                                     <Button type="submit" variant="outline" disabled={processing}>
                                         Desactivar cuenta
                                     </Button>
@@ -804,8 +762,7 @@ function AccountActions({
                             {({ errors, processing }) => (
                                 <div className="space-y-2">
                                     <input type="hidden" name="accion" value="reject" />
-                                    <label className="grid gap-1 text-sm" htmlFor="motivo-rechazo">
-                                        Motivo de rechazo
+                                    <Field id="motivo-rechazo" label="Motivo de rechazo" error={errors.motivo || errors.accion}>
                                         <Textarea
                                             id="motivo-rechazo"
                                             name="motivo"
@@ -813,8 +770,7 @@ function AccountActions({
                                             maxLength={500}
                                             rows={3}
                                         />
-                                    </label>
-                                    <InputError message={errors.motivo || errors.accion} />
+                                    </Field>
                                     <Button type="submit" variant="destructive" disabled={processing}>
                                         Rechazar solicitud
                                     </Button>
@@ -834,7 +790,7 @@ function AccountActions({
                                     <p className="text-sm text-muted-foreground">
                                         Se enviará un enlace de un solo uso al correo institucional.
                                     </p>
-                                    <InputError message={errors.reset} />
+                                    <FieldError id="restablecer-contrasena-error">{errors.reset}</FieldError>
                                     <Button type="submit" variant="outline" disabled={processing}>
                                         Enviar enlace para restablecer contraseña
                                     </Button>
@@ -861,7 +817,7 @@ function AccountActions({
                         >
                             {({ errors, processing }) => (
                                 <div className="space-y-2">
-                                    <InputError message={errors.delete} />
+                                    <FieldError id="eliminar-usuario-error">{errors.delete}</FieldError>
                                     <Button type="submit" variant="destructive" disabled={processing}>
                                         Eliminar usuario
                                     </Button>

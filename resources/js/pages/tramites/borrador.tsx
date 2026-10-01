@@ -1,14 +1,14 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { Children, cloneElement, isValidElement, type ReactElement } from 'react';
 import { ArrowLeft, Eye, FilePlus2, Save, Send } from 'lucide-react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Field as ShadcnField, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -262,7 +262,8 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardTitle>Plantilla y responsables</CardTitle>
                                 <CardDescription>{modo === 'corregir' ? 'La plantilla y su versión se conservan. Los cambios se guardarán como una versión nueva.' : 'El borrador se guarda como una nueva versión y no reserva numeración oficial.'}</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid gap-5 sm:grid-cols-2">
+                            <CardContent>
+                                <FieldGroup className="grid gap-5 sm:grid-cols-2">
                                 <FormSelect
                                     id="plantilla_id"
                                     label="Plantilla publicada"
@@ -321,6 +322,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 {plantillas.length === 0 && (
                                     <p className="text-sm text-destructive sm:col-span-2">No hay plantillas activas disponibles para preparar el borrador.</p>
                                 )}
+                                </FieldGroup>
                             </CardContent>
                         </Card>
 
@@ -329,7 +331,8 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardTitle>Destinatarios</CardTitle>
                                 <CardDescription>El memorando múltiple requiere al menos dos destinatarios y uno principal.</CardDescription>
                             </CardHeader>
-                            <CardContent className="flex flex-col gap-5">
+                            <CardContent>
+                                <FieldGroup className="gap-5">
                                 {form.data.destinatarios.map((destinatario, indice) => (
                                     <div key={indice} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
                                         <Field id={`destinatario-${indice}-nombres`} label="Nombres" error={form.errors[`destinatarios.${indice}.nombres`]}>
@@ -365,16 +368,23 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                                 onChange={(event) => actualizarDestinatario(indice, 'correo', event.target.value)}
                                             />
                                         </Field>
-                                        <Label className="sm:col-span-2">
+                                        <ShadcnField
+                                            orientation="horizontal"
+                                            className="sm:col-span-2"
+                                            data-invalid={form.errors.destinatarios ? true : undefined}
+                                        >
                                             <Checkbox
+                                                id={`destinatario-${indice}-principal`}
                                                 checked={destinatario.principal}
+                                                aria-invalid={form.errors.destinatarios ? true : undefined}
+                                                aria-describedby={form.errors.destinatarios ? 'destinatarios-error' : undefined}
                                                 onCheckedChange={(checked) => actualizarDestinatario(indice, 'principal', checked === true)}
                                             />
-                                            Destinatario principal
-                                        </Label>
+                                            <FieldLabel htmlFor={`destinatario-${indice}-principal`}>Destinatario principal</FieldLabel>
+                                        </ShadcnField>
                                     </div>
                                 ))}
-                                <InputError message={form.errors.destinatarios} />
+                                <FieldError id="destinatarios-error">{form.errors.destinatarios}</FieldError>
                                 {plantillaActual?.modalidad === 'multiple' && (
                                     <Button
                                         type="button"
@@ -389,6 +399,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                         Añadir destinatario
                                     </Button>
                                 )}
+                                </FieldGroup>
                             </CardContent>
                         </Card>
 
@@ -397,7 +408,8 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardTitle>Contenido del borrador</CardTitle>
                                 <CardDescription>La vista previa es provisional y no incluye firma ni número oficial.</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid gap-5">
+                            <CardContent>
+                                <FieldGroup className="gap-5">
                                 <EditableTemplateFields
                                     campos={plantillaActual?.campos ?? []}
                                     valores={form.data.campos}
@@ -433,18 +445,23 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     />
                                 </Field>
                                 {fechaAnterior && (
-                                    <Alert>
+                                    <ShadcnField data-invalid={form.errors.confirmar_fecha_anterior ? true : undefined}>
+                                        <Alert>
                                         <Checkbox
                                             id="confirmar-fecha-anterior"
                                             checked={form.data.confirmar_fecha_anterior}
+                                            aria-invalid={form.errors.confirmar_fecha_anterior ? true : undefined}
+                                            aria-describedby={form.errors.confirmar_fecha_anterior ? 'confirmar-fecha-anterior-error' : undefined}
                                             onCheckedChange={(checked) => form.setData('confirmar_fecha_anterior', checked === true)}
                                         />
                                         <AlertDescription>
-                                            <Label htmlFor="confirmar-fecha-anterior">Confirmo que la fecha del documento es anterior a la recepción.</Label>
+                                            <FieldLabel htmlFor="confirmar-fecha-anterior">Confirmo que la fecha del documento es anterior a la recepción.</FieldLabel>
                                         </AlertDescription>
-                                    </Alert>
+                                        </Alert>
+                                        <FieldError id="confirmar-fecha-anterior-error">{form.errors.confirmar_fecha_anterior}</FieldError>
+                                    </ShadcnField>
                                 )}
-                                <InputError message={form.errors.confirmar_fecha_anterior} />
+                                </FieldGroup>
                             </CardContent>
                         </Card>
 
@@ -455,9 +472,11 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     <CardDescription>Describe los cambios realizados antes de volver a enviar el borrador al mismo revisor.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
+                                    <FieldGroup>
                                     <Field id="resumen_correccion" label="Resumen" error={form.errors.resumen_correccion}>
                                         <Textarea id="resumen_correccion" required minLength={8} maxLength={2000} rows={4} value={form.data.resumen_correccion} onChange={(event) => form.setData('resumen_correccion', event.target.value)} />
                                     </Field>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>
                         )}
@@ -467,7 +486,8 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <CardTitle>Personas mencionadas</CardTitle>
                                 <CardDescription>Registra a las personas que aparecerán en el documento.</CardDescription>
                             </CardHeader>
-                            <CardContent className="flex flex-col gap-4">
+                            <CardContent>
+                                <FieldGroup className="gap-4">
                                 {form.data.personas_mencionadas.map((persona, indice) => (
                                     <div key={indice} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-4">
                                         <Field id={`persona-${indice}-nombres`} label="Nombres" error={form.errors[`personas_mencionadas.${indice}.nombres`]}>
@@ -505,7 +525,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                         </Field>
                                     </div>
                                 ))}
-                                <InputError message={form.errors.personas_mencionadas} />
+                                <FieldError id="personas-mencionadas-error">{form.errors.personas_mencionadas}</FieldError>
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -518,6 +538,7 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     <FilePlus2 />
                                     Añadir persona
                                 </Button>
+                                </FieldGroup>
                             </CardContent>
                         </Card>
 
@@ -527,17 +548,26 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                     <CardTitle>Documentos adjuntos</CardTitle>
                                     <CardDescription>Selecciona los archivos del expediente que se mencionarán en el borrador.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="flex flex-col gap-3">
+                                <CardContent>
+                                    <FieldGroup className="gap-3">
                                     {archivos.map((archivo) => (
-                                        <Label key={archivo.id}>
+                                        <ShadcnField
+                                            key={archivo.id}
+                                            orientation="horizontal"
+                                            data-invalid={form.errors.adjuntos ? true : undefined}
+                                        >
                                             <Checkbox
+                                                id={`adjunto-${archivo.id}`}
                                                 checked={form.data.adjuntos.includes(archivo.id)}
+                                                aria-invalid={form.errors.adjuntos ? true : undefined}
+                                                aria-describedby={form.errors.adjuntos ? 'adjuntos-error' : undefined}
                                                 onCheckedChange={(checked) => alternarAdjunto(archivo.id, checked === true)}
                                             />
-                                            <span>{archivo.nombre} · versión {archivo.version}</span>
-                                        </Label>
+                                            <FieldLabel htmlFor={`adjunto-${archivo.id}`}>{archivo.nombre} · versión {archivo.version}</FieldLabel>
+                                        </ShadcnField>
                                     ))}
-                                    <InputError message={form.errors.adjuntos} />
+                                    <FieldError id="adjuntos-error">{form.errors.adjuntos}</FieldError>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>
                         )}
@@ -663,12 +693,26 @@ function Field({
     error?: string;
     children: React.ReactNode;
 }) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': invalid ? errorId : undefined,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
     return (
-        <div className="grid content-start gap-2">
-            <Label htmlFor={id}>{label}</Label>
-            {children}
-            <InputError message={error} />
-        </div>
+        <ShadcnField data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 
@@ -689,11 +733,19 @@ function FormSelect({
     onValueChange: (value: number | null) => void;
     disabled?: boolean;
 }) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+
     return (
-        <div className="grid content-start gap-2">
-            <Label htmlFor={id}>{label}</Label>
+        <ShadcnField data-invalid={invalid ? true : undefined} data-disabled={disabled ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
             <Select items={options} name={id} value={value || null} onValueChange={onValueChange} disabled={disabled}>
-                <SelectTrigger id={id} className="w-full">
+                <SelectTrigger
+                    id={id}
+                    className="w-full"
+                    aria-describedby={invalid ? errorId : undefined}
+                    aria-invalid={invalid ? true : undefined}
+                >
                     <SelectValue placeholder={`Selecciona ${label.toLocaleLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
@@ -704,8 +756,8 @@ function FormSelect({
                     </SelectGroup>
                 </SelectContent>
             </Select>
-            <InputError message={error} />
-        </div>
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 

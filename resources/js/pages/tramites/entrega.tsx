@@ -1,15 +1,14 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { ArrowLeft, Ban, Check, Download, FileSignature, PackageCheck, RotateCcw, Send } from 'lucide-react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEntregaController from '@/actions/App/Http/Controllers/TramiteEntregaController';
 import TramiteStatusBadge from '@/components/tramite-status-badge';
-import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Field as ShadcnField, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -113,7 +112,7 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                             <Form {...TramiteEntregaController.prepare.form({ tramite: tramite.id })}>
                                 {({ errors, processing }) => (
                                     <div className="space-y-3">
-                                        <InputError message={errors.entrega} />
+                                        <FieldError id="preparar-entrega-error">{errors.entrega}</FieldError>
                                         <Button type="submit" disabled={processing}>
                                             {processing ? <Spinner data-icon="inline-start" /> : <Send data-icon="inline-start" />}
                                             Preparar para entrega
@@ -126,15 +125,15 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                         {puede_registrar_firma && documento && (
                             <Form {...TramiteEntregaController.registerSignature.form({ tramite: tramite.id })}>
                                 {({ errors, processing }) => (
-                                    <div className="grid gap-4 sm:grid-cols-2">
+                                    <FieldGroup className="grid gap-4 sm:grid-cols-2">
                                         <Field id="fecha_firma" label="Fecha y hora de firma" error={errors.fecha_firma}>
                                             <Input id="fecha_firma" name="fecha_firma" type="datetime-local" required={!documento.permite_no_firma} defaultValue={fecha_actual} />
                                         </Field>
                                         {documento.permite_no_firma && (
-                                            <div className="flex items-start gap-3 sm:col-span-2">
+                                            <ShadcnField orientation="horizontal" className="sm:col-span-2">
                                                 <Checkbox id="no-requiere-firma" name="no_requiere_firma" value="1" />
-                                                <Label htmlFor="no-requiere-firma" className="items-start leading-5">Registrar que no se requiere firma física.</Label>
-                                            </div>
+                                                <FieldLabel htmlFor="no-requiere-firma" className="items-start leading-5">Registrar que no se requiere firma física.</FieldLabel>
+                                            </ShadcnField>
                                         )}
                                         {!documento.permite_no_firma && (
                                             <Field id="evidencia-firma" label="Evidencia de firma (opcional)" error={errors.evidencia}>
@@ -150,14 +149,14 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                                         <Field id="observacion-firma" label="Observación" error={errors.observacion}>
                                             <Input id="observacion-firma" name="observacion" maxLength={1000} />
                                         </Field>
-                                        <InputError message={errors.firma} />
+                                        <FieldError id="firma-error">{errors.firma}</FieldError>
                                         <div className="sm:col-span-2">
                                             <Button type="submit" disabled={processing}>
                                                 {processing ? <Spinner data-icon="inline-start" /> : <FileSignature data-icon="inline-start" />}
                                                 Registrar firma y continuar
                                             </Button>
                                         </div>
-                                    </div>
+                                    </FieldGroup>
                                 )}
                             </Form>
                         )}
@@ -193,7 +192,7 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                         {puede_registrar_entrega && medios.length > 0 && (
                             <Form {...TramiteEntregaController.registerDelivery.form({ tramite: tramite.id })}>
                                 {({ errors, processing }) => (
-                                    <div className="grid gap-4 sm:grid-cols-2">
+                                    <FieldGroup className="grid gap-4 sm:grid-cols-2">
                                         <Field id="medio_entrega_id" label="Medio de entrega" error={errors.medio_entrega_id}>
                                             <select id="medio_entrega_id" name="medio_entrega_id" required defaultValue={String(medios[0].id)} className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm">
                                                 {medios.map((medio) => <option key={medio.id} value={medio.id}>{medio.nombre}{medio.requiere_evidencia ? ' · requiere evidencia' : ''}</option>)}
@@ -236,14 +235,14 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                                         <Field id="observacion-entrega" label="Observación" error={errors.observacion}>
                                             <Input id="observacion-entrega" name="observacion" maxLength={1000} />
                                         </Field>
-                                        <InputError message={errors.entrega} />
+                                        <FieldError id="entrega-error">{errors.entrega}</FieldError>
                                         <div className="sm:col-span-2">
                                             <Button type="submit" disabled={processing}>
                                                 {processing ? <Spinner data-icon="inline-start" /> : <PackageCheck data-icon="inline-start" />}
                                                 Registrar entrega
                                             </Button>
                                         </div>
-                                    </div>
+                                    </FieldGroup>
                                 )}
                             </Form>
                         )}
@@ -283,12 +282,23 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                         <Form {...TramiteEntregaController.confirm.form({ tramite: tramite.id })}>
                             {({ errors, processing }) => (
                                 <CardFooter className="flex flex-col items-start gap-3 border-t pt-4">
-                                    <div className="flex items-start gap-3">
-                                        <Checkbox id="confirmar-recepcion-personal" name="confirmar" value="1" required />
-                                        <Label htmlFor="confirmar-recepcion-personal" className="items-start leading-5">Confirmo la recepción registrada por el receptor.</Label>
-                                    </div>
-                                    <InputError message={errors.confirmar} />
-                                    <InputError message={errors.observacion} />
+                                    <FieldGroup className="gap-3">
+                                        <ShadcnField data-invalid={errors.confirmar ? true : undefined}>
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox
+                                                    id="confirmar-recepcion-personal"
+                                                    name="confirmar"
+                                                    value="1"
+                                                    required
+                                                    aria-describedby={errors.confirmar ? 'confirmar-recepcion-personal-error' : undefined}
+                                                    aria-invalid={errors.confirmar ? true : undefined}
+                                                />
+                                                <FieldLabel htmlFor="confirmar-recepcion-personal" className="items-start leading-5">Confirmo la recepción registrada por el receptor.</FieldLabel>
+                                            </div>
+                                            <FieldError id="confirmar-recepcion-personal-error">{errors.confirmar}</FieldError>
+                                        </ShadcnField>
+                                        <FieldError id="confirmar-observacion-error">{errors.observacion}</FieldError>
+                                    </FieldGroup>
                                     <Button type="submit" variant="outline" disabled={processing}>
                                         {processing ? <Spinner data-icon="inline-start" /> : <Check data-icon="inline-start" />}
                                         Confirmar recepción
@@ -301,9 +311,11 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                         <Form {...TramiteEntregaController.annul.form({ tramite: tramite.id, entrega: entrega.id })}>
                             {({ errors, processing }) => (
                                 <CardFooter className="flex flex-col items-start gap-3 border-t pt-4">
-                                    <Field id="motivo-anulacion" label="Motivo de anulación" error={errors.motivo}>
-                                        <Input id="motivo-anulacion" name="motivo" required minLength={10} maxLength={2000} />
-                                    </Field>
+                                    <FieldGroup className="w-full gap-3">
+                                        <Field id="motivo-anulacion" label="Motivo de anulación" error={errors.motivo}>
+                                            <Input id="motivo-anulacion" name="motivo" required minLength={10} maxLength={2000} />
+                                        </Field>
+                                    </FieldGroup>
                                     <Button type="submit" variant="destructive" disabled={processing}>
                                         {processing ? <Spinner data-icon="inline-start" /> : <Ban data-icon="inline-start" />}
                                         Anular entrega pendiente
@@ -323,19 +335,19 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                         {puede_cerrar && (
                             <Form {...TramiteEntregaController.close.form({ tramite: tramite.id })}>
                                 {({ errors, processing }) => (
-                                    <div className="space-y-4">
+                                    <FieldGroup className="gap-4">
                                         <Field id="resumen" label="Resumen de cierre" error={errors.resumen}>
                                             <Textarea id="resumen" name="resumen" required minLength={10} maxLength={2000} rows={4} />
                                         </Field>
                                         <Field id="observacion-cierre" label="Observación (opcional)" error={errors.observacion}>
                                             <Textarea id="observacion-cierre" name="observacion" maxLength={2000} rows={2} />
                                         </Field>
-                                        <InputError message={errors.cierre} />
+                                        <FieldError id="cierre-error">{errors.cierre}</FieldError>
                                         <Button type="submit" disabled={processing}>
                                             {processing ? <Spinner data-icon="inline-start" /> : <Check data-icon="inline-start" />}
                                             Cerrar expediente y generar informe
                                         </Button>
-                                    </div>
+                                    </FieldGroup>
                                 )}
                             </Form>
                         )}
@@ -362,7 +374,7 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                         {puede_reabrir && (
                             <Form {...TramiteEntregaController.reopen.form({ tramite: tramite.id })}>
                                 {({ errors, processing }) => (
-                                    <div className="space-y-3 border-t pt-4">
+                                    <FieldGroup className="gap-3 border-t pt-4">
                                         <Field id="motivo-reapertura" label="Motivo de reapertura" error={errors.motivo}>
                                             <Input id="motivo-reapertura" name="motivo" required minLength={12} maxLength={2000} />
                                         </Field>
@@ -370,7 +382,7 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
                                             {processing ? <Spinner data-icon="inline-start" /> : <RotateCcw data-icon="inline-start" />}
                                             Reabrir expediente
                                         </Button>
-                                    </div>
+                                    </FieldGroup>
                                 )}
                             </Form>
                         )}
@@ -382,12 +394,26 @@ export default function TramiteEntregaPage({ tramite, documento, firma, entrega,
 }
 
 function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: ReactNode }) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': invalid ? errorId : undefined,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
     return (
-        <div className="grid content-start gap-2">
-            <Label htmlFor={id}>{label}</Label>
-            {children}
-            <InputError message={error} />
-        </div>
+        <ShadcnField data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 

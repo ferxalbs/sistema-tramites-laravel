@@ -1,14 +1,13 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, ClipboardCheck, Save } from 'lucide-react';
-import { useState } from 'react';
+import { Children, cloneElement, isValidElement, useState, type ReactElement } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field as ShadcnField, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -85,7 +84,8 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                         <CardDescription>El destino determina el rol permitido. La carga muestra cuántos expedientes activos tiene cada revisor.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form className="grid gap-5 md:grid-cols-2" onSubmit={enviar}>
+                        <form onSubmit={enviar}>
+                            <FieldGroup className="grid gap-5 md:grid-cols-2">
                             <Field id="destino" label="Destino" error={form.errors.destino}>
                                 <select
                                     id="destino"
@@ -101,8 +101,8 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                                     <option value="oficina">Oficina</option>
                                 </select>
                             </Field>
-                            <div className="grid content-start gap-2">
-                                <Label htmlFor="buscar_revisor">Buscar revisor por nombre o DNI</Label>
+                            <FieldGroup className="gap-3">
+                                <Field id="buscar_revisor" label="Buscar revisor por nombre o DNI">
                                 <Input
                                     id="buscar_revisor"
                                     type="search"
@@ -111,26 +111,27 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                                     placeholder="Escribe el nombre o DNI"
                                     maxLength={80}
                                 />
-                                <Label htmlFor="revisor_id">Revisor activo</Label>
-                                <select
-                                    id="revisor_id"
-                                    className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                                    required
-                                    value={form.data.revisor_id ?? ''}
-                                    onChange={(event) => form.setData('revisor_id', event.target.value === '' ? null : Number(event.target.value))}
-                                >
-                                    <option value="">Seleccione un revisor</option>
-                                    {candidatosFiltrados.map((revisor) => (
-                                        <option key={revisor.id} value={revisor.id}>{revisor.name} · DNI {revisor.dni ?? 'sin registrar'} · {revisor.carga_activa} asignaciones activas</option>
-                                    ))}
-                                </select>
-                                <InputError message={form.errors.revisor_id} />
+                                </Field>
+                                <Field id="revisor_id" label="Revisor activo" error={form.errors.revisor_id}>
+                                    <select
+                                        id="revisor_id"
+                                        className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                                        required
+                                        value={form.data.revisor_id ?? ''}
+                                        onChange={(event) => form.setData('revisor_id', event.target.value === '' ? null : Number(event.target.value))}
+                                    >
+                                        <option value="">Seleccione un revisor</option>
+                                        {candidatosFiltrados.map((revisor) => (
+                                            <option key={revisor.id} value={revisor.id}>{revisor.name} · DNI {revisor.dni ?? 'sin registrar'} · {revisor.carga_activa} asignaciones activas</option>
+                                        ))}
+                                    </select>
+                                </Field>
                                 {candidatos.length === 0
                                     ? <p className="text-xs text-destructive">No hay revisores activos disponibles para este destino.</p>
                                     : candidatosFiltrados.length === 0
                                         ? <p className="text-xs text-muted-foreground">No hay revisores con ese nombre o DNI.</p>
                                         : null}
-                            </div>
+                            </FieldGroup>
                             {modo === 'reasignar' && (
                                 <Field id="motivo_reasignacion" label="Justificación de reasignación" error={form.errors.motivo_reasignacion}>
                                     <Textarea
@@ -172,6 +173,7 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
                                     {modo === 'asignar' ? 'Confirmar asignación' : 'Guardar reasignación'}
                                 </Button>
                             </div>
+                            </FieldGroup>
                         </form>
                     </CardContent>
                 </Card>
@@ -181,12 +183,26 @@ export default function AsignacionForm({ tramite, modo, asignacion, revisores, d
 }
 
 function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': invalid ? errorId : undefined,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
     return (
-        <div className="grid content-start gap-2">
-            <Label htmlFor={id}>{label}</Label>
-            {children}
-            <InputError message={error} />
-        </div>
+        <ShadcnField data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 

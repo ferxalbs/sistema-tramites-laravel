@@ -1,6 +1,5 @@
 import { Plus, X } from 'lucide-react';
-import { useRef, useState } from 'react';
-import InputError from '@/components/input-error';
+import { Children, cloneElement, isValidElement, useRef, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -9,8 +8,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Field as ShadcnField, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -149,11 +148,12 @@ export default function ReceptionPreliminaryLists({
                 )}
             </CardHeader>
             <CardContent className={isOpen(kind) ? 'space-y-4' : 'hidden'}>
-                {rows[kind].map((entry, index) => {
+                <FieldGroup className="gap-4">
+                    {rows[kind].map((entry, index) => {
                     const prefix = `${kind}[${index}]`;
                     const errorPrefix = `${kind}.${index}`;
                     return (
-                        <div
+                        <FieldGroup
                             key={entry.id}
                             className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2"
                         >
@@ -227,8 +227,8 @@ export default function ReceptionPreliminaryLists({
                                         errors[`${errorPrefix}.tipo_relacion`]
                                     }
                                 >
-                                    <Select
-                                        name={`${prefix}[tipo_relacion]`}
+                                        <Select
+                                            name={`${prefix}[tipo_relacion]`}
                                         defaultValue={
                                             entry.tipo_relacion ?? 'otro'
                                         }
@@ -238,11 +238,13 @@ export default function ReceptionPreliminaryLists({
                                             value,
                                             label,
                                         }))}
-                                    >
-                                        <SelectTrigger
-                                            id={`${kind}-${entry.id}-tipo`}
-                                            className="w-full"
                                         >
+                                            <SelectTrigger
+                                                id={`${kind}-${entry.id}-tipo`}
+                                                className="w-full"
+                                                aria-describedby={errors[`${errorPrefix}.tipo_relacion`] ? `${kind}-${entry.id}-tipo-error` : undefined}
+                                                aria-invalid={errors[`${errorPrefix}.tipo_relacion`] ? true : undefined}
+                                            >
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -298,6 +300,8 @@ export default function ReceptionPreliminaryLists({
                                             <SelectTrigger
                                                 id={`${kind}-${entry.id}-cargo-id`}
                                                 className="w-full"
+                                                aria-describedby={errors[`${errorPrefix}.cargo_institucional_id`] ? `${kind}-${entry.id}-cargo-id-error` : undefined}
+                                                aria-invalid={errors[`${errorPrefix}.cargo_institucional_id`] ? true : undefined}
                                             >
                                                 <SelectValue placeholder="Sin cargo de catálogo" />
                                             </SelectTrigger>
@@ -390,18 +394,19 @@ export default function ReceptionPreliminaryLists({
                                     <X data-icon="inline-start" /> Quitar
                                 </Button>
                             </div>
-                        </div>
+                        </FieldGroup>
                     );
-                })}
-                <InputError message={errors[kind]} />
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => add(kind)}
-                >
-                    <Plus data-icon="inline-start" /> Agregar
-                </Button>
+                    })}
+                    <FieldError id={`${kind}-error`}>{errors[kind]}</FieldError>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => add(kind)}
+                    >
+                        <Plus data-icon="inline-start" /> Agregar
+                    </Button>
+                </FieldGroup>
             </CardContent>
         </Card>
     ));
@@ -418,11 +423,25 @@ function EntryField({
     error?: string;
     children: React.ReactNode;
 }) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': invalid ? errorId : undefined,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
     return (
-        <div className="grid content-start gap-2">
-            <Label htmlFor={id}>{label}</Label>
-            {children}
-            <InputError message={error} />
-        </div>
+        <ShadcnField data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }

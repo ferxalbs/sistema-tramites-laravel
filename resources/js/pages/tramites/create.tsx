@@ -1,14 +1,13 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, FilePlus2, Plus, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Children, cloneElement, isValidElement, useRef, useState, type ReactElement } from 'react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import ReceptionPreliminaryLists from '@/components/reception-preliminary-lists';
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Field as ShadcnField, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     SelectGroup,
     Select,
@@ -207,7 +206,8 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             ? 'Completa los datos del documento recibido para este tipo de trámite.'
                                             : 'Registra los datos del ingreso y del documento entregado físicamente.'}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="grid gap-5 sm:grid-cols-2">
+                                <CardContent>
+                                    <FieldGroup className="grid gap-5 sm:grid-cols-2">
                                     {seleccion ? (
                                         <>
                                             <input type="hidden" name="clasificacion" value={clasificacion} />
@@ -232,8 +232,12 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         />
                                     )}
                                     {clasificacion === 'estudiantil' && <>
-                                        <div className="grid content-start gap-2">
-                                            <Label htmlFor="dni_estudiante">DNI del estudiante o egresado</Label>
+                                        <Field
+                                            id="dni_estudiante"
+                                            label="DNI del estudiante o egresado"
+                                            description={`El DNI vincula el trámite con la cuenta y completa los datos guardados en el perfil.${estudiantes.length === 0 ? ' No hay cuentas activas disponibles.' : ''}`}
+                                            error={errors.propietario_id ?? errors.persona_identificador}
+                                        >
                                             <Input
                                                 id="dni_estudiante"
                                                 value={dniEstudiante}
@@ -245,12 +249,10 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                                 required
                                                 readOnly={Boolean(seleccion)}
                                             />
-                                            <p className="text-xs text-muted-foreground">El DNI vincula el trámite con la cuenta y completa los datos guardados en el perfil.{estudiantes.length === 0 ? ' No hay cuentas activas disponibles.' : ''}</p>
-                                            <InputError message={errors.propietario_id ?? errors.persona_identificador} />
-                                            {clasificacion === 'estudiantil' && <input type="hidden" name="propietario_id" value={estudianteSeleccionado?.id ?? ''} />}
-                                            {clasificacion === 'estudiantil' && <input type="hidden" name="persona_nombre" value={estudianteSeleccionado?.name ?? ''} />}
-                                            {clasificacion === 'estudiantil' && <input type="hidden" name="persona_identificador" value={estudianteSeleccionado?.dni ?? ''} />}
-                                        </div>
+                                        </Field>
+                                        <input type="hidden" name="propietario_id" value={estudianteSeleccionado?.id ?? ''} />
+                                        <input type="hidden" name="persona_nombre" value={estudianteSeleccionado?.name ?? ''} />
+                                        <input type="hidden" name="persona_identificador" value={estudianteSeleccionado?.dni ?? ''} />
                                         {estudianteSeleccionado ? (
                                             <div className="grid content-start gap-2 rounded-xl border p-4 text-sm">
                                                 <p className="font-medium">Datos encontrados en el perfil</p>
@@ -268,8 +270,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             El programa de estudios se toma del perfil del estudiante seleccionado.
                                         </p>
                                     ) : (
-                                        <div className="grid content-start gap-2">
-                                            <Label htmlFor="programa_estudio_id">Programa de estudios</Label>
+                                        <Field id="programa_estudio_id" label="Programa de estudios" error={errors.programa_estudio_id}>
                                             <select
                                                 id="programa_estudio_id"
                                                 name="programa_estudio_id"
@@ -279,8 +280,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                                 <option value="">No aplica</option>
                                                 {programas.map((programa) => <option key={programa.id} value={programa.id}>{programa.nombre}</option>)}
                                             </select>
-                                            <InputError message={errors.programa_estudio_id} />
-                                        </div>
+                                        </Field>
                                     )}
                                     {!seleccion && <FormSelect
                                         id="tipo_documento"
@@ -328,8 +328,8 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         onValueChange={changeDestinoTipo}
                                     />
                                     {destinoTipo === 'docente' ? (
-                                        <div className="grid content-start gap-2">
-                                            <Label htmlFor="buscar_docente">Buscar docente por nombre o DNI</Label>
+                                        <FieldGroup className="gap-3">
+                                            <Field id="buscar_docente" label="Buscar docente por nombre o DNI">
                                             <Input
                                                 id="buscar_docente"
                                                 type="search"
@@ -338,28 +338,36 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                                 placeholder="Escribe el nombre o DNI"
                                                 maxLength={80}
                                             />
-                                            <Label htmlFor="destino_docente_id">Docente de destino previsto</Label>
-                                            <Select
-                                                items={docentesFiltrados.map((docente) => ({ value: String(docente.id), label: `${docente.name} · DNI ${docente.dni ?? 'sin registrar'}` }))}
-                                                name="destino_docente_id"
-                                                value={destinoDocenteId}
-                                                onValueChange={setDestinoDocenteId}
-                                                required
-                                            >
-                                                <SelectTrigger id="destino_docente_id" className="w-full">
-                                                    <SelectValue placeholder="Seleccione un docente activo" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectGroup>
-                                                        {docentesFiltrados.length === 0
-                                                            ? <SelectItem value="sin-resultados" disabled>No hay docentes con ese nombre o DNI.</SelectItem>
-                                                            : docentesFiltrados.map((docente) => <SelectItem key={docente.id} value={String(docente.id)}>{docente.name} · DNI {docente.dni ?? 'sin registrar'}</SelectItem>)}
-                                                    </SelectGroup>
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="text-xs text-muted-foreground">La asignación formal del revisor se realiza después de preparar el borrador.{docentes.length === 0 ? ' No hay docentes activos disponibles.' : ''}</p>
-                                            <InputError message={errors.destino_docente_id} />
-                                        </div>
+                                            </Field>
+                                            <ShadcnField data-invalid={errors.destino_docente_id ? true : undefined}>
+                                                <FieldLabel htmlFor="destino_docente_id">Docente de destino previsto</FieldLabel>
+                                                <Select
+                                                    items={docentesFiltrados.map((docente) => ({ value: String(docente.id), label: `${docente.name} · DNI ${docente.dni ?? 'sin registrar'}` }))}
+                                                    name="destino_docente_id"
+                                                    value={destinoDocenteId}
+                                                    onValueChange={setDestinoDocenteId}
+                                                    required
+                                                >
+                                                    <SelectTrigger
+                                                        id="destino_docente_id"
+                                                        className="w-full"
+                                                        aria-describedby={errors.destino_docente_id ? 'destino_docente_id-error destino_docente_id-description' : 'destino_docente_id-description'}
+                                                        aria-invalid={errors.destino_docente_id ? true : undefined}
+                                                    >
+                                                        <SelectValue placeholder="Seleccione un docente activo" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectGroup>
+                                                            {docentesFiltrados.length === 0
+                                                                ? <SelectItem value="sin-resultados" disabled>No hay docentes con ese nombre o DNI.</SelectItem>
+                                                                : docentesFiltrados.map((docente) => <SelectItem key={docente.id} value={String(docente.id)}>{docente.name} · DNI {docente.dni ?? 'sin registrar'}</SelectItem>)}
+                                                        </SelectGroup>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FieldDescription id="destino_docente_id-description">La asignación formal del revisor se realiza después de preparar el borrador.{docentes.length === 0 ? ' No hay docentes activos disponibles.' : ''}</FieldDescription>
+                                                <FieldError id="destino_docente_id-error">{errors.destino_docente_id}</FieldError>
+                                            </ShadcnField>
+                                        </FieldGroup>
                                     ) : (
                                         <input
                                             type="hidden"
@@ -396,6 +404,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                     <Field id="persona_entrega_documento" label="Persona que entrega el documento" error={errors.persona_entrega_documento}>
                                         <Input id="persona_entrega_documento" name="persona_entrega_documento" defaultValue={tramite?.persona_entrega_documento ?? ''} maxLength={180} />
                                     </Field>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>
 
@@ -404,13 +413,15 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                     <CardTitle>Persona solicitante</CardTitle>
                                     <CardDescription>Datos de la persona que presenta la documentación.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="grid gap-5 sm:grid-cols-2">
+                                <CardContent>
+                                    <FieldGroup className="grid gap-5 sm:grid-cols-2">
                                     <Field id="persona_nombre" label="Nombres y apellidos" error={errors.persona_nombre}>
                                         <Input id="persona_nombre" name="persona_nombre" defaultValue={tramite?.persona_nombre ?? ''} required maxLength={200} autoComplete="name" />
                                     </Field>
                                     <Field id="persona_identificador" label="DNI u otro documento de identidad" error={errors.persona_identificador}>
                                         <Input id="persona_identificador" name="persona_identificador" defaultValue={seleccion?.dni ?? tramite?.persona_identificador ?? ''} maxLength={50} readOnly={Boolean(seleccion)} />
                                     </Field>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>}
 
@@ -423,7 +434,8 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         ? 'Transcribe la sumilla y la fundamentación del pedido tal como aparecen en el FUT.'
                                         : 'Resume la solicitud recibida y registra debajo su detalle o fundamentación.'}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="grid gap-5 sm:grid-cols-2">
+                                <CardContent>
+                                    <FieldGroup className="grid gap-5 sm:grid-cols-2">
                                     <Field id="asunto" label={esDocumentoInstitucional ? 'Asunto del documento' : seleccion?.tipo_documento === 'FUT' ? 'Resumen de la solicitud (sumilla)' : 'Resumen de la solicitud'} error={errors.asunto} className="sm:col-span-2">
                                         <Input id="asunto" name="asunto" defaultValue={tramite?.asunto ?? ''} required minLength={3} maxLength={255} placeholder={esDocumentoInstitucional ? 'Ej. Informe de actividades del área' : seleccion?.tipo_documento === 'FUT' ? 'Ej. Solicito prácticas pre profesionales' : 'Resume brevemente lo solicitado'} />
                                     </Field>
@@ -451,6 +463,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                     <Field id="folios" label="Cantidad de folios" error={errors.folios}>
                                         <Input id="folios" name="folios" type="number" defaultValue={tramite?.folios ?? ''} min={1} max={5000} inputMode="numeric" />
                                     </Field>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>
 
@@ -471,7 +484,8 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                     <CardTitle>{esDocumentoInstitucional ? 'Archivos del documento' : 'Documentos recibidos'}</CardTitle>
                                     <CardDescription>Cada archivo es un documento independiente. Puede registrar varios en este trámite o agregarlos después.{catalogos.requisitos_tipo[tipoDocumento]?.documento_original ? ' Este tipo exige incluir un documento original.' : ''}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="flex flex-col gap-4">
+                                <CardContent>
+                                    <FieldGroup className="gap-4">
                                     {documentos.map((documento, index) => (
                                         <div key={documento.id} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-end">
                                             <FormSelect
@@ -497,7 +511,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             </Button>
                                         </div>
                                     ))}
-                                    <InputError message={errors.documentos} />
+                                    <FieldError id="documentos-error">{errors.documentos}</FieldError>
                                     <div className="flex flex-wrap items-center gap-3">
                                         <Button type="button" variant="outline" size="sm" onClick={() => {
                                             const id = siguienteDocumentoId.current++;
@@ -507,6 +521,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         </Button>
                                         <p className="text-xs text-muted-foreground">PDF, JPG o PNG; máximo 10 MB por archivo.</p>
                                     </div>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>}
 
@@ -516,11 +531,22 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                     <CardDescription>{esDocumentoInstitucional ? 'Verifica los datos del documento antes de registrarlo.' : 'Verifica los datos de la recepción física antes de registrar el expediente.'}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="flex items-center gap-3">
-                                        <Checkbox id="confirmar_recepcion" name="confirmar_recepcion" value="1" required aria-invalid={Boolean(errors.confirmar_recepcion)} />
-                                        <Label htmlFor="confirmar_recepcion">{esDocumentoInstitucional ? 'Confirmo que revisé los datos del documento.' : 'Confirmo que revisé los datos de la recepción física.'}</Label>
-                                    </div>
-                                    <InputError message={errors.confirmar_recepcion} />
+                                    <FieldGroup className="gap-3">
+                                        <ShadcnField data-invalid={errors.confirmar_recepcion ? true : undefined}>
+                                            <div className="flex items-center gap-3">
+                                                <Checkbox
+                                                    id="confirmar_recepcion"
+                                                    name="confirmar_recepcion"
+                                                    value="1"
+                                                    required
+                                                    aria-describedby={errors.confirmar_recepcion ? 'confirmar_recepcion-error' : undefined}
+                                                    aria-invalid={errors.confirmar_recepcion ? true : undefined}
+                                                />
+                                                <FieldLabel htmlFor="confirmar_recepcion">{esDocumentoInstitucional ? 'Confirmo que revisé los datos del documento.' : 'Confirmo que revisé los datos de la recepción física.'}</FieldLabel>
+                                            </div>
+                                            <FieldError id="confirmar_recepcion-error">{errors.confirmar_recepcion}</FieldError>
+                                        </ShadcnField>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>}
 
@@ -556,13 +582,29 @@ function Field({
     className?: string;
     children: React.ReactNode;
 }) {
+    const errorId = `${id}-error`;
+    const descriptionId = description ? `${id}-description` : undefined;
+    const invalid = Boolean(error);
+    const describedBy = [descriptionId, invalid ? errorId : undefined].filter(Boolean).join(' ') || undefined;
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': describedBy,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
     return (
-        <div className={`grid content-start gap-2 ${className}`}>
-            <Label htmlFor={id}>{label}</Label>
-            {children}
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
-            <InputError message={error} />
-        </div>
+        <ShadcnField className={className} data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            {description && <FieldDescription id={descriptionId}>{description}</FieldDescription>}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 
@@ -591,10 +633,15 @@ function FormSelect({
     }));
 
     return (
-        <div className="grid content-start gap-2">
-            <Label htmlFor={id}>{label}</Label>
+        <ShadcnField data-invalid={error ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
             <Select items={items} name={name} value={value} onValueChange={onValueChange}>
-                <SelectTrigger id={id} className="w-full">
+                <SelectTrigger
+                    id={id}
+                    className="w-full"
+                    aria-describedby={[description ? `${id}-description` : undefined, error ? `${id}-error` : undefined].filter(Boolean).join(' ') || undefined}
+                    aria-invalid={error ? true : undefined}
+                >
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -605,9 +652,9 @@ function FormSelect({
                     </SelectGroup>
                 </SelectContent>
             </Select>
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
-            <InputError message={error} />
-        </div>
+            {description && <FieldDescription id={`${id}-description`}>{description}</FieldDescription>}
+            <FieldError id={`${id}-error`}>{error}</FieldError>
+        </ShadcnField>
     );
 }
 

@@ -10,8 +10,14 @@ import {
     Save,
     SlidersHorizontal,
 } from 'lucide-react';
-import { useState } from 'react';
-import InputError from '@/components/input-error';
+import {
+    Children,
+    cloneElement,
+    isValidElement,
+    useState,
+    type ReactElement,
+    type ReactNode,
+} from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,8 +33,13 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+    Field as ShadcnField,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
@@ -163,11 +174,11 @@ function NuevaPlantillaCard({
             <Form {...store.form()} disableWhileProcessing>
                 {({ errors, processing }) => (
                     <>
-                        <CardContent className="flex flex-col gap-5">
+                        <CardContent>
+                            <FieldGroup className="gap-5">
                             {/* Grid 2 Columnas para metadatos */}
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="codigo-nuevo">Código único</Label>
+                            <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <Field id="codigo-nuevo" label="Código único" error={errors.codigo}>
                                     <Input
                                         id="codigo-nuevo"
                                         name="codigo"
@@ -180,11 +191,9 @@ function NuevaPlantillaCard({
                                     <p className="text-xs text-muted-foreground">
                                         Mayúsculas, números y guiones bajos.
                                     </p>
-                                    <InputError message={errors.codigo} />
-                                </div>
+                                </Field>
 
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="nombre-nuevo">Nombre de la plantilla</Label>
+                                <Field id="nombre-nuevo" label="Nombre de la plantilla" error={errors.nombre}>
                                     <Input
                                         id="nombre-nuevo"
                                         name="nombre"
@@ -193,11 +202,10 @@ function NuevaPlantillaCard({
                                         maxLength={160}
                                         required
                                     />
-                                    <InputError message={errors.nombre} />
-                                </div>
+                                </Field>
 
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="formato-nuevo">Formato de salida</Label>
+                                <ShadcnField data-invalid={errors.tipo_documento_salida ? true : undefined}>
+                                    <FieldLabel htmlFor="formato-nuevo">Formato de salida</FieldLabel>
                                     <Select
                                         name="tipo_documento_salida"
                                         items={formatos.map((item) => ({
@@ -206,7 +214,12 @@ function NuevaPlantillaCard({
                                         }))}
                                         required
                                     >
-                                        <SelectTrigger id="formato-nuevo" className="w-full">
+                                        <SelectTrigger
+                                            id="formato-nuevo"
+                                            className="w-full"
+                                            aria-describedby={errors.tipo_documento_salida ? 'formato-nuevo-error' : undefined}
+                                            aria-invalid={errors.tipo_documento_salida ? true : undefined}
+                                        >
                                             <SelectValue placeholder="Selecciona formato" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -222,13 +235,11 @@ function NuevaPlantillaCard({
                                             </SelectGroup>
                                         </SelectContent>
                                     </Select>
-                                    <InputError
-                                        message={errors.tipo_documento_salida}
-                                    />
-                                </div>
+                                    <FieldError id="formato-nuevo-error">{errors.tipo_documento_salida}</FieldError>
+                                </ShadcnField>
 
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="modalidad-nueva">Modalidad</Label>
+                                <ShadcnField data-invalid={errors.modalidad ? true : undefined}>
+                                    <FieldLabel htmlFor="modalidad-nueva">Modalidad</FieldLabel>
                                     <Select
                                         name="modalidad"
                                         defaultValue="sin_modalidad"
@@ -243,7 +254,12 @@ function NuevaPlantillaCard({
                                             })),
                                         ]}
                                     >
-                                        <SelectTrigger id="modalidad-nueva" className="w-full">
+                                        <SelectTrigger
+                                            id="modalidad-nueva"
+                                            className="w-full"
+                                            aria-describedby={errors.modalidad ? 'modalidad-nueva-error' : undefined}
+                                            aria-invalid={errors.modalidad ? true : undefined}
+                                        >
                                             <SelectValue placeholder="Sin modalidad" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -262,28 +278,31 @@ function NuevaPlantillaCard({
                                             </SelectGroup>
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={errors.modalidad} />
-                                </div>
-                            </div>
+                                    <FieldError id="modalidad-nueva-error">{errors.modalidad}</FieldError>
+                                </ShadcnField>
+                            </FieldGroup>
 
-                            <div className="flex flex-col gap-2">
-                                <Label htmlFor="descripcion-nueva">Descripción (opcional)</Label>
+                            <Field id="descripcion-nueva" label="Descripción (opcional)" error={errors.descripcion}>
                                 <Input
                                     id="descripcion-nueva"
                                     name="descripcion"
                                     placeholder="Indique brevemente el propósito de esta plantilla..."
                                     maxLength={255}
                                 />
-                                <InputError message={errors.descripcion} />
-                            </div>
+                            </Field>
 
-                            <div className="flex flex-col gap-2">
-                                <div className="flex flex-wrap items-center justify-between gap-1">
-                                    <Label htmlFor="contenido-nuevo">Contenido estructurado</Label>
-                                    <span className="text-xs text-muted-foreground font-mono">
-                                        Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
-                                    </span>
-                                </div>
+                            <Field
+                                id="contenido-nuevo"
+                                label={(
+                                    <>
+                                        <span>Contenido estructurado</span>
+                                        <span className="text-xs font-mono text-muted-foreground">
+                                            Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
+                                        </span>
+                                    </>
+                                )}
+                                error={errors.contenido}
+                            >
                                 <Textarea
                                     id="contenido-nuevo"
                                     name="contenido"
@@ -294,8 +313,8 @@ function NuevaPlantillaCard({
                                         '<article><h1>{{NUMERO_DOCUMENTO_PREVIO}}</h1><p>{{CONTENIDO_PRINCIPAL}}</p></article>'
                                     }
                                 />
-                                <InputError message={errors.contenido} />
-                            </div>
+                            </Field>
+                            </FieldGroup>
                         </CardContent>
                         <CardFooter className="flex items-center justify-end gap-3 border-t border-border/50 pt-4">
                             <Button
@@ -446,12 +465,9 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                             disableWhileProcessing
                         >
                             {({ errors, processing }) => (
-                                <div className="flex flex-col gap-4">
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <div className="flex flex-col gap-2">
-                                            <Label htmlFor={`nombre-${plantilla.id}`}>
-                                                Nombre de la nueva versión
-                                            </Label>
+                                <FieldGroup className="gap-4">
+                                    <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <Field id={`nombre-${plantilla.id}`} label="Nombre de la nueva versión" error={errors.nombre}>
                                             <Input
                                                 id={`nombre-${plantilla.id}`}
                                                 name="nombre"
@@ -460,13 +476,12 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                                 maxLength={160}
                                                 required
                                             />
-                                            <InputError message={errors.nombre} />
-                                        </div>
+                                        </Field>
 
-                                        <div className="flex flex-col gap-2">
-                                            <Label htmlFor={`publicar-${plantilla.id}`}>
+                                        <ShadcnField data-invalid={errors.publicar ? true : undefined}>
+                                            <FieldLabel htmlFor={`publicar-${plantilla.id}`}>
                                                 Estado inicial de publicación
-                                            </Label>
+                                            </FieldLabel>
                                             <Select
                                                 name="publicar"
                                                 defaultValue="0"
@@ -482,7 +497,12 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                                 ]}
                                                 required
                                             >
-                                                <SelectTrigger id={`publicar-${plantilla.id}`} className="w-full">
+                                                <SelectTrigger
+                                                    id={`publicar-${plantilla.id}`}
+                                                    className="w-full"
+                                                    aria-describedby={errors.publicar ? `publicar-${plantilla.id}-error` : undefined}
+                                                    aria-invalid={errors.publicar ? true : undefined}
+                                                >
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -496,14 +516,11 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                                     </SelectGroup>
                                                 </SelectContent>
                                             </Select>
-                                            <InputError message={errors.publicar} />
-                                        </div>
-                                    </div>
+                                            <FieldError id={`publicar-${plantilla.id}-error`}>{errors.publicar}</FieldError>
+                                        </ShadcnField>
+                                    </FieldGroup>
 
-                                    <div className="flex flex-col gap-2">
-                                        <Label htmlFor={`descripcion-${plantilla.id}`}>
-                                            Descripción o notas de cambio
-                                        </Label>
+                                    <Field id={`descripcion-${plantilla.id}`} label="Descripción o notas de cambio" error={errors.descripcion}>
                                         <Input
                                             id={`descripcion-${plantilla.id}`}
                                             name="descripcion"
@@ -511,18 +528,20 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                             maxLength={255}
                                             placeholder="Detalle los cambios respecto a la versión anterior..."
                                         />
-                                        <InputError message={errors.descripcion} />
-                                    </div>
+                                    </Field>
 
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center justify-between">
-                                            <Label htmlFor={`contenido-${plantilla.id}`}>
-                                                Contenido HTML de la nueva versión
-                                            </Label>
-                                            <span className="text-xs text-muted-foreground font-mono">
-                                                Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
-                                            </span>
-                                        </div>
+                                    <Field
+                                        id={`contenido-${plantilla.id}`}
+                                        label={(
+                                            <>
+                                                <span>Contenido HTML de la nueva versión</span>
+                                                <span className="text-xs font-mono text-muted-foreground">
+                                                    Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
+                                                </span>
+                                            </>
+                                        )}
+                                        error={errors.contenido}
+                                    >
                                         <Textarea
                                             id={`contenido-${plantilla.id}`}
                                             name="contenido"
@@ -531,8 +550,7 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                             rows={8}
                                             required
                                         />
-                                        <InputError message={errors.contenido} />
-                                    </div>
+                                    </Field>
 
                                     <div className="flex items-center justify-end gap-2 pt-2">
                                         <Button
@@ -552,12 +570,53 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                             Crear versión {plantilla.version + 1}
                                         </Button>
                                     </div>
-                                </div>
+                                </FieldGroup>
                             )}
                         </Form>
                     </div>
                 </CollapsibleContent>
             </Collapsible>
         </Card>
+    );
+}
+
+function Field({
+    id,
+    label,
+    error,
+    children,
+}: {
+    id: string;
+    label: ReactNode;
+    error?: string;
+    children: ReactNode;
+}) {
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(
+            child as ReactElement<{
+                id?: string;
+                'aria-describedby'?: string;
+                'aria-invalid'?: boolean;
+            }>,
+            {
+                id,
+                'aria-describedby': invalid ? errorId : undefined,
+                'aria-invalid': invalid ? true : undefined,
+            },
+        );
+    });
+
+    return (
+        <ShadcnField className="gap-2" data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
     );
 }

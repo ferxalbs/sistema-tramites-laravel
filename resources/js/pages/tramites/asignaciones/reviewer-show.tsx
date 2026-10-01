@@ -1,14 +1,15 @@
 import { Form, Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Download, FileText, Plus, Send } from 'lucide-react';
+import { Children, cloneElement, isValidElement, type ReactElement } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteDocumentoFinalController from '@/actions/App/Http/Controllers/TramiteDocumentoFinalController';
 import TramiteRevisionController from '@/actions/App/Http/Controllers/TramiteRevisionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field as ShadcnField, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -258,14 +259,20 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                 </CardHeader>
                                 <CardContent>
                                     <form className="space-y-5" onSubmit={enviarObservaciones}>
+                                        <FieldGroup className="gap-5">
                                         <Field id="resumen" label="Resumen de la observación" error={observationForm.errors.resumen}>
                                             <Textarea id="resumen" required minLength={8} maxLength={2000} rows={3} value={observationForm.data.resumen} onChange={(event) => observationForm.setData('resumen', event.target.value)} />
                                         </Field>
                                         {observationForm.data.observaciones.map((observacion, index) => (
-                                            <article key={index} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
+                                            <FieldGroup key={index} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
                                                 <Field id={`observacion-${index}-categoria`} label="Categoría" error={observationForm.errors[`observaciones.${index}.categoria`]}>
                                                     <Select items={categorias_observacion.map((categoria) => ({ value: categoria, label: categoria }))} value={observacion.categoria} onValueChange={(value) => value && actualizarObservacion(index, 'categoria', value)}>
-                                                        <SelectTrigger id={`observacion-${index}-categoria`} className="w-full"><SelectValue /></SelectTrigger>
+                                                        <SelectTrigger
+                                                            id={`observacion-${index}-categoria`}
+                                                            className="w-full"
+                                                            aria-describedby={observationForm.errors[`observaciones.${index}.categoria`] ? `observacion-${index}-categoria-error` : undefined}
+                                                            aria-invalid={observationForm.errors[`observaciones.${index}.categoria`] ? true : undefined}
+                                                        ><SelectValue /></SelectTrigger>
                                                         <SelectContent><SelectGroup>{categorias_observacion.map((categoria) => <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>)}</SelectGroup></SelectContent>
                                                     </Select>
                                                 </Field>
@@ -278,23 +285,32 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                                 <Field id={`observacion-${index}-descripcion`} label="Descripción" error={observationForm.errors[`observaciones.${index}.descripcion`]}>
                                                     <Textarea id={`observacion-${index}-descripcion`} required minLength={5} maxLength={5000} rows={3} value={observacion.descripcion} onChange={(event) => actualizarObservacion(index, 'descripcion', event.target.value)} />
                                                 </Field>
-                                                <label className="flex items-center gap-2 text-sm">
-                                                    <input type="checkbox" checked={observacion.obligatoria} onChange={(event) => actualizarObservacion(index, 'obligatoria', event.target.checked)} />
-                                                    Requiere respuesta antes de reenviar
-                                                </label>
-                                                <label className="flex items-center gap-2 text-sm">
-                                                    <input type="checkbox" checked={observacion.visible_para_interesado} onChange={(event) => actualizarObservacion(index, 'visible_para_interesado', event.target.checked)} />
-                                                    Compartir con el estudiante
-                                                </label>
-                                            </article>
+                                                <ShadcnField orientation="horizontal" className="sm:col-span-2">
+                                                    <Checkbox
+                                                        id={`observacion-${index}-obligatoria`}
+                                                        checked={observacion.obligatoria}
+                                                        onCheckedChange={(checked) => actualizarObservacion(index, 'obligatoria', checked === true)}
+                                                    />
+                                                    <FieldLabel htmlFor={`observacion-${index}-obligatoria`}>Requiere respuesta antes de reenviar</FieldLabel>
+                                                </ShadcnField>
+                                                <ShadcnField orientation="horizontal" className="sm:col-span-2">
+                                                    <Checkbox
+                                                        id={`observacion-${index}-visible`}
+                                                        checked={observacion.visible_para_interesado}
+                                                        onCheckedChange={(checked) => actualizarObservacion(index, 'visible_para_interesado', checked === true)}
+                                                    />
+                                                    <FieldLabel htmlFor={`observacion-${index}-visible`}>Compartir con el estudiante</FieldLabel>
+                                                </ShadcnField>
+                                            </FieldGroup>
                                         ))}
-                                        <InputError message={observationForm.errors.observaciones} />
+                                        <FieldError id="observaciones-error">{observationForm.errors.observaciones}</FieldError>
                                         <div className="flex flex-wrap justify-between gap-3">
                                             <Button type="button" variant="outline" disabled={observationForm.data.observaciones.length >= 20} onClick={() => observationForm.setData('observaciones', [...observationForm.data.observaciones, { categoria: categorias_observacion[0] ?? 'Otro', titulo: '', descripcion: '', seccion: '', obligatoria: true, visible_para_interesado: false }])}>
                                                 <Plus /> Añadir observación
                                             </Button>
                                             <Button type="submit" disabled={observationForm.processing}>{observationForm.processing ? <Spinner /> : <Send />} Registrar observaciones</Button>
                                         </div>
+                                        </FieldGroup>
                                     </form>
                                 </CardContent>
                             </Card>
@@ -324,7 +340,8 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                     <CardTitle>Decisión de revisión</CardTitle>
                                     <CardDescription>Las decisiones se registran en la ronda activa y finalizan la asignación.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-5">
+                                <CardContent>
+                                    <FieldGroup className="gap-5">
                                     <Form action={TramiteRevisionController.decide.url({ tramite: tramite.id })} method="post" className="space-y-3">
                                         {({ errors, processing }) => (
                                             <>
@@ -354,6 +371,7 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
                                             </>
                                         )}
                                     </Form>
+                                    </FieldGroup>
                                 </CardContent>
                             </Card>
                         )}
@@ -365,7 +383,27 @@ export default function ReviewerShow({ destino, categorias_observacion, tramite,
 }
 
 function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
-    return <div className="grid content-start gap-2"><Label htmlFor={id}>{label}</Label>{children}<InputError message={error} /></div>;
+    const errorId = `${id}-error`;
+    const invalid = Boolean(error);
+    const control = Children.map(children, (child, index) => {
+        if (index !== 0 || !isValidElement(child)) {
+            return child;
+        }
+
+        return cloneElement(child as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+            id,
+            'aria-describedby': invalid ? errorId : undefined,
+            'aria-invalid': invalid ? true : undefined,
+        });
+    });
+
+    return (
+        <ShadcnField data-invalid={invalid ? true : undefined}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {control}
+            <FieldError id={errorId}>{error}</FieldError>
+        </ShadcnField>
+    );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

@@ -3264,7 +3264,7 @@ test('official PDF draws a QR for the configured public verification URL and omi
 });
 
 test('memorandum layout follows the canonical output type when its template is renamed', function () {
-    $pdf = app(PdfDocumentGenerator::class)->generate([
+    $multiple = app(PdfDocumentGenerator::class)->generate([
         'institucion' => 'Instituto Seoane',
         'tipo_documento' => 'Autorización de ingreso',
         'tipo_documento_salida' => 'memorando',
@@ -3281,10 +3281,64 @@ test('memorandum layout follows the canonical output type when its template is r
         'firmante' => 'Dirección académica',
         'codigo_verificacion' => '',
     ]);
+    $simple = app(PdfDocumentGenerator::class)->generate([
+        'institucion' => 'Instituto Seoane',
+        'tipo_documento' => 'MEMORANDO MULTIPLE RENOMBRADO',
+        'tipo_documento_salida' => 'memorando',
+        'modalidad_documento' => 'simple',
+        'numero' => '028-DSI-HACH-IESTP MSC-2026',
+        'codigo_expediente' => 'EXP-TIPO-000002',
+        'fecha_documento' => '18/06/2026',
+        'lugar' => 'SJL',
+        'asunto' => 'Autorización de ingreso',
+        'destinatarios' => ['Dirección general'],
+        'remitente' => 'Coordinación académica',
+        'contenido_principal' => 'Contenido del memorando simple.',
+        'personas' => [],
+        'firmante' => 'Dirección académica',
+        'codigo_verificacion' => '',
+    ]);
+    $nonMemorando = app(PdfDocumentGenerator::class)->generate([
+        'institucion' => 'Instituto Seoane',
+        'tipo_documento' => 'MEMORANDO MULTIPLE RENOMBRADO',
+        'tipo_documento_salida' => 'informe',
+        'modalidad_documento' => 'multiple',
+        'numero' => 'INF-2026-000003',
+        'codigo_expediente' => 'EXP-TIPO-000003',
+        'fecha_documento' => '18/06/2026',
+        'lugar' => 'SJL',
+        'asunto' => 'Informe de prueba',
+        'destinatarios' => ['Dirección general'],
+        'remitente' => 'Coordinación académica',
+        'introduccion' => null,
+        'contenido_principal' => 'Contenido del informe.',
+        'cierre' => null,
+        'personas' => [],
+        'firmante' => 'Dirección académica',
+        'decision' => 'aprobado',
+        'conclusion' => null,
+        'comentario_publico' => null,
+        'codigo_verificacion' => '',
+        'version_borrador' => 1,
+    ]);
+    $crest = file_get_contents(base_path('resources/images/institucion/encabezado-memorando-multiple.jpeg'));
 
     $titulo = (string) iconv('UTF-8', 'Windows-1252//TRANSLIT', 'MEMORANDO MÚLTIPLE');
+    $tituloSimple = 'MEMORANDUM';
 
-    expect($pdf['bytes'])->toContain($titulo);
+    expect($multiple['bytes'])->toContain($titulo)
+        ->toContain('INSTITUTO DE EDUCACI');
+    expect(is_string($crest))->toBeTrue();
+    expect($multiple['bytes'])->toContain($crest);
+    expect($simple['bytes'])->not->toContain($crest);
+    expect($simple['bytes'])
+        ->toContain($tituloSimple)
+        ->toContain('/Width 1248 /Height 116')
+        ->toContain('/SMask');
+    expect($nonMemorando['bytes'])
+        ->toContain('MEMORANDO MULTIPLE RENOMBRADO')
+        ->not->toContain($titulo)
+        ->not->toContain('INSTITUTO DE EDUCACI');
 });
 
 test('long memorandum keeps its closing and signature on the final page', function () {

@@ -148,8 +148,13 @@ class PdfDocumentGenerator
 
     private function esMemorando(array $documento): bool
     {
-        return mb_strtolower((string) ($documento['tipo_documento_salida'] ?? '')) === 'memorando'
-            || str_contains(mb_strtolower((string) ($documento['tipo_documento'] ?? '')), 'memorando');
+        $tipoSalida = trim((string) ($documento['tipo_documento_salida'] ?? ''));
+
+        if ($tipoSalida !== '') {
+            return mb_strtolower($tipoSalida) === 'memorando';
+        }
+
+        return str_contains(mb_strtolower((string) ($documento['tipo_documento'] ?? '')), 'memorando');
     }
 
     /**
@@ -165,7 +170,9 @@ class PdfDocumentGenerator
         $numero = trim((string) ($documento['numero'] ?? ''));
         $tipo = mb_strtoupper(trim((string) ($documento['tipo_documento'] ?? 'MEMORANDO')));
         $modalidad = mb_strtolower(trim((string) ($documento['modalidad_documento'] ?? '')));
-        $titulo = $modalidad === 'multiple' || str_contains($tipo, 'MULTIPLE') || str_contains($tipo, 'MÚLTIPLE')
+        $esMultiple = $modalidad === 'multiple'
+            || ($modalidad === '' && (str_contains($tipo, 'MULTIPLE') || str_contains($tipo, 'MÚLTIPLE')));
+        $titulo = $esMultiple
             ? 'MEMORANDO MÚLTIPLE'
             : 'MEMORANDUM';
         $this->agregarMemoTexto($items, $titulo.' Nº '.$numero, 13, true, true, 8, 495, true);
@@ -261,7 +268,7 @@ class PdfDocumentGenerator
             $codigo,
             true,
         );
-        $encabezado = $this->leerEncabezadoInstitucional();
+        $encabezado = $this->leerEncabezadoInstitucional($esMultiple ? 'multiple' : 'simple');
 
         return [
             'bytes' => $this->construirPdfMemorando($paginas, $numero, (string) ($documento['institucion'] ?? ''), $qr, $firmaImagen, $encabezado),
@@ -457,9 +464,21 @@ class PdfDocumentGenerator
         return trim(implode(', ', array_filter([(string) ($documento['lugar'] ?? ''), $fechaTexto])));
     }
 
-    private function leerEncabezadoInstitucional(): ?string
+    /**
+     * @return array{tipo: 'simple'|'multiple', bytes: string, formato: 'png'|'jpeg'}|null
+     */
+    private function leerEncabezadoInstitucional(string $modalidad): ?array
     {
-        $ruta = base_path('resources/images/institucion/encabezado-institucional.jpg');
+        $esMultiple = $modalidad === 'multiple';
+        $formato = $esMultiple ? 'jpeg' : 'png';
+        $ruta = base_path($esMultiple
+            ? 'resources/images/institucion/encabezado-memorando-multiple.jpeg'
+            : 'resources/images/institucion/encabezado-institucional.png');
+
+        if (! is_file($ruta) && ! $esMultiple) {
+            $ruta = base_path('resources/images/institucion/encabezado-institucional.jpg');
+            $formato = 'jpeg';
+        }
 
         if (! is_file($ruta)) {
             return null;
@@ -467,7 +486,11 @@ class PdfDocumentGenerator
 
         $bytes = file_get_contents($ruta);
 
-        return is_string($bytes) && $bytes !== '' ? $bytes : null;
+        return is_string($bytes) && $bytes !== '' ? [
+            'tipo' => $esMultiple ? 'multiple' : 'simple',
+            'bytes' => $bytes,
+            'formato' => $formato,
+        ] : null;
     }
 
     /**
@@ -867,8 +890,9 @@ class PdfDocumentGenerator
 
     /**
      * @param  list<list<array<string, mixed>>>  $paginas
+     * @param  array{tipo: 'simple'|'multiple', bytes: string, formato: 'png'|'jpeg'}|null  $encabezado
      */
-    private function construirPdfMemorando(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr, ?string $firmaImagen, ?string $encabezado): string
+    private function construirPdfMemorando(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr, ?string $firmaImagen, ?array $encabezado): string
     {
         $objetos = [
             1 => '<< /Type /Catalog /Pages 2 0 R >>',
@@ -877,16 +901,33 @@ class PdfDocumentGenerator
         ];
         $idsPaginas = [];
         $idEncabezado = null;
+        $idEncabezadoMascara = null;
         $idFirma = null;
+        $siguienteIdImagen = 5;
 
         if ($encabezado !== null) {
-            $medidas = @getimagesizefromstring($encabezado);
+            if (($encabezado['formato'] ?? null) === 'png') {
+                $imagenPng = $this->prepararImagenPngParaPdf($encabezado['bytes']);
 
-            if (is_array($medidas) && ($medidas[2] ?? null) === IMAGETYPE_JPEG) {
-                $idEncabezado = 5;
-                $objetos[$idEncabezado] = '<< /Type /XObject /Subtype /Image /Width '.(int) $medidas[0].' /Height '.(int) $medidas[1]
-                    .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($encabezado)." >>\nstream\n"
-                    .$encabezado."\nendstream";
+                if ($imagenPng !== null) {
+                    $idEncabezado = $siguienteIdImagen++;
+                    $idEncabezadoMascara = $siguienteIdImagen++;
+                    $objetos[$idEncabezadoMascara] = '<< /Type /XObject /Subtype /Image /Width '.$imagenPng['ancho'].' /Height '.$imagenPng['alto']
+                        .' /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length '.strlen($imagenPng['mascara'])." >>\nstream\n"
+                        .$imagenPng['mascara']."\nendstream";
+                    $objetos[$idEncabezado] = '<< /Type /XObject /Subtype /Image /Width '.$imagenPng['ancho'].' /Height '.$imagenPng['alto']
+                        .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /SMask '.$idEncabezadoMascara.' 0 R /Length '.strlen($imagenPng['rgb'])." >>\nstream\n"
+                        .$imagenPng['rgb']."\nendstream";
+                }
+            } else {
+                $medidas = @getimagesizefromstring($encabezado['bytes']);
+
+                if (is_array($medidas) && ($medidas[2] ?? null) === IMAGETYPE_JPEG) {
+                    $idEncabezado = $siguienteIdImagen++;
+                    $objetos[$idEncabezado] = '<< /Type /XObject /Subtype /Image /Width '.(int) $medidas[0].' /Height '.(int) $medidas[1]
+                        .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($encabezado['bytes'])." >>\nstream\n"
+                        .$encabezado['bytes']."\nendstream";
+                }
             }
         }
 
@@ -897,19 +938,19 @@ class PdfDocumentGenerator
                 throw new RuntimeException('La firma del perfil no está en un formato de imagen válido.');
             }
 
-            $idFirma = $idEncabezado === null ? 5 : 6;
+            $idFirma = $siguienteIdImagen++;
             $objetos[$idFirma] = '<< /Type /XObject /Subtype /Image /Width '.(int) $medidas[0].' /Height '.(int) $medidas[1]
                 .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($firmaImagen)." >>\nstream\n"
                 .$firmaImagen."\nendstream";
         }
 
-        $primerIdPagina = max(5, ($idEncabezado ?? 4) + 1, ($idFirma ?? 4) + 1);
+        $primerIdPagina = max(5, $siguienteIdImagen);
 
         foreach ($paginas as $indice => $lineas) {
             $idPagina = $primerIdPagina + ($indice * 2);
             $idContenido = $idPagina + 1;
             $idsPaginas[] = $idPagina.' 0 R';
-            $contenido = $this->contenidoPaginaMemorando($lineas, $qr, $idEncabezado !== null, $idFirma !== null);
+            $contenido = $this->contenidoPaginaMemorando($lineas, $qr, $encabezado, $idEncabezado !== null, $idFirma !== null);
             $xobjects = [];
 
             if ($idEncabezado !== null) {
@@ -950,14 +991,137 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array<string, mixed>>  $lineas
+     * @return array{ancho: int, alto: int, rgb: string, mascara: string}|null
      */
-    private function contenidoPaginaMemorando(array $lineas, ?ByteMatrix $qr, bool $tieneEncabezado, bool $tieneFirma): string
+    private function prepararImagenPngParaPdf(string $bytes): ?array
+    {
+        if (! str_starts_with($bytes, "\x89PNG\x0D\x0A\x1A\x0A")) {
+            return null;
+        }
+
+        $offset = 8;
+        $ancho = null;
+        $alto = null;
+        $bitDepth = null;
+        $colorType = null;
+        $datos = '';
+
+        while ($offset + 8 <= strlen($bytes)) {
+            $longitud = unpack('N', substr($bytes, $offset, 4))[1] ?? 0;
+            $tipo = substr($bytes, $offset + 4, 4);
+            $contenido = substr($bytes, $offset + 8, $longitud);
+            $offset += 12 + $longitud;
+
+            if ($tipo === 'IHDR' && strlen($contenido) >= 13) {
+                $cabecera = unpack('Nancho/Nalto/Cbit_depth/Ccolor_type', $contenido);
+                $ancho = (int) ($cabecera['ancho'] ?? 0);
+                $alto = (int) ($cabecera['alto'] ?? 0);
+                $bitDepth = (int) ($cabecera['bit_depth'] ?? 0);
+                $colorType = (int) ($cabecera['color_type'] ?? 0);
+            }
+
+            if ($tipo === 'IDAT') {
+                $datos .= $contenido;
+            }
+
+            if ($tipo === 'IEND') {
+                break;
+            }
+        }
+
+        if ($ancho === null || $alto === null || $ancho < 1 || $alto < 1 || $bitDepth !== 8 || $colorType !== 6) {
+            return null;
+        }
+
+        $descomprimido = @gzuncompress($datos);
+
+        if (! is_string($descomprimido) || strlen($descomprimido) !== $alto * (($ancho * 4) + 1)) {
+            return null;
+        }
+
+        $filaAnterior = array_fill(0, $ancho * 4, 0);
+        $rgb = '';
+        $mascara = '';
+        $posicion = 0;
+
+        for ($fila = 0; $fila < $alto; $fila++) {
+            $filtro = ord($descomprimido[$posicion++]);
+            $filaCodificada = array_values(unpack('C*', substr($descomprimido, $posicion, $ancho * 4)) ?: []);
+            $posicion += $ancho * 4;
+            $filaActual = [];
+
+            for ($indice = 0; $indice < $ancho * 4; $indice++) {
+                $izquierda = $indice >= 4 ? $filaActual[$indice - 4] : 0;
+                $arriba = $filaAnterior[$indice] ?? 0;
+                $diagonal = $indice >= 4 ? ($filaAnterior[$indice - 4] ?? 0) : 0;
+                $valor = $filaCodificada[$indice] ?? 0;
+
+                $filaActual[$indice] = match ($filtro) {
+                    0 => $valor,
+                    1 => ($valor + $izquierda) & 255,
+                    2 => ($valor + $arriba) & 255,
+                    3 => ($valor + (int) floor(($izquierda + $arriba) / 2)) & 255,
+                    4 => ($valor + $this->paethPredictor($izquierda, $arriba, $diagonal)) & 255,
+                    default => throw new RuntimeException('El encabezado PNG usa un filtro no compatible.'),
+                };
+            }
+
+            for ($indice = 0; $indice < $ancho; $indice++) {
+                $rgb .= chr($filaActual[$indice * 4])
+                    .chr($filaActual[$indice * 4 + 1])
+                    .chr($filaActual[$indice * 4 + 2]);
+                $mascara .= chr($filaActual[$indice * 4 + 3]);
+            }
+
+            $filaAnterior = $filaActual;
+        }
+
+        $rgbComprimido = gzcompress($rgb);
+        $mascaraComprimida = gzcompress($mascara);
+
+        if (! is_string($rgbComprimido) || ! is_string($mascaraComprimida)) {
+            return null;
+        }
+
+        return [
+            'ancho' => $ancho,
+            'alto' => $alto,
+            'rgb' => $rgbComprimido,
+            'mascara' => $mascaraComprimida,
+        ];
+    }
+
+    private function paethPredictor(int $izquierda, int $arriba, int $diagonal): int
+    {
+        $p = $izquierda + $arriba - $diagonal;
+        $pa = abs($p - $izquierda);
+        $pb = abs($p - $arriba);
+        $pc = abs($p - $diagonal);
+
+        if ($pa <= $pb && $pa <= $pc) {
+            return $izquierda;
+        }
+
+        return $pb <= $pc ? $arriba : $diagonal;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lineas
+     * @param  array{tipo: 'simple'|'multiple', bytes: string, formato: 'png'|'jpeg'}|null  $encabezado
+     */
+    private function contenidoPaginaMemorando(array $lineas, ?ByteMatrix $qr, ?array $encabezado, bool $tieneEncabezado, bool $tieneFirma): string
     {
         $contenido = "0.15 0.15 0.15 rg\n";
 
-        if ($tieneEncabezado) {
+        if ($tieneEncabezado && ($encabezado['tipo'] ?? null) === 'simple') {
             $contenido .= "q 495 0 0 46 50 784 cm /Encabezado Do Q\n";
+        }
+
+        if ($tieneEncabezado && ($encabezado['tipo'] ?? null) === 'multiple') {
+            $contenido .= "q 60 0 0 42 55 783 cm /Encabezado Do Q\n";
+            $contenido .= $this->textoCentradoPdf('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO', 10, 817, true);
+            $contenido .= $this->textoCentradoPdf('“MANUEL SEOANE CORRALES”', 10, 802, true);
+            $contenido .= $this->textoCentradoPdf('SAN JUAN DE LURIGANCHO', 8, 788, true);
         }
 
         foreach ($lineas as $linea) {
@@ -1031,6 +1195,15 @@ class PdfDocumentGenerator
         }
 
         return $contenido;
+    }
+
+    private function textoCentradoPdf(string $texto, int $tamano, float $y, bool $negrita = false): string
+    {
+        $fuente = $negrita ? 'F2' : 'F1';
+        $x = max(50, (595 - $this->anchoMemoTextoPuntos($texto, $tamano, $negrita)) / 2);
+
+        return 'BT /'.$fuente.' '.$tamano.' Tf 1 0 0 1 '.number_format($x, 2, '.', '').' '
+            .number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($texto)." Tj ET\n";
     }
 
     private function pdfTexto(string $texto): string
