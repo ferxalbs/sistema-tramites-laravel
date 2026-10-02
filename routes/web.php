@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\AssistantStudentAccountController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InstitutionalPositionController;
@@ -58,25 +57,25 @@ Route::get('cambiar-contrasena', fn (): InertiaResponse => Inertia::render('auth
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('notificaciones', [TramiteNotificacionController::class, 'index'])
-        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->middleware('role:estudiante,docente,administrador')
         ->name('notificaciones.index');
     Route::patch('notificaciones/{notification}/leer', [TramiteNotificacionController::class, 'read'])
-        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->middleware('role:estudiante,docente,administrador')
         ->whereNumber('notification')
         ->name('notificaciones.read');
     Route::patch('notificaciones/leer-todas', [TramiteNotificacionController::class, 'readAll'])
-        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->middleware('role:estudiante,docente,administrador')
         ->name('notificaciones.read-all');
 
     Route::get('dashboard', DashboardController::class)
-        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->middleware('role:estudiante,docente,administrador')
         ->name('dashboard');
 
     Route::get('buscar', GlobalSearchController::class)
-        ->middleware('role:estudiante,asistente,docente,administrador')
+        ->middleware('role:estudiante,docente,administrador')
         ->name('search.index');
 
-    Route::middleware('role:asistente,administrador')->group(function (): void {
+    Route::middleware('role:administrador')->group(function (): void {
         Route::get('admin/reportes', [TramiteReportController::class, 'index'])->name('admin.reports.index');
         Route::post('tramites/iniciar', [TramiteController::class, 'start'])->name('tramites.start');
         Route::resource('tramites', TramiteController::class)->only(['index', 'create', 'store', 'show']);
@@ -94,12 +93,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('tramites.asignacion.prepare');
     });
 
-    Route::middleware('role:asistente')->group(function (): void {
-        Route::get('asistente/estudiantes', [AssistantStudentAccountController::class, 'index'])->name('assistant.students.index');
-        Route::get('asistente/estudiantes/crear', [AssistantStudentAccountController::class, 'create'])->name('assistant.students.create');
-        Route::post('asistente/estudiantes', [AssistantStudentAccountController::class, 'store'])->name('assistant.students.store');
-        Route::get('asistente/estudiantes/{user}/editar', [AssistantStudentAccountController::class, 'edit'])->name('assistant.students.edit');
-        Route::put('asistente/estudiantes/{user}', [AssistantStudentAccountController::class, 'save'])->name('assistant.students.save');
+    Route::middleware('role:administrador')->group(function (): void {
         Route::get('tramites/{tramite}/editar', [TramiteController::class, 'edit'])->name('tramites.edit');
         Route::put('tramites/{tramite}', [TramiteController::class, 'update'])->name('tramites.update');
         Route::post('tramites/{tramite}/documentos', [TramiteController::class, 'upload'])
@@ -189,7 +183,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('mis-tramites/{tramite}', [TramiteEstudianteController::class, 'show'])->name('estudiante.tramites.show');
     });
 
-    Route::middleware('role:asistente,administrador')->group(function (): void {
+    Route::middleware('role:administrador')->group(function (): void {
         Route::get('tramites/{tramite}/entrega', [TramiteEntregaController::class, 'show'])->name('tramites.entrega.show');
         Route::post('tramites/{tramite}/entrega/preparar', [TramiteEntregaController::class, 'prepare'])->name('tramites.entrega.prepare');
         Route::post('tramites/{tramite}/entrega/firma', [TramiteEntregaController::class, 'registerSignature'])->name('tramites.entrega.firma');
@@ -198,7 +192,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::post('tramites/{tramite}/entrega/confirmar', [TramiteEntregaController::class, 'confirm'])
-        ->middleware('role:asistente,administrador,estudiante')
+        ->middleware('role:administrador,estudiante')
         ->name('tramites.entrega.confirmar');
 
     Route::get('tramites/{tramite}/entrega/firmas/{firma}/descargar', [TramiteEntregaController::class, 'downloadSignature'])

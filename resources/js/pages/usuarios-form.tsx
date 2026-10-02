@@ -44,11 +44,6 @@ import {
     store,
     update,
 } from '@/routes/admin/users';
-import {
-    index as studentsIndex,
-    save as saveStudent,
-    store as storeStudent,
-} from '@/routes/assistant/students';
 
 type Account = {
     id: number;
@@ -62,7 +57,6 @@ type Account = {
     email: string;
     correo_alternativo: string | null;
     cargo_institucional_id: number | null;
-    codigo_docente: string | null;
     programa_estudio_id: number | null;
     condicion_academica: string | null;
     ciclo_actual: number | null;
@@ -78,7 +72,6 @@ type Account = {
 };
 
 type Props = {
-    mode?: 'admin' | 'assistant';
     user: Account | null;
     programas: Array<{ id: number; nombre: string }>;
     cargos?: Array<{ id: number; nombre: string }>;
@@ -88,13 +81,11 @@ type Props = {
 
 const roles = [
     { value: 'estudiante', label: 'Acceso estudiantil' },
-    { value: 'asistente', label: 'Asistente de Gestión Documentaria' },
     { value: 'docente', label: 'Docente' },
     { value: 'administrador', label: 'Administrador' },
 ];
 
 export default function UsuariosForm({
-    mode = 'admin',
     user,
     programas,
     cargos = [],
@@ -102,21 +93,14 @@ export default function UsuariosForm({
     viewerId,
 }: Props) {
     useFlashToast();
-    const [role, setRole] = useState(user?.rol ?? 'estudiante');
+    const [role, setRole] = useState(user?.rol === 'asistente' ? '' : user?.rol ?? 'estudiante');
     const [condition, setCondition] = useState(
         user?.condicion_academica ?? 'Estudiante',
     );
     const [program, setProgram] = useState<string | null>(
         user?.programa_estudio_id ? String(user.programa_estudio_id) : null,
     );
-    const assistant = mode === 'assistant';
-    const title = assistant
-        ? user
-            ? 'Editar estudiante/egresado'
-            : 'Crear cuenta de estudiante/egresado'
-        : user
-          ? 'Editar usuario'
-          : 'Crear usuario';
+    const title = user ? 'Editar usuario' : 'Crear usuario';
 
     return (
         <>
@@ -126,10 +110,13 @@ export default function UsuariosForm({
                     <CardHeader>
                         <CardTitle>{title}</CardTitle>
                         <CardDescription>
-                            {assistant
-                                ? 'El rol se asigna como estudiante/egresado en el servidor. No puede cambiar roles ni estados desde este formulario.'
-                                : 'El perfil requerido cambia según el rol. Las cuentas creadas aquí usan una contraseña temporal.'}
+                            El perfil requerido cambia según el rol. Las cuentas creadas aquí usan una contraseña temporal.
                         </CardDescription>
+                        {user?.rol === 'asistente' && (
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                                Esta cuenta conserva el rol Asistente solo como historial. Elige un rol vigente antes de guardar.
+                            </p>
+                        )}
                         {user?.teacher_request && (
                             <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
                                 <p className="font-medium">Solicitud de acceso docente</p>
@@ -143,13 +130,7 @@ export default function UsuariosForm({
                         )}
                     </CardHeader>
                     <Form
-                        {...(assistant
-                            ? user
-                                ? saveStudent.form({ user: user.id })
-                                : storeStudent.form()
-                            : user
-                              ? save.form({ user: user.id })
-                              : store.form())}
+                        {...(user ? save.form({ user: user.id }) : store.form())}
                         disableWhileProcessing
                         noValidate
                         resetOnSuccess={['password', 'password_confirmation']}
@@ -163,7 +144,7 @@ export default function UsuariosForm({
                             <>
                                 <CardContent>
                                     <FieldGroup className="gap-5">
-                                    {!assistant && (
+                                    {(
                                         <ShadcnField className="gap-2" data-invalid={errors.rol ? true : undefined}>
                                             <FieldLabel htmlFor="rol">Rol de acceso</FieldLabel>
                                             <Select
@@ -182,7 +163,7 @@ export default function UsuariosForm({
                                                     aria-describedby={errors.rol ? 'rol-error' : undefined}
                                                     aria-invalid={errors.rol ? true : undefined}
                                                 >
-                                                    <SelectValue />
+                                                    <SelectValue placeholder="Selecciona un rol" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectGroup>
@@ -281,19 +262,17 @@ export default function UsuariosForm({
                                         role === 'docente') && (
                                         <ShadcnField className="gap-2" data-invalid={errors.programa_estudio_id ? true : undefined}>
                                             <FieldLabel htmlFor="programa_estudio_id">
-                                                Programa de estudios
+                                                Programa de estudios{role === 'docente' ? ' (opcional)' : ''}
                                             </FieldLabel>
                                             <Select
                                                 name="programa_estudio_id"
-                                                items={programas.map(
-                                                    (item) => ({
-                                                        value: String(item.id),
-                                                        label: item.nombre,
-                                                    }),
-                                                )}
-                                                value={program}
-                                                onValueChange={setProgram}
-                                                required
+                                                items={[
+                                                    ...(role === 'docente' ? [{ value: 'sin_programa', label: 'Sin programa (curso complementario)' }] : []),
+                                                    ...programas.map((item) => ({ value: String(item.id), label: item.nombre })),
+                                                ]}
+                                                value={program ?? (role === 'docente' ? 'sin_programa' : null)}
+                                                onValueChange={(value) => setProgram(value === 'sin_programa' ? null : value)}
+                                                required={role === 'estudiante'}
                                             >
                                                 <SelectTrigger
                                                     id="programa_estudio_id"
@@ -304,6 +283,9 @@ export default function UsuariosForm({
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectGroup>
+                                                        {role === 'docente' && (
+                                                            <SelectItem value="sin_programa">Sin programa (curso complementario)</SelectItem>
+                                                        )}
                                                         {programas.map(
                                                             (item) => (
                                                                 <SelectItem
@@ -324,6 +306,9 @@ export default function UsuariosForm({
                                                 </SelectContent>
                                             </Select>
                                             <FieldError id="programa_estudio_id-error">{errors.programa_estudio_id}</FieldError>
+                                            {role === 'docente' && (
+                                                <p className="text-sm text-muted-foreground">Déjalo sin programa si el docente dicta cursos complementarios.</p>
+                                            )}
                                             {programas.length === 0 && (
                                                 <p className="text-sm text-destructive">
                                                     No hay programas de estudios
@@ -335,7 +320,7 @@ export default function UsuariosForm({
                                         </ShadcnField>
                                     )}
 
-                                    {!assistant && role !== 'estudiante' && (
+                                    {role !== 'estudiante' && (
                                         <ShadcnField className="gap-2" data-invalid={errors.cargo_institucional_id ? true : undefined}>
                                             <FieldLabel htmlFor="cargo_institucional_id">
                                                 Cargo institucional
@@ -490,17 +475,6 @@ export default function UsuariosForm({
 
                                     {role === 'docente' && (
                                         <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                                            <Field id="codigo_docente" label="Código docente (opcional)" error={errors.codigo_docente}>
-                                                <Input
-                                                    id="codigo_docente"
-                                                    name="codigo_docente"
-                                                    defaultValue={
-                                                        user?.codigo_docente ??
-                                                        ''
-                                                    }
-                                                    maxLength={40}
-                                                />
-                                            </Field>
                                             <Field id="especialidad" label="Especialidad (opcional)" error={errors.especialidad}>
                                                 <Input
                                                     id="especialidad"
@@ -551,7 +525,7 @@ export default function UsuariosForm({
                                                     required
                                                 />
                                             </Field>
-                                            {!assistant && (
+                                            {(
                                                 <ShadcnField orientation="horizontal" className="sm:col-span-2">
                                                     <Checkbox
                                                         id="activar_inmediatamente"
@@ -602,22 +576,14 @@ export default function UsuariosForm({
                                     )}
                                     <div className="flex gap-2">
                                         <Button type="submit" disabled={processing}>
-                                            {user
-                                                ? 'Guardar cambios'
-                                                : assistant
-                                                  ? 'Crear cuenta provisional'
-                                                  : 'Crear usuario'}
+                                            {user ? 'Guardar cambios' : 'Crear usuario'}
                                         </Button>
                                         <Button
                                             variant="outline"
                                             nativeButton={false}
                                             render={
                                                 <Link
-                                                    href={
-                                                        assistant
-                                                            ? studentsIndex()
-                                                            : index()
-                                                    }
+                                                    href={index()}
                                                 />
                                             }
                                         >
@@ -629,7 +595,7 @@ export default function UsuariosForm({
                         )}
                     </Form>
                 </Card>
-                {!assistant && user && (
+                {user && (
                     <AccountActions user={user} viewerId={viewerId} />
                 )}
             </main>

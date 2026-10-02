@@ -32,10 +32,9 @@ class AdminUserRequest extends FormRequest
         $role = $this->input('rol');
         $isCreate = $targetId === null;
         $requiresAdminConfirmation = $role === 'administrador' && ($isCreate || $target->rol !== 'administrador');
-        $teacherProfileId = $target instanceof User ? $target->perfilDocente?->id : null;
 
         $rules = [
-            'rol' => ['required', Rule::in(['estudiante', 'asistente', 'docente', 'administrador'])],
+            'rol' => ['required', Rule::in(['estudiante', 'docente', 'administrador'])],
             'nombres' => ['required', 'string', 'min:2', 'max:120', 'regex:/^[\p{L}\p{M} .\'-]+$/u'],
             'apellidos' => ['required', 'string', 'min:2', 'max:120', 'regex:/^[\p{L}\p{M} .\'-]+$/u'],
             'dni' => ['required', 'digits:8', Rule::unique('users', 'dni')->ignore($targetId)],
@@ -84,11 +83,7 @@ class AdminUserRequest extends FormRequest
             ];
         } elseif ($role === 'docente') {
             $rules += [
-                'programa_estudio_id' => ['required', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
-                'codigo_docente' => [
-                    'nullable', 'regex:/^[A-Z0-9._-]{3,40}$/',
-                    Rule::unique('perfiles_docente', 'codigo_docente')->ignore($teacherProfileId),
-                ],
+                'programa_estudio_id' => ['nullable', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
                 'especialidad' => ['nullable', 'string', 'max:160'],
                 'condicion_laboral' => ['nullable', 'string', 'max:100'],
             ];
@@ -113,18 +108,16 @@ class AdminUserRequest extends FormRequest
             }
         }
 
-        foreach (['codigo_docente'] as $field) {
-            if (is_string($this->input($field))) {
-                $normalized[$field] = mb_strtoupper(trim($this->input($field)));
-            }
-        }
-
         if (is_string($this->input('dni'))) {
             $normalized['dni'] = preg_replace('/\s+/', '', $this->input('dni'));
         }
 
         if ($this->input('cargo_institucional_id') === 'sin_cargo') {
             $normalized['cargo_institucional_id'] = null;
+        }
+
+        if ($this->input('programa_estudio_id') === 'sin_programa') {
+            $normalized['programa_estudio_id'] = null;
         }
 
         $this->merge($normalized);

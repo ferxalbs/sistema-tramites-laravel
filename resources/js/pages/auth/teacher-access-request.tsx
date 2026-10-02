@@ -82,6 +82,18 @@ export default function TeacherAccessRequest({
                                     />
                                     <InputError message={errors.apellidos} />
 
+                                    <Label htmlFor="dni">DNI</Label>
+                                    <Input
+                                        id="dni"
+                                        name="dni"
+                                        required
+                                        inputMode="numeric"
+                                        pattern="[0-9]{8}"
+                                        minLength={8}
+                                        maxLength={8}
+                                    />
+                                    <InputError message={errors.dni} />
+
                                     <Label htmlFor="email">
                                         Correo institucional
                                     </Label>
@@ -96,23 +108,23 @@ export default function TeacherAccessRequest({
                                     <InputError message={errors.email} />
 
                                     <Label htmlFor="programa_estudio_id">
-                                        Programa o área
+                                        Programa de estudios (opcional)
                                     </Label>
                                     <Select
                                         name="programa_estudio_id"
-                                        items={programas.map((item) => ({
-                                            value: String(item.id),
-                                            label: item.nombre,
-                                        }))}
-                                        value={program}
-                                        onValueChange={setProgram}
-                                        required
+                                        items={[
+                                            { value: 'sin_programa', label: 'Sin programa (curso complementario)' },
+                                            ...programas.map((item) => ({ value: String(item.id), label: item.nombre })),
+                                        ]}
+                                        value={program ?? 'sin_programa'}
+                                        onValueChange={(value) => setProgram(value === 'sin_programa' ? null : value)}
                                     >
                                         <SelectTrigger id="programa_estudio_id">
                                             <SelectValue placeholder="Seleccione un programa" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectGroup>
+                                                <SelectItem value="sin_programa">Sin programa (curso complementario)</SelectItem>
                                                 {programas.map((item) => (
                                                     <SelectItem
                                                         key={item.id}
@@ -127,6 +139,7 @@ export default function TeacherAccessRequest({
                                     <InputError
                                         message={errors.programa_estudio_id}
                                     />
+                                    <p className="text-sm text-muted-foreground">Selecciona un programa solo si corresponde a tu labor docente.</p>
 
                                     <Label htmlFor="cargo_institucional_id">
                                         Cargo institucional

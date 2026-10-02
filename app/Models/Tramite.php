@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'modalidad_documento',
     'persona_nombre',
     'persona_identificador',
+    'solicitante_correo',
+    'solicitante_celular',
     'propietario_id',
     'programa_estudio_id',
     'destino_tipo',

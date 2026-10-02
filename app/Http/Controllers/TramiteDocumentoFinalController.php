@@ -37,6 +37,7 @@ class TramiteDocumentoFinalController extends Controller
         abort_unless($ronda?->versionBorrador !== null, 409);
 
         return Inertia::render('tramites/documento-final', [
+            'modelo_oficial_pendiente' => in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true),
             'tramite' => [
                 'id' => $tramite->id,
                 'codigo' => $tramite->codigo,
@@ -161,7 +162,7 @@ class TramiteDocumentoFinalController extends Controller
         abort_unless(($vigente || $historico) && $documento->disco === 'local', 404);
 
         $actor = $request->user();
-        $personal = in_array($actor->rol, ['asistente', 'administrador'], true);
+        $personal = $actor->rol === 'administrador';
         $revisorAsignado = $actor->rol === 'docente' && DB::table('tramite_rondas_revision as rondas')
             ->join('tramite_asignaciones as asignaciones', 'asignaciones.id', '=', 'rondas.asignacion_id')
             ->where('rondas.id', $documento->ronda_revision_id)

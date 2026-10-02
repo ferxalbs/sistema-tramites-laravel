@@ -15,7 +15,7 @@ class EmitTramiteFinalDocumentRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user instanceof User && $user->activo && $user->rol === 'asistente';
+        return $user instanceof User && $user->activo && $user->rol === 'administrador';
     }
 
     /**

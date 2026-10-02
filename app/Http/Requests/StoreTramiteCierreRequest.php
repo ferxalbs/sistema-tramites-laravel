@@ -15,7 +15,7 @@ class StoreTramiteCierreRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user instanceof User && $user->activo && in_array($user->rol, ['asistente', 'administrador'], true);
+        return $user instanceof User && $user->activo && $user->rol === 'administrador';
     }
 
     /**

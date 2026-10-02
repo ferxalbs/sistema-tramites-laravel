@@ -8,6 +8,7 @@ use App\Models\PerfilEstudiante;
 use App\Models\ProgramaEstudio;
 use App\Models\User;
 use App\Notifications\AdministrativeResetPassword;
+use App\Services\Tramites\LinkApplicantAccount;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -104,6 +105,9 @@ class UserAccountController extends Controller
             $user->forceFill(['email_verified_at' => now()])->save();
 
             $this->syncProfile($user, $data);
+            if ($active) {
+                app(LinkApplicantAccount::class)->execute($user, $actor);
+            }
             $this->recordEvent($user, $actor, 'create', 'nuevo', $user->estado_cuenta);
 
             return $user;
@@ -139,7 +143,6 @@ class UserAccountController extends Controller
                 'email' => $user->email,
                 'correo_alternativo' => $user->correo_alternativo,
                 'cargo_institucional_id' => $user->cargo_institucional_id,
-                'codigo_docente' => $teacher?->codigo_docente,
                 'programa_estudio_id' => $student instanceof PerfilEstudiante ? $student->programa_estudio_id : $teacher?->programa_estudio_id,
                 'condicion_academica' => $student?->condicion_academica,
                 'ciclo_actual' => $student?->ciclo_actual,
@@ -209,6 +212,7 @@ class UserAccountController extends Controller
 
             $current->refresh();
             $this->syncProfile($current, $data);
+            app(LinkApplicantAccount::class)->execute($current, $actor);
             $this->recordEvent($current, $actor, 'edit', $current->estado_cuenta, $current->estado_cuenta);
 
             if ($roleChanged) {
@@ -236,6 +240,9 @@ class UserAccountController extends Controller
         DB::transaction(function () use ($actor, $user, $input): void {
             $current = User::query()->findOrFail($user->id);
             $action = $input['accion'];
+            if ($current->rol === 'asistente' && $action === 'activate') {
+                throw ValidationException::withMessages(['accion' => 'El rol Asistente fue retirado. Edite la cuenta y asígnele un rol vigente antes de activarla.']);
+            }
             $newState = match ($action) {
                 'activate' => 'activo',
                 'deactivate' => 'inactivo',
@@ -272,6 +279,11 @@ class UserAccountController extends Controller
 
             if ($changed !== 1) {
                 throw ValidationException::withMessages(['accion' => 'No se pudo actualizar la cuenta; verifique que no sea el último administrador activo.']);
+            }
+
+            if ($newState === 'activo') {
+                $current->refresh();
+                app(LinkApplicantAccount::class)->execute($current, $actor);
             }
 
             $accountEventId = DB::table('user_account_events')->insertGetId([
@@ -327,8 +339,8 @@ class UserAccountController extends Controller
             }
 
             $hasWorkflowHistory = DB::table('tramites')->where(fn ($query) => $query
-                    ->where('propietario_id', $current->id)
-                    ->orWhere('destino_docente_id', $current->id))->exists()
+                ->where('propietario_id', $current->id)
+                ->orWhere('destino_docente_id', $current->id))->exists()
                 || DB::table('tramite_documentos')->where('cargado_por', $current->id)->exists()
                 || DB::table('tramite_eventos')->where('usuario_id', $current->id)->exists()
                 || DB::table('tramite_borradores')->where(fn ($query) => $query
@@ -432,8 +444,8 @@ class UserAccountController extends Controller
             PerfilDocente::query()->where('user_id', $user->id)->delete();
         } elseif ($data['rol'] === 'docente') {
             PerfilDocente::query()->updateOrCreate(['user_id' => $user->id], [
-                'codigo_docente' => $data['codigo_docente'] ?? null,
-                'programa_estudio_id' => $data['programa_estudio_id'],
+                'codigo_docente' => $data['dni'],
+                'programa_estudio_id' => $data['programa_estudio_id'] ?? null,
                 'especialidad' => $data['especialidad'] ?? null,
                 'condicion_laboral' => $data['condicion_laboral'] ?? null,
             ]);

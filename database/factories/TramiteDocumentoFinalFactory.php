@@ -42,7 +42,7 @@ class TramiteDocumentoFinalFactory extends Factory
             'tamano_bytes' => null,
             'numero_paginas' => null,
             'contenido_snapshot' => [],
-            'generado_por' => User::factory()->state(['rol' => 'asistente', 'activo' => true]),
+            'generado_por' => User::factory()->state(['rol' => 'administrador', 'activo' => true]),
             'fecha_emision' => null,
             'error_generacion' => null,
         ];

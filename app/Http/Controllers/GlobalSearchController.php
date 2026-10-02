@@ -77,7 +77,6 @@ class GlobalSearchController extends Controller
 
             if (! $isReviewer && ! $isStudent) {
                 $results['personas'] = User::query()
-                    ->when($actor->rol === 'asistente', fn (Builder $builder): Builder => $builder->where('rol', 'estudiante'))
                     ->where(fn (Builder $builder): Builder => $builder
                         ->whereRaw("name LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("nombres LIKE ? ESCAPE '!'", [$like])

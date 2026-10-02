@@ -12,7 +12,7 @@ test('only administrators can edit institutional positions', function () {
     $this->get(route('admin.positions.index'))->assertRedirect(route('login'));
     $this->patch(route('admin.positions.update', $position->id), $payload)->assertRedirect(route('login'));
 
-    foreach (['estudiante', 'asistente', 'docente'] as $role) {
+    foreach (['estudiante', 'docente'] as $role) {
         $this->actingAs(User::factory()->create(['rol' => $role]))
             ->get(route('admin.positions.index'))->assertForbidden();
         $this->patch(route('admin.positions.update', $position->id), $payload)->assertForbidden();
@@ -43,7 +43,7 @@ test('editing a position is audited and inactive positions cannot be requested',
     $this->get(route('teacher-access.create'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/teacher-access-request')->has('cargos', 2));
     $this->post(route('teacher-access.store'), [
-        'nombres' => 'Elena', 'apellidos' => 'Quispe', 'email' => 'elena@seoane.edu.pe',
+        'nombres' => 'Elena', 'apellidos' => 'Quispe', 'dni' => '76543210', 'email' => 'elena@seoane.edu.pe',
         'programa_estudio_id' => $program->id, 'cargo_institucional_id' => $position->id,
         'motivo' => 'Solicitud de acceso institucional como docente.',
     ])->assertSessionHasErrors('cargo_institucional_id');

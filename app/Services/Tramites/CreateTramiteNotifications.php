@@ -44,7 +44,7 @@ class CreateTramiteNotifications
             ->where('activo', true)
             ->where('estado_cuenta', 'activo')
             ->where(function ($query) use ($tramite, $evento): void {
-                $query->whereIn('rol', ['asistente', 'administrador'])
+                $query->where('rol', 'administrador')
                     ->orWhere(function ($owner) use ($tramite): void {
                         $owner->where('rol', 'estudiante')->where('id', $tramite->propietario_id);
                     })

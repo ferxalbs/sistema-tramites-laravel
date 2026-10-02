@@ -97,12 +97,13 @@ test('profile update rolls back when the academic profile is missing', function 
 
 test('teacher changes professional contacts without changing institutional identity', function () {
     $teacher = User::factory()->create(['rol' => 'docente', 'email' => 'docente@seoane.edu.pe']);
-    $profile = PerfilDocente::factory()->create(['user_id' => $teacher->id, 'codigo_docente' => 'DOC-1']);
+    $profile = PerfilDocente::factory()->create(['user_id' => $teacher->id, 'codigo_docente' => $teacher->dni]);
 
     $this->actingAs($teacher)->get(route('profile.edit'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('identity.rol', 'docente')
-            ->where('profile.codigo', 'DOC-1')
+            ->where('identity.dni', $teacher->dni)
+            ->missing('profile.codigo')
             ->etc());
     $this->patch(route('profile.update'), [
         'nombres' => 'Docente actualizado',
@@ -123,8 +124,8 @@ test('teacher changes professional contacts without changing institutional ident
         ->assertSessionHasErrors('especialidad');
 });
 
-test('assistant and administrator can edit their personal profile without changing role', function () {
-    foreach (['asistente', 'administrador'] as $role) {
+test('administrator can edit a personal profile without changing role', function () {
+    foreach (['administrador'] as $role) {
         $user = User::factory()->create(['rol' => $role]);
         $this->actingAs($user)->get(route('profile.edit'))->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -147,7 +148,6 @@ test('assistant and administrator can edit their personal profile without changi
     $this->actingAs($student)->delete('/settings/profile', ['password' => 'password'])->assertStatus(405);
     expect($student->fresh())->not->toBeNull();
     $legacyAssistant = User::factory()->create(['rol' => 'asistente', 'cuenta_provisional' => null]);
-    $this->actingAs($legacyAssistant)->get(route('profile.edit'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('identity.cuenta_provisional', null)->etc());
-    expect(DB::table('user_account_events')->where('accion', 'edit_profile')->count())->toBe(2);
+    $this->actingAs($legacyAssistant)->get(route('profile.edit'))->assertForbidden();
+    expect(DB::table('user_account_events')->where('accion', 'edit_profile')->count())->toBe(1);
 });

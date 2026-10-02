@@ -100,11 +100,7 @@ test('dashboard limits teacher metrics to assigned expedientes and shows staff t
         ->where('summary.cerrados', 1)
         ->has('activity', 2)
         ->where('adminCharts', null));
-    $this->actingAs($assistant)->get(route('dashboard'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('role', 'asistente')
-        ->where('summary.total', 3)
-        ->where('adminCharts', null));
+    $this->actingAs($assistant)->get(route('dashboard'))->assertForbidden();
     $this->actingAs($administrator)->get(route('dashboard'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('role', 'administrador')
@@ -319,13 +315,8 @@ test('administrative reports filter saved program and current assignment without
     $this->get(route('admin.reports.index'))->assertRedirect(route('login'));
     $this->actingAs($student)->get(route('admin.reports.index'))->assertForbidden();
     $this->actingAs($teacher)->get(route('admin.reports.index'))->assertForbidden();
-    $this->actingAs($assistant)->get(route('admin.reports.index'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('reportes')
-        ->where('rows.total', fn (int $total): bool => $total >= 2)
-        ->where('canExport', false)
-        ->etc());
-    $this->get(route('admin.reports.export'))->assertForbidden();
+    $this->actingAs($assistant)->get(route('admin.reports.index'))->assertForbidden();
+    $this->get(route('admin.reports.export'))->assertRedirect(route('login'));
 
     $filters = [
         'programa' => $programa->id,
@@ -383,7 +374,7 @@ test('only administrators export filtered semicolon CSV with BOM and neutralized
 });
 
 test('report pagination keeps filters and returns only the requested page', function () {
-    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $assistant = User::factory()->create(['rol' => 'administrador']);
     $programa = ProgramaEstudio::factory()->create();
     Tramite::factory()->count(26)->create(['programa_estudio_id' => $programa->id]);
 

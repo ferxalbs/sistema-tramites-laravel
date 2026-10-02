@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Models\User;
 use App\Models\TramiteMedioEntrega;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ class StoreTramiteEntregaRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user instanceof User && $user->activo && in_array($user->rol, ['asistente', 'administrador'], true);
+        return $user instanceof User && $user->activo && $user->rol === 'administrador';
     }
 
     /**

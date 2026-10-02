@@ -39,7 +39,7 @@ class TramiteBorradorFactory extends Factory
             'estado' => 'preparado_asignacion',
             'es_actual' => true,
             'preparado_en' => now(),
-            'creado_por' => User::factory()->state(['rol' => 'asistente', 'activo' => true]),
+            'creado_por' => User::factory()->state(['rol' => 'administrador', 'activo' => true]),
         ];
     }
 }

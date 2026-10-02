@@ -15,7 +15,7 @@ class ReassignTramiteAsignacionRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user !== null && $user->activo && $user->rol === 'asistente';
+        return $user !== null && $user->activo && $user->rol === 'administrador';
     }
 
     /**

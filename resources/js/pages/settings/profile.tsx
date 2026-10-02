@@ -15,7 +15,7 @@ type Identity = {
     nombres: string;
     apellidos: string;
     email: string;
-    rol: 'estudiante' | 'docente' | 'asistente' | 'administrador';
+    rol: 'estudiante' | 'docente' | 'administrador';
     dni: string | null;
     celular: string | null;
     correo_alternativo: string | null;
@@ -24,7 +24,6 @@ type Identity = {
 };
 
 type ProfileData = {
-    codigo?: string | null;
     programa?: string | null;
     condicion?: string | null;
     ciclo_actual?: number | null;
@@ -43,7 +42,6 @@ type Props = {
 const roleLabels: Record<Identity['rol'], string> = {
     estudiante: 'Estudiante / egresado',
     docente: 'Docente',
-    asistente: 'Asistente de gestión documentaria',
     administrador: 'Administrador',
 };
 
@@ -99,17 +97,9 @@ export default function Profile({ identity, profile, status }: Props) {
                             {identity.dni && (
                                 <div>
                                     <dt className="text-sm text-muted-foreground">
-                                        DNI
+                                        {isTeacher ? 'DNI / código docente' : 'DNI'}
                                     </dt>
                                     <dd>{identity.dni}</dd>
-                                </div>
-                            )}
-                            {isTeacher && profile?.codigo && (
-                                <div>
-                                    <dt className="text-sm text-muted-foreground">
-                                        Código docente
-                                    </dt>
-                                    <dd>{profile.codigo}</dd>
                                 </div>
                             )}
                             {profile?.programa && (

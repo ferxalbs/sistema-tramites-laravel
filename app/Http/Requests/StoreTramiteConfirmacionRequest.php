@@ -17,7 +17,7 @@ class StoreTramiteConfirmacionRequest extends FormRequest
 
         return $user instanceof User
             && $user->activo
-            && in_array($user->rol, ['asistente', 'administrador', 'estudiante'], true);
+            && in_array($user->rol, ['administrador', 'estudiante'], true);
     }
 
     /**

@@ -23,7 +23,7 @@ class EnsureAccountIsCurrent
             $user->refresh();
             $sessionVersion = $request->session()->get('account_session_version');
 
-            if (! $user->activo || $user->estado_cuenta !== 'activo'
+            if (! $user->activo || $user->estado_cuenta !== 'activo' || $user->rol === 'asistente'
                 || ($sessionVersion !== null && (int) $sessionVersion !== $user->sesion_version)) {
                 Auth::logout();
                 $request->session()->invalidate();

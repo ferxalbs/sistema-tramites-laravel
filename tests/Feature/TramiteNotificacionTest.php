@@ -38,13 +38,13 @@ test('workflow events notify only active owner, reviewer, and office staff witho
 
     $notifications = DB::table('tramite_notificaciones')->where('evento_id', $event->id)->get();
     expect($notifications->pluck('usuario_id')->sort()->values()->all())
-        ->toBe(collect([$owner->id, $reviewer->id, $assistant->id, $admin->id])->sort()->values()->all())
+        ->toBe(collect([$owner->id, $reviewer->id, $admin->id])->sort()->values()->all())
         ->and($notifications->pluck('mensaje')->unique()->all())->toHaveCount(1)
         ->and($notifications->first()->mensaje)->toContain($tramite->codigo)
         ->not->toContain('Nota reservada', 'Dato privado');
 
     app(CreateTramiteNotifications::class)->forEvent($event);
-    expect(DB::table('tramite_notificaciones')->count())->toBe(4);
+    expect(DB::table('tramite_notificaciones')->count())->toBe(3);
 
     TramiteEvento::query()->create([
         'tramite_id' => $tramite->id,
@@ -52,7 +52,7 @@ test('workflow events notify only active owner, reviewer, and office staff witho
         'accion' => 'acceso_tramite_no_autorizado',
         'descripcion' => 'Acceso denegado',
     ]);
-    expect(DB::table('tramite_notificaciones')->count())->toBe(4)
+    expect(DB::table('tramite_notificaciones')->count())->toBe(3)
         ->and(DB::table('tramite_notificaciones')->where('usuario_id', $inactiveAssistant->id)->exists())->toBeFalse()
         ->and(DB::table('tramite_notificaciones')->where('usuario_id', $otherTeacher->id)->exists())->toBeFalse();
 });
@@ -60,7 +60,7 @@ test('workflow events notify only active owner, reviewer, and office staff witho
 test('notifications are scoped on list, mark one, mark all, and audit', function () {
     $owner = User::factory()->create(['rol' => 'estudiante']);
     $otherStudent = User::factory()->create(['rol' => 'estudiante']);
-    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $assistant = User::factory()->create(['rol' => 'administrador']);
     $tramite = Tramite::factory()->create(['propietario_id' => $owner->id, 'recibido_por' => $assistant->id]);
 
     TramiteEvento::query()->create(['tramite_id' => $tramite->id, 'usuario_id' => $assistant->id, 'accion' => 'recepcion', 'descripcion' => 'Recepción']);
@@ -95,7 +95,7 @@ test('notifications are scoped on list, mark one, mark all, and audit', function
 
 test('notification writes roll back with their workflow event', function () {
     $owner = User::factory()->create(['rol' => 'estudiante']);
-    $assistant = User::factory()->create(['rol' => 'asistente']);
+    $assistant = User::factory()->create(['rol' => 'administrador']);
     $tramite = Tramite::factory()->create(['propietario_id' => $owner->id, 'recibido_por' => $assistant->id]);
 
     try {

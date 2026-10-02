@@ -93,6 +93,7 @@ class TramiteBorradorController extends Controller
                     'campos' => $this->camposEditables($plantilla),
                 ])->all(),
             'usuarios' => $this->usuariosAutorizados(),
+            'destinatarios_sugeridos' => $this->destinatariosSugeridos(),
             'borrador' => $borrador === null ? null : [
                 'id' => $borrador->id,
                 'plantilla_id' => $borrador->plantilla_id,
@@ -180,6 +181,7 @@ class TramiteBorradorController extends Controller
             'hoy' => now()->toDateString(),
             'plantillas' => $plantillas,
             'usuarios' => $this->usuariosAutorizados(),
+            'destinatarios_sugeridos' => $this->destinatariosSugeridos(),
             'borrador' => [
                 'id' => $borrador->id,
                 'plantilla_id' => $borrador->plantilla_id,
@@ -306,5 +308,36 @@ class TramiteBorradorController extends Controller
                 'cargo' => $usuario->cargo,
                 'firma_registrada' => Storage::disk('local')->exists('firmas-perfil/'.$usuario->id.'.jpg'),
             ])->all();
+    }
+
+    /** @return array<int, array{key: string, label: string, nombres: string, apellidos: string, cargo: string, correo: string}> */
+    private function destinatariosSugeridos(): array
+    {
+        $director = [
+            'key' => 'director-general',
+            'label' => 'Mg. RAUL WILLIAM LOPEZ REYNA · Director General',
+            'nombres' => 'Mg. RAUL WILLIAM',
+            'apellidos' => 'LOPEZ REYNA',
+            'cargo' => 'Director General del I.E.S.T.P. “Manuel Seoane Corrales”',
+            'correo' => '',
+        ];
+
+        $docentes = DB::table('users as usuario')
+            ->leftJoin('cargos_institucionales as cargo', 'cargo.id', '=', 'usuario.cargo_institucional_id')
+            ->where('usuario.rol', 'docente')
+            ->where('usuario.activo', true)
+            ->where('usuario.estado_cuenta', 'activo')
+            ->orderBy('usuario.name')
+            ->get(['usuario.id', 'usuario.name', 'usuario.nombres', 'usuario.apellidos', 'usuario.email', 'cargo.nombre as cargo'])
+            ->map(fn ($usuario): array => [
+                'key' => 'docente-'.$usuario->id,
+                'label' => $usuario->name.' · '.($usuario->cargo ?: 'Docente'),
+                'nombres' => trim((string) ($usuario->nombres ?: $usuario->name)),
+                'apellidos' => trim((string) $usuario->apellidos),
+                'cargo' => (string) ($usuario->cargo ?: 'Docente'),
+                'correo' => (string) $usuario->email,
+            ])->all();
+
+        return [$director, ...$docentes];
     }
 }

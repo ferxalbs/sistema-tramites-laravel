@@ -38,7 +38,6 @@ class ProfileController extends Controller
         } elseif ($user->rol === 'docente') {
             $teacher = $user->perfilDocente()->with('programa')->firstOrFail();
             $profile = [
-                'codigo' => $teacher->codigo_docente,
                 'programa' => $teacher->programa?->nombre,
                 'especialidad' => $teacher->especialidad,
                 'condicion_laboral' => $teacher->condicion_laboral,

@@ -32,7 +32,7 @@ class TramiteNumeracionDocumentalFactory extends Factory
             'correlativo' => fake()->unique()->numberBetween(1, 999999),
             'numero_completo' => 'PRU-'.now()->format('Y').'-'.Str::upper(Str::random(8)),
             'estado' => 'reservada',
-            'reservada_por' => User::factory()->state(['rol' => 'asistente', 'activo' => true]),
+            'reservada_por' => User::factory()->state(['rol' => 'administrador', 'activo' => true]),
             'error_generacion' => null,
         ];
     }

@@ -10,6 +10,7 @@ import TramiteController from '@/actions/App/Http/Controllers/TramiteController'
 import TramiteDocumentoFinalController from '@/actions/App/Http/Controllers/TramiteDocumentoFinalController';
 
 type Props = {
+    modelo_oficial_pendiente: boolean;
     tramite: {
         id: number;
         codigo: string;
@@ -32,7 +33,7 @@ type Props = {
     };
 };
 
-export default function DocumentoFinal({ tramite, revision, borrador }: Props) {
+export default function DocumentoFinal({ tramite, revision, borrador, modelo_oficial_pendiente }: Props) {
     return (
         <>
             <Head title={`Emitir documento · ${tramite.codigo}`} />
@@ -61,6 +62,11 @@ export default function DocumentoFinal({ tramite, revision, borrador }: Props) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-5 sm:grid-cols-2">
+                        {modelo_oficial_pendiente && (
+                            <p className="text-sm text-destructive sm:col-span-2">
+                                Falta el modelo institucional aprobado para este tipo de trámite. Puedes registrar y revisar el expediente, pero aún no emitir su PDF oficial.
+                            </p>
+                        )}
                         <Detail label="Resultado" value={revision.decision === 'aprobado' ? 'Aprobado' : 'Rechazado'} />
                         <Detail label="Ronda de revisión" value={revision.numero_ronda.toString()} />
                         <Detail label="Plantilla" value={borrador.plantilla} />
@@ -100,7 +106,7 @@ export default function DocumentoFinal({ tramite, revision, borrador }: Props) {
                                             <ShieldCheck />
                                             El archivo se guarda de forma privada y se verificará con SHA-256 en cada descarga.
                                         </p>
-                                        <Button type="submit" disabled={processing || !borrador.firma_perfil_registrada}>
+                                        <Button type="submit" disabled={processing || !borrador.firma_perfil_registrada || modelo_oficial_pendiente}>
                                             {processing ? <Spinner data-icon="inline-start" /> : <FileCheck2 data-icon="inline-start" />}
                                             Emitir documento oficial
                                         </Button>

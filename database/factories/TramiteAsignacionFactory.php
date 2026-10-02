@@ -24,7 +24,7 @@ class TramiteAsignacionFactory extends Factory
             'destino' => 'docente',
             'revisor_id' => User::factory()->state(['rol' => 'docente', 'activo' => true]),
             'rol_revisor' => 'docente',
-            'asignado_por' => User::factory()->state(['rol' => 'asistente', 'activo' => true]),
+            'asignado_por' => User::factory()->state(['rol' => 'administrador', 'activo' => true]),
             'motivo' => fake()->sentence(8),
             'instrucciones_revision' => fake()->sentence(),
             'fecha_esperada' => fake()->dateTimeBetween('+1 day', '+30 days')->format('Y-m-d'),

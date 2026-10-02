@@ -115,7 +115,7 @@ class SaveTramiteDraft
      */
     public function correct(Tramite $tramite, array $datos, User $actor): TramiteBorrador
     {
-        abort_unless($actor->activo && $actor->rol === 'asistente', 403);
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
 
         $plantilla = TramitePlantilla::query()->whereKey($datos['plantilla_id'])->first();
 
@@ -417,9 +417,9 @@ class SaveTramiteDraft
         $academicos = [];
 
         foreach ([
-            'Estudiante' => $estudiante === null ? null : $estudiante->name,
-            'DNI' => $estudiante === null ? null : $estudiante->dni,
-            'Código' => $estudiante === null ? null : $estudiante->dni,
+            'Estudiante' => $estudiante?->name ?? $tramite->persona_nombre,
+            'DNI' => $estudiante?->dni ?? $tramite->persona_identificador,
+            'Código' => $estudiante?->dni ?? $tramite->persona_identificador,
             'Ciclo' => $perfil === null ? null : $perfil->ciclo_actual,
             'Año de egreso' => $perfil === null ? null : $perfil->anio_egreso,
         ] as $etiqueta => $valor) {
@@ -435,9 +435,9 @@ class SaveTramiteDraft
             'FECHA' => $fecha,
             'LUGAR_FECHA' => $this->fechaDocumentoEspanol($fecha, $lugar),
             'PROGRAMA_ESTUDIO' => (string) ($programa ?? ''),
-            'ESTUDIANTE_NOMBRE' => (string) ($estudiante === null ? '' : $estudiante->name),
-            'DNI' => (string) ($estudiante === null ? '' : $estudiante->dni),
-            'CODIGO_ESTUDIANTE' => (string) ($estudiante === null ? '' : $estudiante->dni),
+            'ESTUDIANTE_NOMBRE' => (string) ($estudiante?->name ?? $tramite->persona_nombre ?? ''),
+            'DNI' => (string) ($estudiante?->dni ?? $tramite->persona_identificador ?? ''),
+            'CODIGO_ESTUDIANTE' => (string) ($estudiante?->dni ?? $tramite->persona_identificador ?? ''),
             'CICLO' => (string) ($perfil === null ? '' : $perfil->ciclo_actual),
             'ANIO_EGRESO' => (string) ($perfil === null ? '' : $perfil->anio_egreso),
             'DESTINATARIO_NOMBRE' => $destinatario === null ? '' : $nombre($destinatario),

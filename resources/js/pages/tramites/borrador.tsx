@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Children, cloneElement, isValidElement, type ReactElement } from 'react';
+import { Children, cloneElement, isValidElement, useState, type ReactElement } from 'react';
 import { ArrowLeft, Eye, FilePlus2, Save, Send } from 'lucide-react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
@@ -60,6 +60,11 @@ type Recipient = {
     cargo: string;
     correo: string;
     principal: boolean;
+};
+
+type RecipientSuggestion = Omit<Recipient, 'principal'> & {
+    key: string;
+    label: string;
 };
 
 type MentionedPerson = {
@@ -140,6 +145,7 @@ type Props = {
     hoy: string;
     plantillas: Plantilla[];
     usuarios: StaffUser[];
+    destinatarios_sugeridos: RecipientSuggestion[];
     borrador: ExistingDraft | null;
     archivos: Attachment[];
     versiones: DraftVersion[];
@@ -147,7 +153,8 @@ type Props = {
     observaciones?: ReviewObservation[];
 };
 
-export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuarios, borrador, archivos, versiones, resumen_observacion, observaciones = [] }: Props) {
+export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuarios, destinatarios_sugeridos, borrador, archivos, versiones, resumen_observacion, observaciones = [] }: Props) {
+    const [destinatariosElegidos, setDestinatariosElegidos] = useState<Record<number, string>>({});
     const form = useForm<DraftForm>({
         plantilla_id: borrador?.plantilla_id ?? plantillas[0]?.id ?? 0,
         remitente_id: borrador?.remitente_id ?? usuarios[0]?.id ?? null,
@@ -184,6 +191,18 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
     function actualizarDestinatario(indice: number, campo: keyof Recipient, valor: string | boolean) {
         form.setData('destinatarios', form.data.destinatarios.map((destinatario, posicion) => (
             posicion === indice ? { ...destinatario, [campo]: valor } : destinatario
+        )));
+    }
+
+    function aplicarDestinatario(indice: number, key: string | null) {
+        if (!key) return;
+        const sugerencia = destinatarios_sugeridos.find((item) => item.key === key);
+        if (!sugerencia) return;
+        setDestinatariosElegidos((actual) => ({ ...actual, [indice]: key }));
+        form.setData('destinatarios', form.data.destinatarios.map((destinatario, posicion) => (
+            posicion === indice
+                ? { ...destinatario, nombres: sugerencia.nombres, apellidos: sugerencia.apellidos, cargo: sugerencia.cargo, correo: sugerencia.correo }
+                : destinatario
         )));
     }
 
@@ -335,6 +354,26 @@ export default function TramiteBorrador({ modo, tramite, hoy, plantillas, usuari
                                 <FieldGroup className="gap-5">
                                 {form.data.destinatarios.map((destinatario, indice) => (
                                     <div key={indice} className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
+                                        <ShadcnField className="gap-2 sm:col-span-2">
+                                            <FieldLabel htmlFor={`destinatario-${indice}-sugerido`}>Elegir director o docente registrado (opcional)</FieldLabel>
+                                            <Select
+                                                value={destinatariosElegidos[indice] ?? null}
+                                                onValueChange={(key) => aplicarDestinatario(indice, key)}
+                                            >
+                                                <SelectTrigger id={`destinatario-${indice}-sugerido`}>
+                                                    <SelectValue placeholder="Selecciona una persona o escribe los datos manualmente" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        {destinatarios_sugeridos.map((sugerencia) => (
+                                                            <SelectItem key={sugerencia.key} value={sugerencia.key}>
+                                                                {sugerencia.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                        </ShadcnField>
                                         <Field id={`destinatario-${indice}-nombres`} label="Nombres" error={form.errors[`destinatarios.${indice}.nombres`]}>
                                             <Input
                                                 id={`destinatario-${indice}-nombres`}

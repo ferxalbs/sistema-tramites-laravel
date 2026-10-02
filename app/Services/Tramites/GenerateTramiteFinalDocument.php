@@ -29,7 +29,12 @@ class GenerateTramiteFinalDocument
 
     public function execute(Tramite $tramite, User $actor): TramiteDocumentoFinal
     {
-        abort_unless($actor->activo && $actor->rol === 'asistente', 403);
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
+        if (in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true)) {
+            throw ValidationException::withMessages([
+                'documento' => 'Falta el modelo institucional aprobado para este tipo de trámite. Se puede registrar y revisar el expediente, pero aún no emitir su PDF oficial.',
+            ]);
+        }
         $reserva = $this->reservarNumeracion($tramite, $actor);
         $ruta = null;
 
@@ -159,7 +164,7 @@ class GenerateTramiteFinalDocument
      */
     public function preview(Tramite $tramite, TramiteBorrador $borrador, User $actor): array
     {
-        abort_unless($actor->activo && in_array($actor->rol, ['asistente', 'administrador'], true), 403);
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
         abort_unless((int) $borrador->tramite_id === (int) $tramite->id, 404);
 
         $borrador->loadMissing(['plantilla', 'remitente', 'firmante']);
@@ -414,6 +419,7 @@ class GenerateTramiteFinalDocument
      *     comentario_publico: ?string,
      *     codigo_verificacion: string,
      *     version_borrador: int,
+     *     contenido_renderizado: ?string,
      *     requiere_firma_fisica: bool,
      *     plantilla: string,
      *     personas_titulo: string,
@@ -518,6 +524,7 @@ class GenerateTramiteFinalDocument
             'comentario_publico' => $ronda?->comentario_publico,
             'codigo_verificacion' => $codigoVerificacion,
             'version_borrador' => (int) $borrador->version,
+            'contenido_renderizado' => $borrador->contenido_renderizado,
             'borrador_renderizado_sha256' => $borrador->contenido_renderizado === null
                 ? null : hash('sha256', $borrador->contenido_renderizado),
             'requiere_firma_fisica' => false,

@@ -16,7 +16,7 @@ class StoreTramiteBorradorRequest extends FormRequest
 
         return $user !== null
             && $user->activo
-            && in_array($user->rol, ['asistente', 'administrador'], true);
+            && $user->rol === 'administrador';
     }
 
     /**

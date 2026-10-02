@@ -33,7 +33,7 @@ class TramiteFactory extends Factory
             'fecha_recepcion' => now()->toDateString(),
             'folios' => fake()->numberBetween(1, 20),
             'estado' => 'digitalizado',
-            'recibido_por' => User::factory()->state(['rol' => 'asistente', 'activo' => true]),
+            'recibido_por' => User::factory()->state(['rol' => 'administrador', 'activo' => true]),
         ];
     }
 }

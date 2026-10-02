@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select';
 import { dashboard } from '@/routes';
 
-type Role = 'estudiante' | 'asistente' | 'docente' | 'administrador';
+type Role = 'estudiante' | 'docente' | 'administrador';
 type StateCount = { codigo: string; nombre: string; total: number };
 type Activity = {
     tramite_id: number;
@@ -86,7 +86,6 @@ type Props = {
 
 const titles: Record<Role, string> = {
     estudiante: 'Panel del Estudiante / Egresado',
-    asistente: 'Panel Operativo',
     docente: 'Panel del Docente',
     administrador: 'Panel de Administración',
 };

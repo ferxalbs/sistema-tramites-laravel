@@ -43,7 +43,6 @@ import { index as searchIndex } from '@/routes/search';
 import { index as reportsIndex } from '@/routes/admin/reports';
 import { index as supportIndex } from '@/routes/support';
 import { index as notificationsIndex } from '@/routes/notificaciones';
-import { index as studentsIndex } from '@/routes/assistant/students';
 import type { Auth, NavItem } from '@/types';
 
 type PageProps = {
@@ -83,7 +82,7 @@ export function AppSidebar() {
         icon: Bell,
     });
 
-    if (['asistente', 'administrador'].includes(auth.user.rol)) {
+    if (auth.user.rol === 'administrador') {
         mainNavItems.push(
             {
                 title: 'Bandeja de trámites',
@@ -103,19 +102,6 @@ export function AppSidebar() {
         );
     }
 
-    if (auth.user.rol === 'asistente') {
-        mainNavItems.push({
-            title: 'Estudiantes y egresados',
-            href: studentsIndex(),
-            icon: Users,
-        });
-        mainNavItems.push({
-            title: 'Asignaciones',
-            href: TramiteAsignacionController.index(),
-            icon: ClipboardCheck,
-        });
-    }
-
     if (auth.user.rol === 'docente') {
         mainNavItems.push({
             title: 'Mis asignaciones',
@@ -125,6 +111,11 @@ export function AppSidebar() {
     }
 
     if (auth.user.rol === 'administrador') {
+        mainNavItems.push({
+            title: 'Asignaciones',
+            href: TramiteAsignacionController.index(),
+            icon: ClipboardCheck,
+        });
         mainNavItems.push({
             title: 'Entregas y cierres',
             href: TramiteEntregaAdminController.index(),
@@ -175,7 +166,7 @@ export function AppSidebar() {
         });
     }
 
-    if (['estudiante', 'asistente', 'docente', 'administrador'].includes(auth.user.rol)) {
+    if (['estudiante', 'docente', 'administrador'].includes(auth.user.rol)) {
         mainNavItems.push({
             title: 'Buscar',
             href: searchIndex(),

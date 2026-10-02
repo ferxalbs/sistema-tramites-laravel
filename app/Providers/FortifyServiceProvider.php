@@ -73,6 +73,7 @@ class FortifyServiceProvider extends ServiceProvider
             return $user instanceof User
                 && $user->activo
                 && $user->estado_cuenta === 'activo'
+                && $user->rol !== 'asistente'
                 && Hash::check((string) $request->input('password', ''), $user->password)
                     ? $user
                     : null;

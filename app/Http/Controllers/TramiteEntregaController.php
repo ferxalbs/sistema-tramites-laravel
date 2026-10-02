@@ -222,7 +222,7 @@ class TramiteEntregaController extends Controller
         $borradorId = $documentoId > 0
             ? TramiteDocumentoFinal::query()->whereKey($documentoId)->value('borrador_id')
             : null;
-        $autorizado = in_array($actor->rol, ['asistente', 'administrador'], true)
+        $autorizado = $actor->rol === 'administrador'
             || ($actor->rol === 'estudiante' && (int) $tramite->propietario_id === (int) $actor->id)
             || ($actor->rol === 'docente' && $borradorId !== null && TramiteRondaRevision::query()
                 ->where('tramite_id', $tramite->id)

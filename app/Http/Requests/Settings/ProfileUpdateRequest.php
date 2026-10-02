@@ -13,7 +13,7 @@ class ProfileUpdateRequest extends FormRequest
     {
         return $this->user() instanceof User
             && $this->user()->activo
-            && in_array($this->user()->rol, ['estudiante', 'asistente', 'docente', 'administrador'], true);
+            && in_array($this->user()->rol, ['estudiante', 'docente', 'administrador'], true);
     }
 
     protected function prepareForValidation(): void

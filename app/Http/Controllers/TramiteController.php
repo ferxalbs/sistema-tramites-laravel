@@ -185,7 +185,7 @@ class TramiteController extends Controller
             ...$this->receptionFormData(),
             'ahora' => now()->format('Y-m-d\TH:i'),
             'tramite' => $tramite->only([
-                'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador',
+                'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador', 'solicitante_correo', 'solicitante_celular',
                 'formato_salida', 'modalidad_documento',
                 'propietario_id', 'programa_estudio_id', 'destino_tipo', 'destino_nombre', 'destino_docente_id', 'asunto', 'descripcion', 'prioridad', 'folios',
                 'numero_expediente_externo', 'area_procedencia', 'persona_entrega_documento', 'observacion_recepcion',
@@ -222,7 +222,8 @@ class TramiteController extends Controller
 
             $tramite = DB::transaction(function () use ($codigo, $datos, $listas, $datosDocumentos, $request): Tramite {
                 $datos['programa_estudio_id'] = $this->programaParaRecepcion($datos);
-                $estado = $datosDocumentos === [] ? 'recibido_oficina' : 'digitalizado';
+                $esDocumentoInterno = ! TramiteTypeCatalog::requiresApplicant($datos['tipo_documento']);
+                $estado = $datosDocumentos !== [] || $esDocumentoInterno ? 'digitalizado' : 'recibido_oficina';
                 $tramite = Tramite::create([
                     ...$datos,
                     'codigo' => $codigo,
@@ -236,8 +237,8 @@ class TramiteController extends Controller
                     'tramite_id' => $tramite->id,
                     'usuario_id' => $request->user()->id,
                     'accion' => 'recepcion',
-                    'descripcion' => 'El trámite fue recibido en oficina.',
-                    'estado_nuevo' => 'recibido_oficina',
+                    'descripcion' => $esDocumentoInterno ? 'El documento institucional fue registrado en oficina.' : 'El trámite fue recibido en oficina.',
+                    'estado_nuevo' => $estado,
                     'metadatos' => isset($datos['propietario_id']) ? ['propietario_id' => $datos['propietario_id']] : null,
                 ]);
 
@@ -457,7 +458,7 @@ class TramiteController extends Controller
 
     public function receipt(Tramite $tramite): InertiaResponse
     {
-        $recepcion = $tramite->eventos()->where('accion', 'recepcion')->orderBy('id')->first(['created_at']);
+        $recepcion = $tramite->eventos()->where('accion', 'recepcion')->orderBy('id')->first(['created_at', 'estado_nuevo']);
         $typeLabels = TramiteTypeCatalog::labels();
 
         return Inertia::render('tramites/comprobante', [
@@ -469,7 +470,7 @@ class TramiteController extends Controller
                 'fecha_documento' => $tramite->fecha_presentacion_original?->toDateString(),
                 'fecha_registro' => ($recepcion?->created_at ?? $tramite->created_at)?->toIso8601String(),
                 'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
-                'estado_inicial' => config('tramites.estados.recibido_oficina'),
+                'estado_inicial' => config('tramites.estados.'.($recepcion?->estado_nuevo ?? $tramite->estado), $recepcion?->estado_nuevo ?? $tramite->estado),
                 'destino' => $tramite->destino_nombre ?: 'Pendiente',
                 'interesado' => $tramite->persona_nombre ?? 'Documento institucional',
                 'asunto' => $tramite->asunto,
@@ -518,6 +519,8 @@ class TramiteController extends Controller
                 'persona_nombre' => $tramite->persona_nombre,
                 'es_documento_institucional' => ! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento),
                 'persona_identificador' => $tramite->persona_identificador,
+                'solicitante_correo' => $tramite->solicitante_correo,
+                'solicitante_celular' => $tramite->solicitante_celular,
                 'destino_tipo' => config('tramites.destinos.'.$tramite->destino_tipo, $tramite->destino_tipo),
                 'destino_nombre' => $tramite->destino_nombre,
                 'asunto' => $tramite->asunto,
@@ -537,19 +540,19 @@ class TramiteController extends Controller
                 'recibido_por' => $tramite->recibidoPor?->name,
                 'propietario' => $tramite->propietario?->name,
                 'programa' => $tramite->programa?->nombre,
-                'puede_gestionar_asignacion' => $request->user()->rol === 'asistente',
-                'puede_corregir_revision' => $request->user()->rol === 'asistente' && $tramite->estado === 'observado',
-                'puede_gestionar_documentos_recepcion' => $request->user()->rol === 'asistente'
+                'puede_gestionar_asignacion' => $request->user()->rol === 'administrador',
+                'puede_corregir_revision' => $request->user()->rol === 'administrador' && $tramite->estado === 'observado',
+                'puede_gestionar_documentos_recepcion' => $request->user()->rol === 'administrador'
                     && in_array($tramite->estado, ['recibido_oficina', 'digitalizado'], true),
-                'puede_registrar_subsanacion' => $request->user()->rol === 'asistente' && $tramite->estado === 'observado',
-                'puede_editar_recepcion' => $request->user()->rol === 'asistente' && $this->canEditReception($tramite),
-                'puede_emitir_documento_final' => $request->user()->rol === 'asistente'
+                'puede_registrar_subsanacion' => $request->user()->rol === 'administrador' && $tramite->estado === 'observado',
+                'puede_editar_recepcion' => $request->user()->rol === 'administrador' && $this->canEditReception($tramite),
+                'puede_emitir_documento_final' => $request->user()->rol === 'administrador'
                     && in_array($tramite->estado, ['aprobado', 'rechazado'], true)
                     && $documentoFinal === null,
                 'puede_anular_documento_final' => $request->user()->rol === 'administrador'
                     && $tramite->estado === 'documento_final_generado'
                     && $documentoFinal?->estado === 'emitido',
-                'url_gestion_entrega' => in_array($request->user()->rol, ['asistente', 'administrador'], true)
+                'url_gestion_entrega' => $request->user()->rol === 'administrador'
                     && $documentoFinal !== null
                     ? route('tramites.entrega.show', $tramite)
                     : null,
@@ -667,7 +670,7 @@ class TramiteController extends Controller
     {
         abort_unless((int) $documento->tramite_id === (int) $tramite->id, 404);
         $user = request()->user();
-        $allowed = in_array($user->rol, ['asistente', 'administrador'], true)
+        $allowed = $user->rol === 'administrador'
             || ($user->rol === 'estudiante' && (int) $tramite->propietario_id === (int) $user->id)
             || ($user->rol === 'docente' && $tramite->asignaciones()->where('revisor_id', $user->id)->exists());
         abort_unless($allowed, 403);
@@ -851,21 +854,34 @@ class TramiteController extends Controller
             return;
         }
 
+        $dni = (string) ($datos['persona_identificador'] ?? '');
+        $selectedAccountId = $datos['propietario_id'] ?? null;
         $estudiante = User::query()
-            ->whereKey($datos['propietario_id'] ?? null)
+            ->when(filled($selectedAccountId), fn ($query) => $query->whereKey($selectedAccountId),
+                fn ($query) => $query->where('dni', $dni))
             ->where('rol', 'estudiante')
             ->where('activo', true)
-            ->first(['id', 'name', 'dni']);
+            ->where('estado_cuenta', 'activo')
+            ->first(['id', 'name', 'dni', 'email', 'celular']);
 
-        if ($estudiante === null || $estudiante->dni === null) {
+        if (filled($selectedAccountId) && $estudiante === null) {
             throw ValidationException::withMessages([
-                'propietario_id' => 'Vincule una cuenta activa de estudiante con DNI registrado.',
+                'propietario_id' => 'La cuenta seleccionada no está activa como estudiante.',
             ]);
         }
 
-        $datos['propietario_id'] = $estudiante->id;
-        $datos['persona_nombre'] = $estudiante->name;
-        $datos['persona_identificador'] = $estudiante->dni;
+        if ($estudiante !== null) {
+            $datos['propietario_id'] = $estudiante->id;
+            $datos['persona_nombre'] = $estudiante->name;
+            $datos['persona_identificador'] = $estudiante->dni;
+            $datos['solicitante_correo'] = $estudiante->email;
+            $datos['solicitante_celular'] = $estudiante->celular;
+
+            return;
+        }
+
+        $datos['propietario_id'] = null;
+        $datos['persona_nombre'] = trim((string) $datos['persona_nombre']);
     }
 
     /**

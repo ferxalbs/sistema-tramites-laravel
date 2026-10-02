@@ -7,8 +7,7 @@ import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteE
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { index as adminUsersIndex } from '@/routes/admin/users';
-import { edit as assistantStudentEdit } from '@/routes/assistant/students';
+import { edit as adminUserEdit } from '@/routes/admin/users';
 import { index as searchIndex } from '@/routes/search';
 
 type Expediente = {
@@ -32,7 +31,6 @@ type Props = {
     status: 'empty' | 'short' | 'too_long' | 'ok';
     reviewer: boolean;
     student: boolean;
-    administrator: boolean;
     results: {
         expedientes: Expediente[];
         personas: Person[];
@@ -40,7 +38,7 @@ type Props = {
     };
 };
 
-export default function Buscar({ query, status, reviewer, student, administrator, results }: Props) {
+export default function Buscar({ query, status, reviewer, student, results }: Props) {
     const [text, setText] = useState(query);
 
     function submit(event: FormEvent<HTMLFormElement>) {
@@ -156,9 +154,7 @@ export default function Buscar({ query, status, reviewer, student, administrator
                                                     key={person.id}
                                                     className="py-3 first:pt-0"
                                                 >
-                                                    {administrator ? (
-                                                        <Link className="font-medium text-primary hover:underline" href={adminUsersIndex({ query: { selected: person.id } })}>{person.name}</Link>
-                                                    ) : <Link className="font-medium text-primary hover:underline" href={assistantStudentEdit({ user: person.id })}>{person.name}</Link>}
+                                                    <Link className="font-medium text-primary hover:underline" href={adminUserEdit({ user: person.id })}>{person.name}</Link>
                                                     <p className="text-sm text-muted-foreground">
                                                         {person.rol}
                                                     </p>

@@ -36,8 +36,11 @@ class TeacherAccessRequestController extends Controller
         $request->merge([
             'nombres' => trim((string) $request->input('nombres', '')),
             'apellidos' => trim((string) $request->input('apellidos', '')),
+            'dni' => is_string($request->input('dni')) ? preg_replace('/\s+/', '', $request->input('dni')) : $request->input('dni'),
             'email' => mb_strtolower(trim((string) $request->input('email', ''))),
             'motivo' => trim((string) $request->input('motivo', '')),
+            'programa_estudio_id' => $request->input('programa_estudio_id') === 'sin_programa'
+                ? null : $request->input('programa_estudio_id'),
         ]);
         $personName = static function (string $attribute, mixed $value, Closure $fail): void {
             if (! is_string($value) || preg_match("/^[\\p{L}\\p{M} .'-]+$/u", $value) !== 1) {
@@ -47,11 +50,12 @@ class TeacherAccessRequestController extends Controller
         $data = $request->validate([
             'nombres' => ['required', 'string', 'min:2', 'max:120', $personName],
             'apellidos' => ['required', 'string', 'min:2', 'max:120', $personName],
+            'dni' => ['required', 'digits:8', Rule::unique('users', 'dni')],
             'email' => [
                 'required', 'email', 'max:190', 'regex:/@seoane\.edu\.pe\z/i',
                 Rule::unique('users', 'email'), Rule::unique('users', 'correo_alternativo'),
             ],
-            'programa_estudio_id' => ['required', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
+            'programa_estudio_id' => ['nullable', 'integer', Rule::exists('programas_estudio', 'id')->where('activo', true)],
             'cargo_institucional_id' => ['required', 'integer', Rule::exists('cargos_institucionales', 'id')
                 ->where('activo', true)->whereIn('codigo', self::ALLOWED_POSITIONS)],
             'motivo' => ['required', 'string', 'min:10', 'max:500'],
@@ -62,6 +66,7 @@ class TeacherAccessRequestController extends Controller
                 'name' => $data['nombres'].' '.$data['apellidos'],
                 'nombres' => $data['nombres'],
                 'apellidos' => $data['apellidos'],
+                'dni' => $data['dni'],
                 'email' => $data['email'],
                 'password' => Hash::make(Str::random(64)),
                 'rol' => 'docente',
@@ -71,7 +76,11 @@ class TeacherAccessRequestController extends Controller
                 'debe_cambiar_password' => true,
                 'cuenta_provisional' => true,
             ]);
-            PerfilDocente::query()->create(['user_id' => $user->id, 'programa_estudio_id' => $data['programa_estudio_id']]);
+            PerfilDocente::query()->create([
+                'user_id' => $user->id,
+                'programa_estudio_id' => $data['programa_estudio_id'] ?? null,
+                'codigo_docente' => $data['dni'],
+            ]);
             DB::table('teacher_access_requests')->insert([
                 'user_id' => $user->id,
                 'cargo_institucional_id' => $data['cargo_institucional_id'],

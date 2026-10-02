@@ -205,7 +205,7 @@ class ManageTramiteAssignment
 
     private function authorizeActor(User $actor): void
     {
-        abort_unless($actor->activo && $actor->rol === 'asistente', 403);
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
     }
 
     private function assertPreparedDraft(int $tramiteId): void

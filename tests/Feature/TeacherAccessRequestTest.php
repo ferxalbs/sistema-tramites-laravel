@@ -20,6 +20,7 @@ test('public teacher request is pending, keeps the teacher role, and awaits veri
     $this->post(route('teacher-access.store'), [
         'nombres' => 'Elena',
         'apellidos' => 'Quispe Soto',
+        'dni' => '76543210',
         'email' => 'Docente@seoane.edu.pe',
         'programa_estudio_id' => $program->id,
         'cargo_institucional_id' => $position->id,
@@ -36,9 +37,11 @@ test('public teacher request is pending, keeps the teacher role, and awaits veri
         ->and($user->debe_cambiar_password)->toBeTrue()
         ->and($user->cuenta_provisional)->toBeTrue()
         ->and($user->cargo_institucional_id)->toBe($position->id)
+        ->and($user->dni)->toBe('76543210')
         ->and($user->hasVerifiedEmail())->toBeFalse()
         ->and(Hash::check('password', $user->password))->toBeFalse()
         ->and($user->perfilDocente->programa_estudio_id)->toBe($program->id)
+        ->and($user->perfilDocente->codigo_docente)->toBe($user->dni)
         ->and(DB::table('teacher_access_requests')->where('user_id', $user->id)->value('motivo'))
         ->toBe('Solicito acceso para revisar expedientes asignados.');
     Notification::assertSentTo($user, VerifyEmail::class, 1);
@@ -65,7 +68,7 @@ test('teacher request rejects noninstitutional mail, inactive programs, unrelate
     $director = DB::table('cargos_institucionales')->where('codigo', 'director_general')->first();
     $position = DB::table('cargos_institucionales')->where('codigo', 'docente')->first();
     $payload = [
-        'nombres' => 'Elena', 'apellidos' => 'Quispe',
+        'nombres' => 'Elena', 'apellidos' => 'Quispe', 'dni' => '76543210',
         'email' => 'elena@example.com', 'programa_estudio_id' => $inactiveProgram->id,
         'cargo_institucional_id' => $director->id, 'motivo' => 'Corto',
     ];
@@ -80,6 +83,8 @@ test('teacher request rejects noninstitutional mail, inactive programs, unrelate
     $payload['motivo'] = 'Necesito acceso docente para revisar expedientes.';
     $this->post(route('teacher-access.store'), $payload)->assertRedirect(route('teacher-access.create'));
     $this->post(route('teacher-access.store'), $payload)->assertSessionHasErrors('email');
+    $payload['email'] = 'otra.docente@seoane.edu.pe';
+    $this->post(route('teacher-access.store'), $payload)->assertSessionHasErrors('dni');
     expect(User::query()->count())->toBe(1);
     Notification::assertSentTo(User::query()->firstOrFail(), VerifyEmail::class, 1);
 });
@@ -89,4 +94,23 @@ test('authenticated accounts cannot submit a public teacher request', function (
     $this->actingAs($user)->get(route('teacher-access.create'))->assertRedirect(route('dashboard'));
     $this->post(route('teacher-access.store'), [])->assertRedirect(route('dashboard'));
     expect(DB::table('teacher_access_requests')->count())->toBe(0);
+});
+
+test('teacher of complementary courses can request access without a study program', function () {
+    Notification::fake();
+    $position = DB::table('cargos_institucionales')->where('codigo', 'docente')->first();
+
+    $this->post(route('teacher-access.store'), [
+        'nombres' => 'Gregorio Samuel',
+        'apellidos' => 'Mercado Prudencio',
+        'dni' => '70123456',
+        'email' => 'gregorio@seoane.edu.pe',
+        'programa_estudio_id' => 'sin_programa',
+        'cargo_institucional_id' => $position->id,
+        'motivo' => 'Dicto cursos complementarios y revisaré expedientes asignados.',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('teacher-access.create'));
+
+    $teacher = User::query()->where('dni', '70123456')->firstOrFail();
+    expect($teacher->perfilDocente?->programa_estudio_id)->toBeNull()
+        ->and($teacher->perfilDocente?->codigo_docente)->toBe('70123456');
 });

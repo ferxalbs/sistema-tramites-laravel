@@ -64,16 +64,20 @@ class StoreTramiteRequest extends FormRequest
                 ? ['required', 'string', 'max:200']
                 : ['prohibited', 'nullable', 'string', 'max:200'],
             'persona_identificador' => $requiereSolicitante
-                ? ['nullable', 'string', 'max:50']
+                ? ($this->input('clasificacion') === 'estudiantil'
+                    ? [Rule::requiredIf(blank($this->input('propietario_id'))), 'nullable', 'digits:8']
+                    : ['nullable', 'string', 'max:50'])
                 : ['prohibited', 'nullable', 'string', 'max:50'],
+            'solicitante_correo' => ['nullable', 'email:rfc', 'max:190'],
+            'solicitante_celular' => ['nullable', 'regex:/^[0-9+() -]{7,20}$/'],
             'propietario_id' => [
                 'nullable',
                 ...(! $requiereSolicitante ? ['prohibited'] : []),
-                'required_if:clasificacion,estudiantil',
                 'integer',
                 Rule::exists('users', 'id')->where(fn (Builder $query) => $query->where('rol', 'estudiante')->where('activo', true)),
             ],
             'programa_estudio_id' => [
+                Rule::requiredIf($this->input('clasificacion') === 'estudiantil' && blank($this->input('propietario_id'))),
                 'nullable',
                 'integer',
                 Rule::exists('programas_estudio', 'id')->where(fn (Builder $query) => $query->where('activo', true)),

@@ -61,7 +61,7 @@ return [
         ],
         'corregir-observacion' => [
             'question' => '¿Cómo corrijo una observación?',
-            'answer' => 'Revise los puntos visibles y entregue la subsanación físicamente en Mesa de Partes. El asistente registra la corrección; el estudiante no adjunta archivos desde este portal.',
+            'answer' => 'Revise los puntos visibles y entregue la subsanación físicamente en Mesa de Partes. La administración de la oficina registra la corrección; el estudiante no adjunta archivos desde este portal.',
             'assistant' => true,
             'faq' => true,
         ],
@@ -119,14 +119,11 @@ return [
             ['title' => 'Observaciones', 'description' => 'Registre indicaciones claras.'],
             ['title' => 'Decisiones', 'description' => 'Apruebe o rechace con fundamento.'],
         ],
-        'asistente' => [
-            ['title' => 'Recepción', 'description' => 'Registre y digitalice expedientes.'],
-            ['title' => 'Borradores', 'description' => 'Prepare documentos institucionales.'],
-            ['title' => 'Asignaciones', 'description' => 'Derive al revisor correcto.'],
-            ['title' => 'Entregas', 'description' => 'Registre evidencia y cierre.'],
-        ],
         'administrador' => [
             ['title' => 'Usuarios', 'description' => 'Administre cuentas y roles.'],
+            ['title' => 'Recepción', 'description' => 'Digitalice en la oficina los documentos recibidos en Mesa de Partes.'],
+            ['title' => 'Asignaciones', 'description' => 'Derive expedientes a los docentes revisores.'],
+            ['title' => 'Documentos', 'description' => 'Prepare los PDF institucionales y registre su entrega.'],
             ['title' => 'Catálogos', 'description' => 'Mantenga configuraciones vigentes.'],
             ['title' => 'Reportes', 'description' => 'Consulte indicadores reales.'],
         ],

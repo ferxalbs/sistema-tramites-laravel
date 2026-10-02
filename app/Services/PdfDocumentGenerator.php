@@ -93,6 +93,10 @@ class PdfDocumentGenerator
             return $this->generarMemorando($documento, $firmaImagen);
         }
 
+        if (filled($documento['contenido_renderizado'] ?? null)) {
+            return $this->generarDesdePlantilla($documento, $firmaImagen);
+        }
+
         $lineas = [];
         $this->agregarParrafo($lineas, $documento['institucion'], 10, true, 4, true);
         $this->agregarParrafo($lineas, 'GESTIÓN DOCUMENTARIA INSTITUCIONAL', 9, false, 18, true);
@@ -142,6 +146,53 @@ class PdfDocumentGenerator
 
         return [
             'bytes' => $this->construirPdf($paginas, $documento['numero'], $documento['institucion'], $qr, $firmaImagen),
+            'paginas' => count($paginas),
+        ];
+    }
+
+    /**
+     * The approved draft is the source of truth for non-memorandum documents.
+     * Keep its resolved text in the issued PDF instead of rebuilding a generic body.
+     *
+     * @param  array<string, mixed>  $documento
+     * @return array{bytes: string, paginas: int}
+     */
+    private function generarDesdePlantilla(array $documento, ?string $firmaImagen): array
+    {
+        $lineas = [];
+        $this->agregarParrafo($lineas, (string) $documento['institucion'], 10, true, 4, true);
+        $this->agregarParrafo($lineas, (string) $documento['numero'], 12, true, 10, true);
+
+        $contenido = trim((string) $documento['contenido_renderizado']);
+        $firmante = trim((string) ($documento['firmante_nombre'] ?? $documento['firmante'] ?? ''));
+        if ($firmante !== '') {
+            $contenido = preg_replace('/\R\s*'.preg_quote($firmante, '/').'\s*\z/u', '', $contenido) ?? $contenido;
+        }
+
+        foreach (preg_split('/\R/u', trim($contenido)) ?: [] as $indice => $parrafo) {
+            $this->agregarParrafo($lineas, $parrafo, $indice === 0 ? 14 : 10, $indice === 0, $parrafo === '' ? 6 : 4, $indice === 0);
+        }
+
+        if (($documento['decision'] ?? null) === 'rechazado') {
+            $this->agregarSeccion($lineas, 'Resultado de la evaluación', 'Rechazado');
+            $this->agregarSeccion($lineas, 'Fundamento', $documento['conclusion'] ?? null);
+            $this->agregarSeccion($lineas, 'Comunicación al interesado', $documento['comentario_publico'] ?? null);
+        }
+
+        if ($firmaImagen !== null) {
+            $lineas[] = ['firma' => true, 'alto' => 42];
+        }
+        $this->agregarParrafo($lineas, '________________________________________', 10, false, 4);
+        $this->agregarParrafo($lineas, $firmante, 10, true, 2);
+        if (filled($documento['firmante_cargo'] ?? null)) {
+            $this->agregarParrafo($lineas, (string) $documento['firmante_cargo'], 9, false, 4);
+        }
+
+        $qr = $this->matrizVerificacion((string) $documento['codigo_verificacion']);
+        $paginas = $this->distribuirEnPaginas($lineas, (string) $documento['codigo_expediente'], (string) $documento['codigo_verificacion'], $qr !== null);
+
+        return [
+            'bytes' => $this->construirPdf($paginas, (string) $documento['numero'], (string) $documento['institucion'], $qr, $firmaImagen),
             'paginas' => count($paginas),
         ];
     }

@@ -51,7 +51,7 @@ const statusLabels: Record<Status, string> = {
 };
 const roleLabels: Record<string, string> = {
     estudiante: 'Cuenta estudiantil',
-    asistente: 'Asistente',
+    asistente: 'Asistente (rol retirado)',
     docente: 'Docente',
     administrador: 'Administrador',
 };

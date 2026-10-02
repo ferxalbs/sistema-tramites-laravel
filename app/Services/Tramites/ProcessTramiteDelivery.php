@@ -2,6 +2,7 @@
 
 namespace App\Services\Tramites;
 
+use App\Mail\TramiteDocumentoEntregado;
 use App\Models\Tramite;
 use App\Models\TramiteCierre;
 use App\Models\TramiteDocumentoFinal;
@@ -16,6 +17,7 @@ use App\Services\PdfDocumentGenerator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -151,10 +153,14 @@ class ProcessTramiteDelivery
     public function registerDelivery(Tramite $tramite, User $actor, array $datos, ?UploadedFile $evidencia): TramiteEntrega
     {
         $this->authorizeStaff($actor);
+        $medioSolicitado = TramiteMedioEntrega::query()->find((int) $datos['medio_entrega_id']);
+        if ($medioSolicitado?->codigo === 'correo_electronico' && in_array(config('mail.default'), ['log', 'array'], true)) {
+            throw ValidationException::withMessages(['medio_entrega_id' => 'El envío por correo requiere configurar el servidor SMTP institucional.']);
+        }
         $archivo = $evidencia === null ? null : $this->storePrivateFile($evidencia, $tramite->id, 'evidencias-entrega');
 
         try {
-            return DB::transaction(function () use ($tramite, $actor, $datos, $archivo): TramiteEntrega {
+            $entrega = DB::transaction(function () use ($tramite, $actor, $datos, $archivo): TramiteEntrega {
                 $registro = Tramite::query()->findOrFail($tramite->id);
                 abort_unless($registro->estado === 'listo_entrega', 409);
                 abort_if(
@@ -200,7 +206,7 @@ class ProcessTramiteDelivery
                     'confirmado' => false,
                     'codigo_confirmacion' => $this->codigoVerificacion(),
                     'observaciones' => $datos['observacion'] ?? null,
-                    'estado' => 'registrada',
+                    'estado' => $medio->codigo === 'correo_electronico' ? 'pendiente_envio' : 'registrada',
                     'activa' => true,
                 ]);
 
@@ -229,18 +235,23 @@ class ProcessTramiteDelivery
                     ]);
                 }
 
-                $this->registrarEvento(
-                    $registro->id,
-                    $actor->id,
-                    'entrega_registrada',
-                    'Se registró el medio de entrega; la recepción queda pendiente de confirmación.',
-                    'listo_entrega',
-                    'listo_entrega',
-                    ['entrega_id' => $entrega->id, 'medio' => $medio->codigo, 'evidencia' => $archivo !== null || $tipoEvidencia !== ''],
-                );
+                if ($medio->codigo !== 'correo_electronico') {
+                    $this->registrarEvento(
+                        $registro->id, $actor->id, 'entrega_registrada',
+                        'Se registró el medio de entrega; la recepción queda pendiente de confirmación.',
+                        'listo_entrega', 'listo_entrega',
+                        ['entrega_id' => $entrega->id, 'medio' => $medio->codigo, 'evidencia' => $archivo !== null || $tipoEvidencia !== ''],
+                    );
+                }
 
                 return $entrega;
             });
+
+            if ($medioSolicitado?->codigo === 'correo_electronico') {
+                $this->sendDeliveryEmail($tramite, $entrega, $actor);
+            }
+
+            return $entrega->refresh();
         } catch (Throwable $exception) {
             $this->deleteUnpersistedFile($archivo, TramiteEvidenciaEntrega::class);
 
@@ -248,9 +259,44 @@ class ProcessTramiteDelivery
         }
     }
 
+    private function sendDeliveryEmail(Tramite $tramite, TramiteEntrega $entrega, User $actor): void
+    {
+        $documento = $entrega->documentoFinal;
+        abort_unless($documento !== null && $documento->disco === 'local' && is_string($documento->ruta) && is_string($documento->sha256), 409);
+        $pdf = Storage::disk('local')->get($documento->ruta);
+        abort_unless(is_string($pdf) && hash_equals($documento->sha256, hash('sha256', $pdf)), 409);
+
+        try {
+            Mail::to($entrega->correo_destino)->send(new TramiteDocumentoEntregado(
+                $tramite->codigo,
+                $documento->numero_documento,
+                $pdf,
+                $documento->nombre_archivo ?? 'documento-oficial.pdf',
+            ));
+        } catch (Throwable $exception) {
+            $entrega->update(['estado' => 'envio_indeterminado']);
+            $this->registrarEvento(
+                $tramite->id, $actor->id, 'envio_correo_indeterminado',
+                'No se pudo confirmar el envío por correo. Revise el proveedor antes de repetirlo.',
+                'listo_entrega', 'listo_entrega', ['entrega_id' => $entrega->id],
+            );
+            throw ValidationException::withMessages([
+                'medio_entrega_id' => 'No se pudo confirmar el envío. Revise el correo institucional antes de anular o repetir esta entrega.',
+            ]);
+        }
+
+        $entrega->update(['estado' => 'registrada', 'fecha_entrega' => now()]);
+        $this->registrarEvento(
+            $tramite->id, $actor->id, 'entrega_registrada',
+            'El documento oficial se envió por correo y espera confirmación de recepción.',
+            'listo_entrega', 'listo_entrega',
+            ['entrega_id' => $entrega->id, 'medio' => 'correo_electronico'],
+        );
+    }
+
     public function confirmDelivery(Tramite $tramite, User $actor, ?string $observacion = null): TramiteEntrega
     {
-        abort_unless($actor->activo && in_array($actor->rol, ['asistente', 'administrador', 'estudiante'], true), 403);
+        abort_unless($actor->activo && in_array($actor->rol, ['administrador', 'estudiante'], true), 403);
 
         return DB::transaction(function () use ($tramite, $actor, $observacion): TramiteEntrega {
             $registro = Tramite::query()->findOrFail($tramite->id);
@@ -266,7 +312,7 @@ class ProcessTramiteDelivery
                 ->where('tramite_id', $registro->id)
                 ->where('activa', true)
                 ->first();
-            abort_unless($entrega !== null && ! $entrega->confirmado, 409);
+            abort_unless($entrega !== null && ! $entrega->confirmado && $entrega->estado === 'registrada', 409);
 
             $actualizado = DB::table('tramite_entregas')
                 ->where('id', $entrega->id)
@@ -662,7 +708,7 @@ class ProcessTramiteDelivery
 
     private function authorizeStaff(User $actor): void
     {
-        abort_unless($actor->activo && in_array($actor->rol, ['asistente', 'administrador'], true), 403);
+        abort_unless($actor->activo && $actor->rol === 'administrador', 403);
     }
 
     /** @param array<string, mixed>|null $metadatos */

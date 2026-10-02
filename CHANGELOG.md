@@ -1,16 +1,39 @@
 # Changelog
 
-Registro de cambios del Sistema de Trámites. Actualizado el **1 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. Distingue el código publicado de los cambios locales todavía no publicados. No contiene contraseñas, claves SMTP ni tokens.
+Registro de cambios del Sistema de Trámites. Actualizado el **2 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
 
-## Estado actual — 2026-10-01
+## Estado actual — 2026-10-02
 
-- `HEAD` y `origin/main` coinciden en [`7b41f14`](https://github.com/ferxalbs/sistema-tramites-laravel/commit/7b41f1403e89a3029a72813f9491680b86bcedf2), que añade la vista previa PDF privada de borradores, el generador documental actualizado y el componente `Textarea`.
-- El árbol de trabajo contiene ajustes locales de PDF, formularios y pruebas posteriores a `7b41f14`. Esos ajustes todavía no constituyen una versión publicada; esta sección registra sus verificaciones locales sin presentarlos como un despliegue.
-- La migración de Informe y Memorandos se aplicó correctamente en la base SQLite local. Su aplicación en la base de producción todavía no se ha verificado.
-- El código está publicado en GitHub. La actualización efectiva y el funcionamiento de esa versión en Railway siguen pendientes de comprobación.
-- La suite completa local se ejecutó con `PAO_DISABLE=1 PATH=/Users/fer/.config/herd-lite/bin:$PATH vendor/bin/pest --display-warnings --display-deprecations --compact` y terminó con **154 pruebas aprobadas, 6 omitidas, 3102 aserciones y 17.58 segundos**. Las seis omitidas son pruebas de integración remota condicionadas a `TURSO_TEST_*`, porque no había credenciales remotas desechables.
-- El mismo recorrido deja dos imports inefectivos preexistentes de `RuntimeException`, en `tests/Feature/TramiteWorkflowTest.php:34` y `tests/Feature/Database/TursoConnectionTest.php:12`; no se atribuyen a los cambios locales. `pnpm run types:check`, `pnpm run build` y la comprobación específica de recepción (10 pruebas, 428 aserciones) pasaron. React Doctor conserva 65 avisos de complejidad ya existentes, concentrados en `tramites/borrador.tsx` (150) y `tramites/create.tsx` (101).
-- Las pruebas locales no demuestran por sí solas el funcionamiento completo de producción.
+- Esta revisión reúne la unificación del código docente con el DNI, la retirada del rol Asistente y las correcciones de recepción, PDF y entrega descritas abajo.
+- Las tres migraciones del 2 de octubre se aplicaron correctamente en SQLite local. Su aplicación en la base de producción debe verificarse después del despliegue.
+- La suite completa terminó con **164 pruebas aprobadas, 6 omitidas y 3057 aserciones**. Las seis pruebas omitidas requieren una base Turso remota desechable.
+- `pnpm run types:check` y `pnpm run build` pasaron. Las pruebas locales no demuestran por sí solas el funcionamiento completo de producción.
+- El envío real de correos está implementado, pero no se puede activar ni comprobar con el correo institucional hasta conocer y configurar sus datos SMTP y su secreto en Railway.
+- Los PDF oficiales de justificación de tardanza y constancia de prácticas están bloqueados hasta recibir los modelos aprobados. Sus FUT pueden registrarse y revisarse.
+- El servidor local responde en `http://127.0.0.1:8000/login` (HTTP 200). Las cuentas de demostración Administrador, Docente y Estudiante conservan su contraseña local conocida; la cuenta histórica Asistente quedó inactiva.
+
+## 2026-10-02 — Correcciones de recepción, PDF y correo
+
+- Un FUT puede registrarse con DNI, nombre y datos de contacto aunque todavía no exista una cuenta estudiantil activa. Cuando la administración activa esa cuenta, los expedientes pendientes se vinculan por DNI y se deja un evento de seguimiento.
+- Informe y Memorando simple/múltiple creados en la oficina comienzan directamente en estado digitalizado y pueden pasar al borrador sin adjuntar un archivo de solicitud inexistente.
+- El PDF final de Informe y Constancia incorpora el contenido completo del borrador aprobado, además de la firma escaneada y el código de verificación. El diseño de Memorando conserva su maquetación específica. Falta comparar visualmente cada PDF con el modelo institucional definitivo.
+- La entrega por correo adjunta el PDF verificado y registra el envío solo después de que el transporte lo acepte. Si el envío falla o es ambiguo, se conserva el registro para revisión. Los transportes de prueba `log` y `array` no permiten simular una entrega real.
+- La verificación de correo y recuperación de contraseña usan el transporte de Laravel; para que salgan al exterior se necesitan los datos SMTP institucionales indicados en `docs/CORREO_INSTITUCIONAL.md`.
+- La emisión oficial de justificación de tardanza y constancia de prácticas se detiene hasta recibir los modelos y reglas oficiales. Los requisitos están en `docs/MODELOS_OFICIALES_PENDIENTES.md`.
+- El arranque en Railway ahora falla si una migración falla; así se evita que una versión nueva aparezca sana con el esquema anterior.
+- El comprobante vuelve a mostrar el estado registrado al recibir el expediente, incluso después de cambios posteriores de estado.
+
+## 2026-10-02 — Recepción en oficina y retiro del rol Asistente
+
+- Las altas y ediciones administrativas de docentes guardan `codigo_docente` igual al DNI; el formulario ya no pide un segundo código y el perfil muestra un único identificador.
+- La solicitud pública de acceso docente ahora exige un DNI único y lo usa también como código docente; antes creaba perfiles sin ese identificador.
+- La migración `2026_10_02_000000_sync_teacher_codes_with_dni.php` normaliza perfiles existentes. Una prueba cubre códigos antiguos que podrían colisionar durante la actualización.
+- El estudiante presenta físicamente sus solicitudes en Mesa de Partes. La oficina de Desarrollo de Sistemas de la Información las recibe y digitaliza. La cuenta estudiantil consulta el expediente y sus resultados; la presentación en línea queda para una etapa futura.
+- El Administrador puede registrar y editar la recepción, cargar y corregir documentos, preparar borradores, asignar revisiones a docentes, emitir el PDF final y registrar la entrega. Informe y Memorando simple/múltiple pueden originarse en la propia oficina, sin DNI de solicitante.
+- Se retiró Asistente de la creación de cuentas, la navegación y las rutas operativas. Una migración desactiva las cuentas históricas de ese rol y cierra sus sesiones; la administración puede reasignarles un rol vigente tras revisar cada cuenta. El docente mantiene su revisión de expedientes asignados.
+- El formulario de borrador sugiere al Director General indicado y a todos los docentes activos como destinatarios; sus nombres, cargos y correos se copian a campos editables. Los docentes de cursos complementarios pueden registrarse sin programa de estudios.
+- Las pruebas focalizadas de cuentas, perfil, notificaciones, búsqueda, recepción, emisión y entrega se adaptaron al nuevo flujo. La comparación visual exacta de cada PDF con los modelos oficiales y las pruebas remotas Turso siguen pendientes.
+- Queda por decidir si el docente redactará datos del documento de respuesta antes de la aprobación administrativa o si la administración redactará y emitirá todo.
 
 ## 2026-09-30 a 2026-10-01 — Auditoría local de PDF, memorandos y catálogos
 
@@ -19,7 +42,7 @@ Registro de cambios del Sistema de Trámites. Actualizado el **1 de octubre de 2
 - El PDF usa las fuentes Type 1 Helvetica y Helvetica-Bold. La medición de Helvetica normal está implementada y la de negrita conserva aproximaciones; no se afirma identidad tipográfica con los originales. La reserva del pie deja el espacio del QR en la previsualización y la emisión: el test de Memorando largo conserva la misma cantidad de páginas con código válido o sin él.
 - La previsualización de borradores es privada, no almacena número oficial ni muta numeración, expedientes, eventos o archivos. La URL pública definitiva y la lectura independiente del QR todavía no están verificadas en Railway.
 - La auditoría funcional confirmó que `JUSTIFICACION_TARDANZA` sigue siendo un catálogo provisional sin lógica específica para el destinatario de primera hora; no existe un tipo o flujo `INASISTENCIA`. `CONSTANCIA_PRACTICA` permanece como catálogo demostrativo y no tiene reglas específicas de viabilidad, aforo, supervisor o aprobación de prácticas.
-- `CONSTANCIA_MODALIDAD_TITULACION` sí existe como catálogo y plantilla publicada. La prueba de borrador conserva texto renderizado con estudiante, DNI y programa de estudios; la generación final actualmente guarda solo `borrador_renderizado_sha256` en el snapshot y no incorpora el cuerpo renderizado completo al PDF. La extensión del snapshot y la corrección de esa pérdida siguen pendientes.
+- `CONSTANCIA_MODALIDAD_TITULACION` existe como catálogo y plantilla publicada. En esta auditoría se detectó que el PDF final solo conservaba la huella del borrador; el problema se corrigió el 2 de octubre al incorporar también su texto renderizado completo.
 - El servidor local de prueba quedó preparado en `http://127.0.0.1:18080` con base desechable, almacenamiento privado y cuatro usuarios ficticios; `/login` respondió 200. El recorrido completo mediante navegador todavía no se certifica.
 
 ## 2026-09-29 — Registro de Informe y Memorandos (`190669b`)
@@ -125,7 +148,7 @@ Estos cambios están en los commits posteriores a `8c44879` y anteriores a `339e
 
 ### Solicitudes y limitaciones aún abiertas
 
-- [ ] Completar la unificación del identificador docente con el DNI: la búsqueda por DNI está incorporada, pero `codigo_docente` todavía admite un valor opcional independiente. El código estudiantil sí quedó sincronizado.
+- [x] Unificar el identificador docente con el DNI en altas, ediciones y perfiles existentes mediante la migración local del 2 de octubre. Falta aplicar esa migración en el entorno publicado.
 - [ ] Completar la maquetación comparativa de los PDF frente a los Word institucionales. Los encabezados exactos ya están identificados por hash y la estructura de Memorando está cubierta por pruebas locales, pero la equivalencia visual completa y la identidad tipográfica no están certificadas.
 - [ ] Hacer que la emisión de la constancia de titulación consuma el cuerpo completo de `contenido_renderizado` y ampliar el snapshot para conservarlo; actualmente solo se conserva su hash y el PDF final puede perder ese cuerpo.
 - [ ] Revisar las diferencias de presentación de plantillas respecto del sistema de origen: el renderizado conserva texto escapado, pero no toda su presentación HTML limitada. No reconstruir versiones antiguas sin instantánea a partir de datos actuales.

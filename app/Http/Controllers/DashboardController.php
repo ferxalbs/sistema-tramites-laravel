@@ -189,7 +189,7 @@ class DashboardController extends Controller
                     ])->all(),
                 'tipos' => $documentTypes,
                 'estados' => config('tramites.estados'),
-                'revisores' => in_array($actor->rol, ['asistente', 'administrador'], true)
+                'revisores' => $actor->rol === 'administrador'
                     ? User::query()->whereIn('rol', ['docente', 'administrador'])->where('activo', true)->orderBy('name')->get(['id', 'name'])
                         ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])->all()
                     : [],

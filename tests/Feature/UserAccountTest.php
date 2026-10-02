@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PerfilDocente;
 use App\Models\ProgramaEstudio;
 use App\Models\TramiteAsignacion;
 use App\Models\User;
@@ -24,7 +25,6 @@ function adminUserPayload(string $role, int $programId, int $sequence = 1): arra
         'codigo_estudiante' => "EST{$sequence}AA",
         'condicion_academica' => 'Estudiante',
         'ciclo_actual' => 4,
-        'codigo_docente' => "DOC{$sequence}AA",
         'especialidad' => 'Gestión documental',
         'condicion_laboral' => 'Contratado',
         'password' => 'Temporal2026A',
@@ -34,13 +34,26 @@ function adminUserPayload(string $role, int $programId, int $sequence = 1): arra
     ];
 }
 
+test('legacy teacher codes are normalized to DNI even when codes previously collide', function () {
+    $first = User::factory()->create(['rol' => 'docente', 'dni' => '76543210']);
+    $second = User::factory()->create(['rol' => 'docente', 'dni' => '12345678']);
+    PerfilDocente::factory()->create(['user_id' => $first->id, 'codigo_docente' => '12345678']);
+    PerfilDocente::factory()->create(['user_id' => $second->id, 'codigo_docente' => 'LEGACY']);
+
+    $migration = require database_path('migrations/2026_10_02_000000_sync_teacher_codes_with_dni.php');
+    $migration->up();
+
+    expect($first->perfilDocente()->value('codigo_docente'))->toBe('76543210')
+        ->and($second->perfilDocente()->value('codigo_docente'))->toBe('12345678');
+});
+
 test('only administrators can list and change account states', function () {
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $pending = User::factory()->create(['activo' => false, 'estado_cuenta' => 'pendiente']);
 
     $this->get(route('admin.users.index'))->assertRedirect(route('login'));
 
-    foreach (['estudiante', 'asistente', 'docente'] as $role) {
+    foreach (['estudiante', 'docente'] as $role) {
         $viewer = User::factory()->create(['rol' => $role]);
         $this->actingAs($viewer)->get(route('admin.users.index'))->assertForbidden();
         $this->patch(route('admin.users.update', $pending), ['accion' => 'activate'])->assertForbidden();
@@ -178,7 +191,7 @@ test('only administrators can create or edit accounts through server routes', fu
     $this->get(route('admin.users.create'))->assertRedirect(route('login'));
     $this->post(route('admin.users.store'), $payload)->assertRedirect(route('login'));
 
-    foreach (['estudiante', 'asistente', 'docente'] as $role) {
+    foreach (['estudiante', 'docente'] as $role) {
         $viewer = User::factory()->create(['rol' => $role]);
         $this->actingAs($viewer)->get(route('admin.users.create'))->assertForbidden();
         $this->get(route('admin.users.edit', $target))->assertForbidden();
@@ -189,64 +202,26 @@ test('only administrators can create or edit accounts through server routes', fu
     expect(User::query()->where('email', $payload['email'])->exists())->toBeFalse();
 });
 
-test('assistant creates and edits only student accounts without changing roles or account states', function () {
-    $program = ProgramaEstudio::factory()->create();
+test('retired assistant accounts lose access and cannot be reactivated without a role change', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
     $assistant = User::factory()->create(['rol' => 'asistente']);
-    $teacher = User::factory()->create(['rol' => 'docente']);
-    $student = User::factory()->create(['rol' => 'estudiante']);
-    $payload = adminUserPayload('estudiante', $program->id, 72);
+    DB::table('sessions')->insert(['id' => 'assistant-old-session', 'user_id' => $assistant->id, 'payload' => '', 'last_activity' => time()]);
 
-    $this->get(route('assistant.students.index'))->assertRedirect(route('login'));
-    $this->actingAs($student)->get(route('assistant.students.index'))->assertForbidden();
-    $this->actingAs($assistant)->get(route('assistant.students.create'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('usuarios-form')->where('mode', 'assistant')->has('programas', 3));
-    $this->post(route('assistant.students.store'), [
-        ...$payload, 'rol' => 'administrador', 'estado_cuenta' => 'rechazado', 'activar_inmediatamente' => '0', 'cuenta_provisional' => '0',
-    ])->assertSessionHasNoErrors()->assertRedirect();
+    $migration = require database_path('migrations/2026_10_02_000001_retire_assistant_accounts.php');
+    $migration->up();
 
-    $created = User::query()->where('email', $payload['email'])->firstOrFail();
-    expect($created->rol)->toBe('estudiante')
-        ->and($created->estado_cuenta)->toBe('activo')
-        ->and($created->activo)->toBeTrue()
-        ->and($created->debe_cambiar_password)->toBeTrue()
-        ->and($created->cuenta_provisional)->toBeTrue()
-        ->and($created->hasVerifiedEmail())->toBeTrue()
-        ->and(Hash::check($payload['password'], $created->password))->toBeTrue()
-        ->and($created->perfilEstudiante?->codigo_estudiante)->toBe($payload['dni'])
-        ->and($created->perfilEstudiante?->programa_estudio_id)->toBe($program->id);
-
-    $this->get(route('assistant.students.index', ['q' => $payload['dni'], 'programa' => $program->id, 'condicion' => 'Estudiante', 'estado' => 'activo']))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('estudiantes')->has('students.data', 1)
-            ->where('students.data.0.id', $created->id)
-            ->where('students.data.0.dni', $payload['dni'])
-            ->missing('students.data.0.password'));
-    $this->get(route('assistant.students.edit', $teacher))->assertNotFound();
-    $this->put(route('assistant.students.save', $teacher), $payload)->assertForbidden();
-    $this->get(route('admin.users.index'))->assertForbidden();
-
-    $this->put(route('assistant.students.save', $created), [
-        ...$payload,
-        'rol' => 'administrador',
-        'estado_cuenta' => 'inactivo',
-        'activo' => '0',
-        'cuenta_provisional' => '0',
-        'apellidos' => 'Ramos Chávez',
-        'condicion_academica' => 'Egresado',
-        'anio_egreso' => now()->year,
-    ])->assertSessionHasNoErrors()->assertRedirect(route('assistant.students.index'));
-    expect($created->fresh()->rol)->toBe('estudiante')
-        ->and($created->fresh()->estado_cuenta)->toBe('activo')
-        ->and($created->fresh()->cuenta_provisional)->toBeTrue()
-        ->and($created->fresh()->apellidos)->toBe('Ramos Chávez')
-        ->and($created->fresh()->perfilEstudiante?->condicion_academica)->toBe('Egresado')
-        ->and($created->fresh()->perfilEstudiante?->anio_egreso)->toBe(now()->year)
-        ->and(DB::table('user_account_events')->where('user_id', $created->id)->pluck('accion')->all())->toBe(['create', 'edit']);
+    expect($assistant->fresh()->activo)->toBeFalse()
+        ->and($assistant->fresh()->estado_cuenta)->toBe('inactivo')
+        ->and(DB::table('sessions')->where('user_id', $assistant->id)->exists())->toBeFalse();
+    $this->post(route('login.store'), ['email' => $assistant->email, 'password' => 'password']);
+    $this->assertGuest();
+    $this->actingAs($administrator)->patch(route('admin.users.update', $assistant), ['accion' => 'activate'])
+        ->assertSessionHasErrors('accion');
+    $this->post(route('admin.users.store'), adminUserPayload('asistente', ProgramaEstudio::factory()->create()->id, 72))
+        ->assertSessionHasErrors('rol');
 });
 
-test('administrator creates every source role with the matching profile and temporary password', function () {
+test('administrator creates every current role with the matching profile and temporary password', function () {
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $program = ProgramaEstudio::factory()->create();
     $position = DB::table('cargos_institucionales')->where('codigo', 'docente')->first();
@@ -254,7 +229,7 @@ test('administrator creates every source role with the matching profile and temp
         ->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('usuarios-form')->has('programas', 3)->has('cargos', 5));
 
-    foreach (['estudiante', 'docente', 'asistente', 'administrador'] as $index => $role) {
+    foreach (['estudiante', 'docente', 'administrador'] as $index => $role) {
         $payload = adminUserPayload($role, $program->id, $index + 1);
         if ($role !== 'administrador') {
             unset($payload['confirmar_administrador']);
@@ -274,6 +249,19 @@ test('administrator creates every source role with the matching profile and temp
         expect($created->perfilEstudiante !== null)->toBe($role === 'estudiante')
             ->and($created->perfilDocente !== null)->toBe($role === 'docente');
     }
+});
+
+test('administrator can register a teacher of complementary courses without a program', function () {
+    $administrator = User::factory()->create(['rol' => 'administrador']);
+    $payload = adminUserPayload('docente', ProgramaEstudio::factory()->create()->id, 79);
+    $payload['programa_estudio_id'] = 'sin_programa';
+
+    $this->actingAs($administrator)->post(route('admin.users.store'), $payload)
+        ->assertSessionHasNoErrors()->assertRedirect();
+
+    $teacher = User::query()->where('email', $payload['email'])->firstOrFail();
+    expect($teacher->perfilDocente?->programa_estudio_id)->toBeNull()
+        ->and($teacher->perfilDocente?->codigo_docente)->toBe($payload['dni']);
 });
 
 test('administrator creation validates confirmation, identity, program and inactive state', function () {
@@ -297,7 +285,7 @@ test('administrator creation validates confirmation, identity, program and inact
     $this->post(route('admin.users.store'), $payload)->assertSessionHasErrors('ciclo_actual');
     expect(User::query()->where('email', $payload['email'])->exists())->toBeFalse();
 
-    $payload = adminUserPayload('asistente', $activeProgram->id, 2);
+    $payload = adminUserPayload('docente', $activeProgram->id, 2);
     $inactivePosition = DB::table('cargos_institucionales')->where('codigo', 'otro')->value('id');
     DB::table('cargos_institucionales')->where('id', $inactivePosition)->update(['activo' => false]);
     $this->post(route('admin.users.store'), [...$payload, 'cargo_institucional_id' => $inactivePosition])
@@ -325,6 +313,7 @@ test('editing an account changes role and profile and revokes prior sessions', f
     ]);
     DB::table('sessions')->insert(['id' => 'student-old-session', 'user_id' => $student->id, 'payload' => '', 'last_activity' => time()]);
     $payload = adminUserPayload('docente', $program->id, 3);
+    $payload['codigo_docente'] = 'DOC3AA';
     unset($payload['confirmar_administrador']);
     $position = DB::table('cargos_institucionales')->where('codigo', 'docente')->first();
     $payload['cargo_institucional_id'] = $position->id;
@@ -341,7 +330,7 @@ test('editing an account changes role and profile and revokes prior sessions', f
         ->and($student->name)->toBe('María Pérez Ramos')
         ->and($student->sesion_version)->toBe(1)
         ->and($student->perfilEstudiante)->toBeNull()
-        ->and($student->perfilDocente?->codigo_docente)->toBe('DOC3AA')
+        ->and($student->perfilDocente?->codigo_docente)->toBe($payload['dni'])
         ->and($student->cargo_institucional_id)->toBe($position->id)
         ->and(DB::table('sessions')->where('user_id', $student->id)->exists())->toBeFalse()
         ->and(DB::table('user_account_events')->where('user_id', $student->id)->count())->toBe(2);
@@ -351,20 +340,20 @@ test('an existing inactive position can be retained but cannot be assigned to an
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $program = ProgramaEstudio::factory()->create();
     $positionId = DB::table('cargos_institucionales')->where('codigo', 'otro')->value('id');
-    $assigned = User::factory()->create(['rol' => 'asistente', 'cargo_institucional_id' => $positionId]);
-    $other = User::factory()->create(['rol' => 'asistente']);
+    $assigned = User::factory()->create(['rol' => 'docente', 'cargo_institucional_id' => $positionId]);
+    $other = User::factory()->create(['rol' => 'docente']);
     DB::table('cargos_institucionales')->where('id', $positionId)->update(['activo' => false]);
 
     $this->actingAs($administrator)->get(route('admin.users.edit', $assigned))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('user.cargo_institucional_id', $positionId)
             ->where('cargos', fn ($positions): bool => collect($positions)->contains('id', $positionId)));
     $this->put(route('admin.users.save', $assigned), [
-        ...adminUserPayload('asistente', $program->id, 42), 'cargo_institucional_id' => $positionId,
+        ...adminUserPayload('docente', $program->id, 42), 'cargo_institucional_id' => $positionId,
     ])->assertSessionHasNoErrors()->assertRedirect();
     expect($assigned->fresh()->cargo_institucional_id)->toBe($positionId);
 
     $this->put(route('admin.users.save', $other), [
-        ...adminUserPayload('asistente', $program->id, 43), 'cargo_institucional_id' => $positionId,
+        ...adminUserPayload('docente', $program->id, 43), 'cargo_institucional_id' => $positionId,
     ])->assertSessionHasErrors('cargo_institucional_id');
 });
 
@@ -436,11 +425,11 @@ test('self role changes and changes with active assignments are rejected', funct
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $teacher = User::factory()->create(['rol' => 'docente']);
     $program = ProgramaEstudio::factory()->create();
-    $this->actingAs($administrator)->put(route('admin.users.save', $administrator), adminUserPayload('asistente', $program->id, 4))
+    $this->actingAs($administrator)->put(route('admin.users.save', $administrator), adminUserPayload('docente', $program->id, 4))
         ->assertSessionHasErrors('rol');
 
     TramiteAsignacion::factory()->create(['revisor_id' => $teacher->id]);
-    $this->put(route('admin.users.save', $teacher), adminUserPayload('asistente', $program->id, 5))
+    $this->put(route('admin.users.save', $teacher), adminUserPayload('estudiante', $program->id, 5))
         ->assertSessionHasErrors('rol');
 
     expect($administrator->fresh()->rol)->toBe('administrador')
@@ -451,7 +440,7 @@ test('self role changes and changes with active assignments are rejected', funct
 test('temporary password must be changed before accessing the application', function () {
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $program = ProgramaEstudio::factory()->create();
-    $payload = adminUserPayload('asistente', $program->id, 6);
+    $payload = adminUserPayload('docente', $program->id, 6);
     $this->actingAs($administrator)->post(route('admin.users.store'), $payload)->assertSessionHasNoErrors();
     $created = User::query()->where('email', $payload['email'])->firstOrFail();
 

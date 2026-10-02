@@ -1,6 +1,13 @@
 <?php
 
 return [
+    // La recepción y revisión pueden probarse, pero no se debe emitir un PDF
+    // oficial de estos tipos hasta cargar y verificar el modelo institucional.
+    'modelos_oficiales_pendientes' => [
+        'JUSTIFICACION_TARDANZA',
+        'CONSTANCIA_PRACTICA',
+    ],
+
     'destinos' => [
         'oficina' => 'Oficina',
         'docente' => 'Docente',

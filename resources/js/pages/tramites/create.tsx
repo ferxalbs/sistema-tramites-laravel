@@ -62,6 +62,8 @@ type Props = {
         modalidad_documento: string | null;
         persona_nombre: string | null;
         persona_identificador: string | null;
+        solicitante_correo: string | null;
+        solicitante_celular: string | null;
         propietario_id: number | null;
         programa_estudio_id: number | null;
         destino_tipo: string;
@@ -235,7 +237,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                         <Field
                                             id="dni_estudiante"
                                             label="DNI del estudiante o egresado"
-                                            description={`El DNI vincula el trámite con la cuenta y completa los datos guardados en el perfil.${estudiantes.length === 0 ? ' No hay cuentas activas disponibles.' : ''}`}
+                                            description="Si existe una cuenta activa, sus datos se completan automáticamente. También puedes registrar el FUT sin crear una cuenta."
                                             error={errors.propietario_id ?? errors.persona_identificador}
                                         >
                                             <Input
@@ -251,8 +253,12 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                             />
                                         </Field>
                                         <input type="hidden" name="propietario_id" value={estudianteSeleccionado?.id ?? ''} />
-                                        <input type="hidden" name="persona_nombre" value={estudianteSeleccionado?.name ?? ''} />
-                                        <input type="hidden" name="persona_identificador" value={estudianteSeleccionado?.dni ?? ''} />
+                                        <input type="hidden" name="persona_identificador" value={dniEstudiante} />
+                                        {estudianteSeleccionado && <>
+                                            <input type="hidden" name="persona_nombre" value={estudianteSeleccionado.name} />
+                                            <input type="hidden" name="solicitante_correo" value={estudianteSeleccionado.email} />
+                                            <input type="hidden" name="solicitante_celular" value={estudianteSeleccionado.celular ?? ''} />
+                                        </>}
                                         {estudianteSeleccionado ? (
                                             <div className="grid content-start gap-2 rounded-xl border p-4 text-sm">
                                                 <p className="font-medium">Datos encontrados en el perfil</p>
@@ -262,10 +268,21 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                                 {estudianteSeleccionado.correo_alternativo && <p className="text-muted-foreground">Correo alternativo: {estudianteSeleccionado.correo_alternativo}</p>}
                                             </div>
                                         ) : (
-                                            <p className="self-center text-sm text-muted-foreground">{dniEstudiante.length === 8 ? 'No se encontró una cuenta activa con ese DNI. Registra primero al estudiante.' : 'Al ingresar un DNI registrado aparecerán los datos del perfil.'}</p>
+                                            <div className="grid gap-3 rounded-xl border p-4 sm:col-span-2">
+                                                <p className="text-sm text-muted-foreground">{dniEstudiante.length === 8 ? 'No hay una cuenta activa con este DNI. Transcribe los datos del FUT; la cuenta se podrá vincular posteriormente.' : 'Al ingresar un DNI registrado aparecerán los datos del perfil.'}</p>
+                                                <Field id="persona_nombre" label="Nombre completo del solicitante" error={errors.persona_nombre}>
+                                                    <Input id="persona_nombre" name="persona_nombre" defaultValue={tramite?.persona_nombre ?? ''} required maxLength={200} />
+                                                </Field>
+                                                <Field id="solicitante_correo" label="Correo del solicitante (si figura en el FUT)" error={errors.solicitante_correo}>
+                                                    <Input id="solicitante_correo" name="solicitante_correo" type="email" defaultValue={tramite?.solicitante_correo ?? ''} maxLength={190} />
+                                                </Field>
+                                                <Field id="solicitante_celular" label="Celular del solicitante (si figura en el FUT)" error={errors.solicitante_celular}>
+                                                    <Input id="solicitante_celular" name="solicitante_celular" defaultValue={tramite?.solicitante_celular ?? ''} maxLength={20} />
+                                                </Field>
+                                            </div>
                                         )}
                                     </>}
-                                    {clasificacion === 'estudiantil' ? (
+                                    {clasificacion === 'estudiantil' && estudianteSeleccionado ? (
                                         <p className="self-center text-sm text-muted-foreground">
                                             El programa de estudios se toma del perfil del estudiante seleccionado.
                                         </p>
@@ -277,7 +294,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                                 defaultValue={tramite?.programa_estudio_id ?? ''}
                                                 className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
                                             >
-                                                <option value="">No aplica</option>
+                                                <option value="">{clasificacion === 'estudiantil' ? 'Selecciona el programa del FUT' : 'No aplica'}</option>
                                                 {programas.map((programa) => <option key={programa.id} value={programa.id}>{programa.nombre}</option>)}
                                             </select>
                                         </Field>
@@ -554,7 +571,7 @@ export default function TramiteCreate({ catalogos, ahora, estudiantes, docentes,
                                 <Button render={<Link href={tramite ? TramiteController.show({ tramite: tramite.id }) : TramiteController.index()} />} variant="outline">
                                     Cancelar
                                 </Button>
-                                <Button type="submit" disabled={processing || Boolean(seleccion && clasificacion === 'estudiantil' && !estudianteSeleccionado)}>
+                                <Button type="submit" disabled={processing || (clasificacion === 'estudiantil' && dniEstudiante.length !== 8)}>
                                     {processing ? <Spinner /> : <FilePlus2 />}
                                     {tramite ? 'Guardar cambios' : esDocumentoInstitucional ? 'Registrar documento' : seleccion?.tipo_documento === 'FUT' ? 'Digitalizar FUT' : seleccion ? 'Digitalizar solicitud' : 'Guardar trámite'}
                                 </Button>
