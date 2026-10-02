@@ -1,0 +1,17 @@
+# Revisión de hallazgos de prioridad alta y media
+
+Revisión del 2 de octubre de 2026. «Implementado» significa que existe código y una prueba local; no equivale por sí solo a una aceptación del proceso institucional en producción.
+
+| Prioridad | Hallazgo | Estado y evidencia |
+| --- | --- | --- |
+| Alta | FUT de persona sin cuenta activa | Implementado. La oficina puede digitalizar con DNI y datos del FUT; la cuenta se vincula después. Prueba `office registers a scanned FUT without a student account...` en `TramiteWorkflowTest.php`. |
+| Alta | Informe y memorandos nacidos en la oficina sin archivo de solicitud | Implementado. Empiezan en estado digitalizado y pueden pasar al borrador. Prueba `institutional reports and memorandums register without a request applicant or DNI`. |
+| Alta | PDF final perdía contenido del borrador | Implementado para los modelos disponibles. El PDF conserva el cuerpo resuelto; prueba `the final PDF includes the exact resolved body of a constancia`. La equivalencia visual con cada modelo oficial todavía requiere cotejo humano. |
+| Alta | Envío por correo solo registrado, sin adjunto real | Código implementado y probado con transporte simulado (`email delivery sends the official PDF...`). Falta configurar y verificar el SMTP institucional y la recepción externa; el proveedor y las credenciales no están disponibles. |
+| Alta | Reglas y modelos de justificación de tardanza y prácticas | La emisión oficial permanece bloqueada para evitar documentos supuestos. Falta recibir los modelos, firmantes y reglas aprobados; ver `MODELOS_OFICIALES_PENDIENTES.md`. |
+| Alta | Despliegue sigue después de una migración fallida | Corregido. El arranque termina antes de iniciar el servidor; `tests/Deployment/entrypoint-failure.sh` simula el error. SQLite de pruebas migró; una prueba Turso de staging requiere una base desechable separada. |
+| Alta | Firmas, adjuntos y PDF pueden perderse al desplegar | Código preparado: ruta privada única, validación de volumen declarado y comando `storage:verify-persistence`. **Pendiente en Railway:** adjuntar volumen en `/app/storage/app/private`, migrar archivos anteriores, activar respaldo y comprobar el marcador antes/después de un despliegue. Ver `DESPLIEGUE_SEGURO.md`. |
+| Media | Función docente ambigua; director fijo en el código | Resuelto para el flujo actual: el docente revisa expedientes asignados; la administración prepara y emite. La ayuda muestra esa división. Director y otros destinatarios se editan en un catálogo exclusivo del administrador; pruebas en `InstitutionalRecipientTest.php`. |
+| Media | Cambios locales ausentes de GitHub y flujo alojado sin comprobar | La paridad Git se comprueba al subir cada commit. La suite local cubre los flujos principales; la prueba integral con personas, SMTP y archivos persistentes en Railway queda pendiente por falta de acceso y configuración externa. |
+
+El usuario decidió que la firma de perfil del docente se inserte automáticamente en el PDF cuando la administración lo seleccione como firmante, sin una aprobación individual en cada emisión. La prueba `issued PDF automatically embeds the signer profile signature` documenta ese comportamiento.

@@ -45,5 +45,8 @@ jobs:
       - name: Setup Application
         run: composer setup
 
+      - name: Verify deployment stops on migration failure
+        run: sh tests/Deployment/entrypoint-failure.sh
+
       - name: Run CI Checks
         run: composer ci:check

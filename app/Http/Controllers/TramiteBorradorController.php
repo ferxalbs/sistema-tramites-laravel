@@ -313,14 +313,18 @@ class TramiteBorradorController extends Controller
     /** @return array<int, array{key: string, label: string, nombres: string, apellidos: string, cargo: string, correo: string}> */
     private function destinatariosSugeridos(): array
     {
-        $director = [
-            'key' => 'director-general',
-            'label' => 'Mg. RAUL WILLIAM LOPEZ REYNA · Director General',
-            'nombres' => 'Mg. RAUL WILLIAM',
-            'apellidos' => 'LOPEZ REYNA',
-            'cargo' => 'Director General del I.E.S.T.P. “Manuel Seoane Corrales”',
-            'correo' => '',
-        ];
+        $institucionales = DB::table('destinatarios_institucionales')
+            ->where('activo', true)
+            ->orderBy('apellidos')->orderBy('nombres')
+            ->get(['id', 'nombres', 'apellidos', 'cargo', 'correo'])
+            ->map(fn ($destinatario): array => [
+                'key' => 'institucional-'.$destinatario->id,
+                'label' => trim($destinatario->nombres.' '.$destinatario->apellidos).' · '.$destinatario->cargo,
+                'nombres' => $destinatario->nombres,
+                'apellidos' => $destinatario->apellidos,
+                'cargo' => $destinatario->cargo,
+                'correo' => (string) $destinatario->correo,
+            ])->all();
 
         $docentes = DB::table('users as usuario')
             ->leftJoin('cargos_institucionales as cargo', 'cargo.id', '=', 'usuario.cargo_institucional_id')
@@ -338,6 +342,6 @@ class TramiteBorradorController extends Controller
                 'correo' => (string) $usuario->email,
             ])->all();
 
-        return [$director, ...$docentes];
+        return [...$institucionales, ...$docentes];
     }
 }

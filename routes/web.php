@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InstitutionalPositionController;
+use App\Http\Controllers\InstitutionalRecipientController;
 use App\Http\Controllers\OutputDocumentTypeController;
 use App\Http\Controllers\RegistrationVerificationController;
 use App\Http\Controllers\TeacherAccessRequestController;
@@ -136,6 +137,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('admin/cargos', [InstitutionalPositionController::class, 'index'])->name('admin.positions.index');
         Route::patch('admin/cargos/{position}', [InstitutionalPositionController::class, 'update'])
             ->whereNumber('position')->name('admin.positions.update');
+        Route::get('admin/destinatarios', [InstitutionalRecipientController::class, 'index'])->name('admin.recipients.index');
+        Route::post('admin/destinatarios', [InstitutionalRecipientController::class, 'store'])->name('admin.recipients.store');
+        Route::patch('admin/destinatarios/{recipient}', [InstitutionalRecipientController::class, 'update'])
+            ->whereNumber('recipient')->name('admin.recipients.update');
         Route::get('admin/tipos-tramite', [TramiteTypeController::class, 'index'])->name('admin.types.index');
         Route::patch('admin/tipos-tramite/{type}', [TramiteTypeController::class, 'update'])
             ->whereNumber('type')->name('admin.types.update');

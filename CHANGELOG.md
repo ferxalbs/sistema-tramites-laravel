@@ -4,9 +4,12 @@ Registro de cambios del Sistema de Trámites. Actualizado el **2 de octubre de 2
 
 ## Estado actual — 2026-10-02
 
+- El director y otros destinatarios institucionales ya tienen un catálogo administrable; las sugerencias del borrador leen ese catálogo y excluyen entradas inactivas. La ayuda delimita la revisión docente de la preparación y emisión administrativas.
+- El arranque rechaza base de datos ausente, migración fallida y un volumen Railway declarado en ruta incorrecta. Se agregó una prueba de fallo de arranque y un marcador para comprobar persistencia entre despliegues.
+- **Pendiente fuera del repositorio:** adjuntar el volumen a Railway, respaldar su contenido y Turso, ensayar migraciones en un entorno separado y verificar firmas/adjuntos/PDF tras un nuevo despliegue. Detalles en `docs/DESPLIEGUE_SEGURO.md`.
 - Esta revisión reúne la unificación del código docente con el DNI, la retirada del rol Asistente y las correcciones de recepción, PDF y entrega descritas abajo.
-- Las tres migraciones del 2 de octubre se aplicaron correctamente en SQLite local. Su aplicación en la base de producción debe verificarse después del despliegue.
-- La suite completa terminó con **164 pruebas aprobadas, 6 omitidas y 3057 aserciones**. Las seis pruebas omitidas requieren una base Turso remota desechable.
+- Las cuatro migraciones del 2 de octubre se aplicaron correctamente en SQLite de pruebas. Su aplicación en la base de producción debe verificarse después del despliegue.
+- La suite completa terminó con **168 pruebas aprobadas, 6 omitidas y 3120 aserciones**. Las seis pruebas omitidas requieren una base Turso remota desechable.
 - `pnpm run types:check` y `pnpm run build` pasaron. Las pruebas locales no demuestran por sí solas el funcionamiento completo de producción.
 - La revisión estática PHPStan existente aún tiene 529 hallazgos en el proyecto, principalmente en el adaptador Turso y modelos Eloquent. Se mantiene como trabajo pendiente; la verificación continua ejecuta las pruebas funcionales y los chequeos de frontend que sí tienen una línea base limpia.
 - El envío real de correos está implementado, pero no se puede activar ni comprobar con el correo institucional hasta conocer y configurar sus datos SMTP y su secreto en Railway.
@@ -32,9 +35,9 @@ Registro de cambios del Sistema de Trámites. Actualizado el **2 de octubre de 2
 - El estudiante presenta físicamente sus solicitudes en Mesa de Partes. La oficina de Desarrollo de Sistemas de la Información las recibe y digitaliza. La cuenta estudiantil consulta el expediente y sus resultados; la presentación en línea queda para una etapa futura.
 - El Administrador puede registrar y editar la recepción, cargar y corregir documentos, preparar borradores, asignar revisiones a docentes, emitir el PDF final y registrar la entrega. Informe y Memorando simple/múltiple pueden originarse en la propia oficina, sin DNI de solicitante.
 - Se retiró Asistente de la creación de cuentas, la navegación y las rutas operativas. Una migración desactiva las cuentas históricas de ese rol y cierra sus sesiones; la administración puede reasignarles un rol vigente tras revisar cada cuenta. El docente mantiene su revisión de expedientes asignados.
-- El formulario de borrador sugiere al Director General indicado y a todos los docentes activos como destinatarios; sus nombres, cargos y correos se copian a campos editables. Los docentes de cursos complementarios pueden registrarse sin programa de estudios.
+- El formulario de borrador sugiere los destinatarios institucionales activos y a todos los docentes activos; sus nombres, cargos y correos se copian a campos editables. Los docentes de cursos complementarios pueden registrarse sin programa de estudios.
 - Las pruebas focalizadas de cuentas, perfil, notificaciones, búsqueda, recepción, emisión y entrega se adaptaron al nuevo flujo. La comparación visual exacta de cada PDF con los modelos oficiales y las pruebas remotas Turso siguen pendientes.
-- Queda por decidir si el docente redactará datos del documento de respuesta antes de la aprobación administrativa o si la administración redactará y emitirá todo.
+- Para esta versión, la administración redacta y emite; el docente revisa únicamente expedientes asignados y su firma de perfil puede insertarse cuando es seleccionado como firmante. Cambiar ese reparto requiere confirmar un proceso institucional distinto.
 
 ## 2026-09-30 a 2026-10-01 — Auditoría local de PDF, memorandos y catálogos
 

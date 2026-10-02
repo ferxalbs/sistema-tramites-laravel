@@ -621,8 +621,8 @@ export default function TramiteBorrador({
                                                     <FieldLabel
                                                         htmlFor={`destinatario-${indice}-sugerido`}
                                                     >
-                                                        Elegir director o
-                                                        docente registrado
+                                                        Elegir destinatario
+                                                        institucional o docente
                                                         (opcional)
                                                     </FieldLabel>
                                                     <Select

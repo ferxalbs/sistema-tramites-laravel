@@ -35,6 +35,7 @@ import {
 import { dashboard } from '@/routes';
 import { index as usersIndex } from '@/routes/admin/users';
 import { index as positionsIndex } from '@/routes/admin/positions';
+import { index as recipientsIndex } from '@/routes/admin/recipients';
 import { index as typesIndex } from '@/routes/admin/types';
 import { index as classificationsIndex } from '@/routes/admin/classifications';
 import { index as outputFormatsIndex } from '@/routes/admin/output-formats';
@@ -135,6 +136,11 @@ export function AppSidebar() {
             title: 'Cargos institucionales',
             href: positionsIndex(),
             icon: BriefcaseBusiness,
+        });
+        mainNavItems.push({
+            title: 'Destinatarios institucionales',
+            href: recipientsIndex(),
+            icon: Users,
         });
         mainNavItems.push({
             title: 'Tipos de trámite',
