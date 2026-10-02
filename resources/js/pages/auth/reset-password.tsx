@@ -6,7 +6,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
@@ -26,7 +25,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
         <>
             <Head title="Restablecer Contraseña" />
 
-            <Card className="w-full shadow-sm border-border/80">
+            <Card className="w-full border-border/80 shadow-sm">
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-xl font-bold tracking-tight">
                         Restablecer Contraseña
@@ -45,7 +44,9 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                         {({ processing, errors }) => (
                             <div className="flex flex-col gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo electrónico</Label>
+                                    <Label htmlFor="email">
+                                        Correo electrónico
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
@@ -59,7 +60,9 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="password">Nueva contraseña</Label>
+                                    <Label htmlFor="password">
+                                        Nueva contraseña
+                                    </Label>
                                     <PasswordInput
                                         id="password"
                                         name="password"
@@ -89,7 +92,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 
                                 <Button
                                     type="submit"
-                                    className="w-full mt-2"
+                                    className="mt-2 w-full"
                                     disabled={processing}
                                     data-test="reset-password-button"
                                 >

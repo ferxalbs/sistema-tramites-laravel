@@ -6,7 +6,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
@@ -19,17 +18,22 @@ export default function ConfirmPassword() {
         <>
             <Head title="Confirmar Contraseña" />
 
-            <Card className="w-full shadow-sm border-border/80">
+            <Card className="w-full border-border/80 shadow-sm">
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-xl font-bold tracking-tight">
                         Confirmar Contraseña
                     </CardTitle>
                     <CardDescription className="text-sm">
-                        Esta es un área protegida del sistema. Por favor confirma tu contraseña antes de continuar.
+                        Esta es un área protegida del sistema. Por favor
+                        confirma tu contraseña antes de continuar.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Form id="confirm-password-form" {...store.form()} resetOnSuccess={['password']}>
+                    <Form
+                        id="confirm-password-form"
+                        {...store.form()}
+                        resetOnSuccess={['password']}
+                    >
                         {({ processing, errors }) => (
                             <div className="flex flex-col gap-4">
                                 <div className="grid gap-2">
@@ -46,7 +50,7 @@ export default function ConfirmPassword() {
 
                                 <Button
                                     type="submit"
-                                    className="w-full mt-2"
+                                    className="mt-2 w-full"
                                     disabled={processing}
                                     data-test="confirm-password-button"
                                 >

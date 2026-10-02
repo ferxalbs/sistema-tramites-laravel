@@ -46,8 +46,14 @@ export default function TramiteComprobante({
                             <dd>{formatDate(comprobante.fecha_recepcion)}</dd>
                             {comprobante.fecha_documento && (
                                 <>
-                                    <dt className="font-medium">Fecha del documento (FUT)</dt>
-                                    <dd>{formatDate(comprobante.fecha_documento)}</dd>
+                                    <dt className="font-medium">
+                                        Fecha del documento (FUT)
+                                    </dt>
+                                    <dd>
+                                        {formatDate(
+                                            comprobante.fecha_documento,
+                                        )}
+                                    </dd>
                                 </>
                             )}
                             {comprobante.fecha_registro && (
@@ -70,7 +76,9 @@ export default function TramiteComprobante({
                             <dd>{comprobante.destino}</dd>
                             <dt className="font-medium">Interesado</dt>
                             <dd>{comprobante.interesado}</dd>
-                            <dt className="font-medium">Resumen de la solicitud (sumilla)</dt>
+                            <dt className="font-medium">
+                                Resumen de la solicitud (sumilla)
+                            </dt>
                             <dd>{comprobante.asunto}</dd>
                         </dl>
                         <p className="rounded-xl border bg-muted p-4 font-medium print:bg-transparent">

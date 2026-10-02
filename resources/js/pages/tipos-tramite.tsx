@@ -41,13 +41,17 @@ export default function TiposTramite({ tipos }: { tipos: TramiteType[] }) {
                         Tipos de trámite
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Catálogo provisional del sistema. Un tipo inactivo no puede seleccionarse en nuevas recepciones.
+                        Catálogo provisional del sistema. Un tipo inactivo no
+                        puede seleccionarse en nuevas recepciones.
                     </p>
                 </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {tipos.map((tipo) => (
-                        <Card key={tipo.id} className="transition-all hover:border-foreground/20">
+                        <Card
+                            key={tipo.id}
+                            className="transition-all hover:border-foreground/20"
+                        >
                             <CardHeader>
                                 <CardTitle>{tipo.nombre}</CardTitle>
                                 <CardDescription>
@@ -58,89 +62,100 @@ export default function TiposTramite({ tipos }: { tipos: TramiteType[] }) {
                                     {tipo.es_demostracion ? 'Provisional.' : ''}
                                 </CardDescription>
                             </CardHeader>
-                        <Form
-                            {...update.form({ type: tipo.id })}
-                            disableWhileProcessing
-                        >
-                            {({ errors, processing }) => (
-                                <>
-                                    <CardContent className="grid gap-4">
-                                        <Label htmlFor={`nombre-${tipo.id}`}>
-                                            Nombre
-                                        </Label>
-                                        <Input
-                                            id={`nombre-${tipo.id}`}
-                                            name="nombre"
-                                            required
-                                            minLength={2}
-                                            maxLength={140}
-                                            defaultValue={tipo.nombre}
-                                        />
-                                        <InputError message={errors.nombre} />
-                                        <Label
-                                            htmlFor={`descripcion-${tipo.id}`}
-                                        >
-                                            Descripción
-                                        </Label>
-                                        <Input
-                                            id={`descripcion-${tipo.id}`}
-                                            name="descripcion"
-                                            maxLength={255}
-                                            defaultValue={
-                                                tipo.descripcion ?? ''
-                                            }
-                                        />
-                                        <InputError
-                                            message={errors.descripcion}
-                                        />
-                                        <Label htmlFor={`activo-${tipo.id}`}>
-                                            Estado
-                                        </Label>
-                                        <Select
-                                            name="activo"
-                                            defaultValue={
-                                                tipo.activo ? '1' : '0'
-                                            }
-                                            items={[
-                                                { value: '1', label: 'Activo' },
-                                                {
-                                                    value: '0',
-                                                    label: 'Inactivo',
-                                                },
-                                            ]}
-                                            required
-                                        >
-                                            <SelectTrigger
-                                                id={`activo-${tipo.id}`}
+                            <Form
+                                {...update.form({ type: tipo.id })}
+                                disableWhileProcessing
+                            >
+                                {({ errors, processing }) => (
+                                    <>
+                                        <CardContent className="grid gap-4">
+                                            <Label
+                                                htmlFor={`nombre-${tipo.id}`}
                                             >
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectGroup>
-                                                    <SelectItem value="1">
-                                                        Activo
-                                                    </SelectItem>
-                                                    <SelectItem value="0">
-                                                        Inactivo
-                                                    </SelectItem>
-                                                </SelectGroup>
-                                            </SelectContent>
-                                        </Select>
-                                        <InputError message={errors.activo} />
-                                    </CardContent>
-                                    <CardFooter>
-                                        <Button
-                                            type="submit"
-                                            disabled={processing}
-                                        >
-                                            Guardar
-                                        </Button>
-                                    </CardFooter>
-                                </>
-                            )}
-                        </Form>
-                    </Card>
-                ))}
+                                                Nombre
+                                            </Label>
+                                            <Input
+                                                id={`nombre-${tipo.id}`}
+                                                name="nombre"
+                                                required
+                                                minLength={2}
+                                                maxLength={140}
+                                                defaultValue={tipo.nombre}
+                                            />
+                                            <InputError
+                                                message={errors.nombre}
+                                            />
+                                            <Label
+                                                htmlFor={`descripcion-${tipo.id}`}
+                                            >
+                                                Descripción
+                                            </Label>
+                                            <Input
+                                                id={`descripcion-${tipo.id}`}
+                                                name="descripcion"
+                                                maxLength={255}
+                                                defaultValue={
+                                                    tipo.descripcion ?? ''
+                                                }
+                                            />
+                                            <InputError
+                                                message={errors.descripcion}
+                                            />
+                                            <Label
+                                                htmlFor={`activo-${tipo.id}`}
+                                            >
+                                                Estado
+                                            </Label>
+                                            <Select
+                                                name="activo"
+                                                defaultValue={
+                                                    tipo.activo ? '1' : '0'
+                                                }
+                                                items={[
+                                                    {
+                                                        value: '1',
+                                                        label: 'Activo',
+                                                    },
+                                                    {
+                                                        value: '0',
+                                                        label: 'Inactivo',
+                                                    },
+                                                ]}
+                                                required
+                                            >
+                                                <SelectTrigger
+                                                    id={`activo-${tipo.id}`}
+                                                >
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        <SelectItem value="1">
+                                                            Activo
+                                                        </SelectItem>
+                                                        <SelectItem value="0">
+                                                            Inactivo
+                                                        </SelectItem>
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError
+                                                message={errors.activo}
+                                            />
+                                        </CardContent>
+                                        <CardFooter>
+                                            <Button
+                                                type="submit"
+                                                disabled={processing}
+                                            >
+                                                Guardar
+                                            </Button>
+                                        </CardFooter>
+                                    </>
+                                )}
+                            </Form>
+                        </Card>
+                    ))}
                 </div>
             </div>
         </>

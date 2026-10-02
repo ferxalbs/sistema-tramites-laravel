@@ -24,17 +24,73 @@ const quickQuestionKeys = [
 ];
 
 const topicKeywords: Record<string, string[]> = {
-    'consultar-tramite': ['tramite', 'expediente', 'seguimiento', 'consultar', 'consulta', 'estado'],
-    'estado-observado': ['observado', 'observacion', 'subsanar', 'corregir', 'correccion'],
+    'consultar-tramite': [
+        'tramite',
+        'expediente',
+        'seguimiento',
+        'consultar',
+        'consulta',
+        'estado',
+    ],
+    'estado-observado': [
+        'observado',
+        'observacion',
+        'subsanar',
+        'corregir',
+        'correccion',
+    ],
     'estado-revision': ['revision', 'revisando', 'asignado', 'evaluando'],
-    'recibir-documento': ['recibir', 'entrega', 'descargar', 'documento', 'emitido', 'final'],
-    password: ['contrasena', 'clave', 'olvide', 'recuperar', 'restablecer', 'password'],
-    login: ['iniciar', 'sesion', 'entrar', 'acceder', 'ingresar', 'login', 'cuenta'],
+    'recibir-documento': [
+        'recibir',
+        'entrega',
+        'descargar',
+        'documento',
+        'emitido',
+        'final',
+    ],
+    password: [
+        'contrasena',
+        'clave',
+        'olvide',
+        'recuperar',
+        'restablecer',
+        'password',
+    ],
+    login: [
+        'iniciar',
+        'sesion',
+        'entrar',
+        'acceder',
+        'ingresar',
+        'login',
+        'cuenta',
+    ],
     requisitos: ['requisito', 'documentos', 'documento', 'fut', 'presentar'],
-    'corregir-observacion': ['corregir', 'observacion', 'subsanacion', 'subsanar'],
+    'corregir-observacion': [
+        'corregir',
+        'observacion',
+        'subsanacion',
+        'subsanar',
+    ],
 };
 
-const stopWords = new Set(['como', 'que', 'para', 'por', 'una', 'uno', 'los', 'las', 'del', 'con', 'mi', 'me', 'el', 'la', 'un']);
+const stopWords = new Set([
+    'como',
+    'que',
+    'para',
+    'por',
+    'una',
+    'uno',
+    'los',
+    'las',
+    'del',
+    'con',
+    'mi',
+    'me',
+    'el',
+    'la',
+    'un',
+]);
 
 function normalize(text: string): string {
     return text
@@ -43,20 +99,27 @@ function normalize(text: string): string {
         .toLocaleLowerCase();
 }
 
-function findTopicKey(question: string, topics: SupportProps['assistant_topics']): string | null {
+function findTopicKey(
+    question: string,
+    topics: SupportProps['assistant_topics'],
+): string | null {
     const normalizedQuestion = normalize(question);
     const words = new Set(
-        (normalizedQuestion.match(/[a-z0-9]+/g) ?? []).filter((word) => !stopWords.has(word)),
+        (normalizedQuestion.match(/[a-z0-9]+/g) ?? []).filter(
+            (word) => !stopWords.has(word),
+        ),
     );
 
     let bestKey: string | null = null;
     let bestScore = 0;
 
     for (const [key, topic] of Object.entries(topics)) {
-        const topicWords = new Set([
-            ...(normalize(topic.question).match(/[a-z0-9]+/g) ?? []),
-            ...(topicKeywords[key] ?? []),
-        ].filter((word) => !stopWords.has(word)));
+        const topicWords = new Set(
+            [
+                ...(normalize(topic.question).match(/[a-z0-9]+/g) ?? []),
+                ...(topicKeywords[key] ?? []),
+            ].filter((word) => !stopWords.has(word)),
+        );
         const score = [...words].filter((word) => topicWords.has(word)).length;
 
         if (score > bestScore) {
@@ -83,7 +146,10 @@ export default function ChatbotWidget() {
     const conversationEnd = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        conversationEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        conversationEnd.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'end',
+        });
     }, [messages, open]);
 
     function sendQuestion(question: string) {
@@ -101,7 +167,8 @@ export default function ChatbotWidget() {
                 : 'El canal de WhatsApp todavía no está disponible.';
         }
 
-        answer ??= 'No encontré una respuesta para esa pregunta. Prueba con “consultar mi trámite”, “olvidé mi contraseña” o “corregir una observación”.';
+        answer ??=
+            'No encontré una respuesta para esa pregunta. Prueba con “consultar mi trámite”, “olvidé mi contraseña” o “corregir una observación”.';
 
         const userId = nextMessageId.current++;
         const assistantId = nextMessageId.current++;
@@ -121,7 +188,9 @@ export default function ChatbotWidget() {
 
     const quickQuestions = quickQuestionKeys
         .map((key) => support.assistant_topics[key])
-        .filter((topic): topic is { question: string; answer: string } => Boolean(topic));
+        .filter((topic): topic is { question: string; answer: string } =>
+            Boolean(topic),
+        );
 
     return (
         <div className="fixed right-4 bottom-20 z-50 flex flex-col items-end gap-3">
@@ -138,8 +207,12 @@ export default function ChatbotWidget() {
                                 <Bot className="size-5" aria-hidden="true" />
                             </span>
                             <div className="min-w-0">
-                                <h2 className="truncate text-sm font-semibold">Chatbot de trámites</h2>
-                                <p className="text-xs opacity-80">Orientación automática</p>
+                                <h2 className="truncate text-sm font-semibold">
+                                    Chatbot de trámites
+                                </h2>
+                                <p className="text-xs opacity-80">
+                                    Orientación automática
+                                </p>
                             </div>
                         </div>
                         <Button
@@ -166,9 +239,10 @@ export default function ChatbotWidget() {
                                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 <p
-                                    className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed ${message.role === 'user'
-                                        ? 'rounded-br-sm bg-primary text-primary-foreground'
-                                        : 'rounded-bl-sm bg-muted text-foreground'
+                                    className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                                        message.role === 'user'
+                                            ? 'rounded-br-sm bg-primary text-primary-foreground'
+                                            : 'rounded-bl-sm bg-muted text-foreground'
                                     }`}
                                 >
                                     {message.text}
@@ -178,13 +252,17 @@ export default function ChatbotWidget() {
 
                         {messages.length === 1 && (
                             <div className="space-y-2 pt-1">
-                                <p className="text-xs font-medium text-muted-foreground">Preguntas frecuentes</p>
+                                <p className="text-xs font-medium text-muted-foreground">
+                                    Preguntas frecuentes
+                                </p>
                                 {quickQuestions.map((topic) => (
                                     <button
                                         key={topic.question}
                                         type="button"
                                         className="block w-full rounded-xl border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                                        onClick={() => sendQuestion(topic.question)}
+                                        onClick={() =>
+                                            sendQuestion(topic.question)
+                                        }
                                     >
                                         {topic.question}
                                     </button>
@@ -201,12 +279,18 @@ export default function ChatbotWidget() {
                             rel="noopener noreferrer"
                             className="mx-4 mb-2 inline-flex items-center justify-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
                         >
-                            <MessageCircle className="size-4" aria-hidden="true" />
+                            <MessageCircle
+                                className="size-4"
+                                aria-hidden="true"
+                            />
                             Hablar con una persona por WhatsApp
                         </a>
                     )}
 
-                    <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-border p-3">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="flex items-center gap-2 border-t border-border p-3"
+                    >
                         <Input
                             value={draft}
                             onChange={(event) => setDraft(event.target.value)}
@@ -214,13 +298,21 @@ export default function ChatbotWidget() {
                             aria-label="Escribe tu pregunta"
                             maxLength={500}
                         />
-                        <Button type="submit" size="icon" disabled={!draft.trim()} aria-label="Enviar pregunta">
+                        <Button
+                            type="submit"
+                            size="icon"
+                            disabled={!draft.trim()}
+                            aria-label="Enviar pregunta"
+                        >
                             <Send className="size-4" />
                         </Button>
                     </form>
 
                     <div className="flex items-center justify-between px-4 pb-3 text-xs text-muted-foreground">
-                        <Link href={supportIndex()} className="underline underline-offset-4 hover:text-foreground">
+                        <Link
+                            href={supportIndex()}
+                            className="underline underline-offset-4 hover:text-foreground"
+                        >
                             Ver preguntas frecuentes
                         </Link>
                         <span>Orientación general</span>
@@ -233,9 +325,17 @@ export default function ChatbotWidget() {
                 className="rounded-full shadow-lg"
                 onClick={() => setOpen((current) => !current)}
                 aria-expanded={open}
-                aria-label={open ? 'Cerrar chatbot de trámites' : 'Abrir chatbot de trámites'}
+                aria-label={
+                    open
+                        ? 'Cerrar chatbot de trámites'
+                        : 'Abrir chatbot de trámites'
+                }
             >
-                {open ? <X data-icon="inline-start" /> : <MessageCircle data-icon="inline-start" />}
+                {open ? (
+                    <X data-icon="inline-start" />
+                ) : (
+                    <MessageCircle data-icon="inline-start" />
+                )}
                 {open ? 'Cerrar chatbot' : 'Chatbot'}
             </Button>
         </div>

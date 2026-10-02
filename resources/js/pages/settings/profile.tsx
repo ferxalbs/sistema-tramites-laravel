@@ -58,7 +58,7 @@ export default function Profile({ identity, profile, status }: Props) {
                     variant="small"
                     title="Mi perfil"
                     description={
-                        "Actualiza tus nombres y datos de contacto. El rol, DNI y correo institucional identifican tu cuenta."
+                        'Actualiza tus nombres y datos de contacto. El rol, DNI y correo institucional identifican tu cuenta.'
                     }
                 />
 
@@ -97,7 +97,9 @@ export default function Profile({ identity, profile, status }: Props) {
                             {identity.dni && (
                                 <div>
                                     <dt className="text-sm text-muted-foreground">
-                                        {isTeacher ? 'DNI / código docente' : 'DNI'}
+                                        {isTeacher
+                                            ? 'DNI / código docente'
+                                            : 'DNI'}
                                     </dt>
                                     <dd>{identity.dni}</dd>
                                 </div>
@@ -152,146 +154,152 @@ export default function Profile({ identity, profile, status }: Props) {
                         <CardTitle>Editar datos del perfil</CardTitle>
                     </CardHeader>
                     <CardContent>
-                            <Form
-                                {...ProfileController.update.form()}
-                                options={{ preserveScroll: true }}
-                                onBefore={() =>
-                                    window.confirm('¿Deseas guardar los cambios de tu perfil?')
-                                }
-                                className="space-y-4"
-                            >
-                                {({ processing, errors }) => (
-                                    <>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="nombres">Nombres</Label>
-                                            <Input
-                                                id="nombres"
-                                                name="nombres"
-                                                defaultValue={identity.nombres}
-                                                minLength={2}
-                                                maxLength={120}
-                                                required
-                                                autoComplete="given-name"
-                                            />
-                                            <InputError message={errors.nombres} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="apellidos">Apellidos</Label>
-                                            <Input
-                                                id="apellidos"
-                                                name="apellidos"
-                                                defaultValue={identity.apellidos}
-                                                minLength={2}
-                                                maxLength={120}
-                                                autoComplete="family-name"
-                                            />
-                                            <InputError message={errors.apellidos} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="celular">
-                                                Celular
-                                            </Label>
-                                            <Input
-                                                id="celular"
-                                                name="celular"
-                                                defaultValue={
-                                                    identity.celular ?? ''
-                                                }
-                                                required
-                                                autoComplete="tel"
-                                            />
-                                            <InputError
-                                                message={errors.celular}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="correo_alternativo">
-                                                Correo alternativo
-                                            </Label>
-                                            <Input
-                                                id="correo_alternativo"
-                                                name="correo_alternativo"
-                                                type="email"
-                                                defaultValue={identity.correo_alternativo ?? ''}
-                                                autoComplete="email"
-                                            />
-                                            <InputError message={errors.correo_alternativo} />
-                                        </div>
-                                        {isStudent && (
-                                            <>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="direccion_residencia">
-                                                        Dirección de residencia
-                                                    </Label>
-                                                    <Input
-                                                        id="direccion_residencia"
-                                                        name="direccion_residencia"
-                                                        defaultValue={
-                                                            profile?.direccion_residencia ??
-                                                            ''
-                                                        }
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.direccion_residencia
-                                                        }
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-                                        {isTeacher && (
-                                            <>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="especialidad">
-                                                        Especialidad
-                                                    </Label>
-                                                    <Input
-                                                        id="especialidad"
-                                                        name="especialidad"
-                                                        defaultValue={
-                                                            profile?.especialidad ??
-                                                            ''
-                                                        }
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.especialidad
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="condicion_laboral">
-                                                        Condición laboral
-                                                    </Label>
-                                                    <Input
-                                                        id="condicion_laboral"
-                                                        name="condicion_laboral"
-                                                        defaultValue={
-                                                            profile?.condicion_laboral ??
-                                                            ''
-                                                        }
-                                                    />
-                                                    <InputError
-                                                        message={
-                                                            errors.condicion_laboral
-                                                        }
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-                                        <Button
-                                            type="submit"
-                                            disabled={processing}
-                                        >
-                                            Guardar perfil
-                                        </Button>
-                                    </>
-                                )}
-                            </Form>
+                        <Form
+                            {...ProfileController.update.form()}
+                            options={{ preserveScroll: true }}
+                            onBefore={() =>
+                                window.confirm(
+                                    '¿Deseas guardar los cambios de tu perfil?',
+                                )
+                            }
+                            className="space-y-4"
+                        >
+                            {({ processing, errors }) => (
+                                <>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="nombres">Nombres</Label>
+                                        <Input
+                                            id="nombres"
+                                            name="nombres"
+                                            defaultValue={identity.nombres}
+                                            minLength={2}
+                                            maxLength={120}
+                                            required
+                                            autoComplete="given-name"
+                                        />
+                                        <InputError message={errors.nombres} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="apellidos">
+                                            Apellidos
+                                        </Label>
+                                        <Input
+                                            id="apellidos"
+                                            name="apellidos"
+                                            defaultValue={identity.apellidos}
+                                            minLength={2}
+                                            maxLength={120}
+                                            autoComplete="family-name"
+                                        />
+                                        <InputError
+                                            message={errors.apellidos}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="celular">Celular</Label>
+                                        <Input
+                                            id="celular"
+                                            name="celular"
+                                            defaultValue={
+                                                identity.celular ?? ''
+                                            }
+                                            required
+                                            autoComplete="tel"
+                                        />
+                                        <InputError message={errors.celular} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="correo_alternativo">
+                                            Correo alternativo
+                                        </Label>
+                                        <Input
+                                            id="correo_alternativo"
+                                            name="correo_alternativo"
+                                            type="email"
+                                            defaultValue={
+                                                identity.correo_alternativo ??
+                                                ''
+                                            }
+                                            autoComplete="email"
+                                        />
+                                        <InputError
+                                            message={errors.correo_alternativo}
+                                        />
+                                    </div>
+                                    {isStudent && (
+                                        <>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="direccion_residencia">
+                                                    Dirección de residencia
+                                                </Label>
+                                                <Input
+                                                    id="direccion_residencia"
+                                                    name="direccion_residencia"
+                                                    defaultValue={
+                                                        profile?.direccion_residencia ??
+                                                        ''
+                                                    }
+                                                />
+                                                <InputError
+                                                    message={
+                                                        errors.direccion_residencia
+                                                    }
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                    {isTeacher && (
+                                        <>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="especialidad">
+                                                    Especialidad
+                                                </Label>
+                                                <Input
+                                                    id="especialidad"
+                                                    name="especialidad"
+                                                    defaultValue={
+                                                        profile?.especialidad ??
+                                                        ''
+                                                    }
+                                                />
+                                                <InputError
+                                                    message={
+                                                        errors.especialidad
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="condicion_laboral">
+                                                    Condición laboral
+                                                </Label>
+                                                <Input
+                                                    id="condicion_laboral"
+                                                    name="condicion_laboral"
+                                                    defaultValue={
+                                                        profile?.condicion_laboral ??
+                                                        ''
+                                                    }
+                                                />
+                                                <InputError
+                                                    message={
+                                                        errors.condicion_laboral
+                                                    }
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                    <Button type="submit" disabled={processing}>
+                                        Guardar perfil
+                                    </Button>
+                                </>
+                            )}
+                        </Form>
                     </CardContent>
                 </Card>
 
-                {(isStudent || isTeacher || identity.rol === 'administrador') && (
+                {(isStudent ||
+                    isTeacher ||
+                    identity.rol === 'administrador') && (
                     <Card>
                         <CardHeader>
                             <CardTitle>Firma escaneada</CardTitle>
@@ -303,7 +311,10 @@ export default function Profile({ identity, profile, status }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <p className="text-sm">
-                                Estado: {identity.firma_registrada ? 'firma registrada' : 'falta registrar la firma'}
+                                Estado:{' '}
+                                {identity.firma_registrada
+                                    ? 'firma registrada'
+                                    : 'falta registrar la firma'}
                             </p>
                             <Form
                                 {...ProfileController.uploadSignature.form()}
@@ -323,7 +334,9 @@ export default function Profile({ identity, profile, status }: Props) {
                                                 accept="image/jpeg,image/png"
                                                 required
                                             />
-                                            <InputError message={errors.firma} />
+                                            <InputError
+                                                message={errors.firma}
+                                            />
                                         </div>
                                         <label className="flex items-start gap-2 text-sm">
                                             <input
@@ -339,9 +352,16 @@ export default function Profile({ identity, profile, status }: Props) {
                                                     : 'Confirmo que esta imagen corresponde a mi firma y autorizo insertarla en los documentos PDF que firme.'}
                                             </span>
                                         </label>
-                                        <InputError message={errors.confirmar_uso} />
-                                        <Button type="submit" disabled={processing}>
-                                            {identity.firma_registrada ? 'Actualizar firma' : 'Guardar firma'}
+                                        <InputError
+                                            message={errors.confirmar_uso}
+                                        />
+                                        <Button
+                                            type="submit"
+                                            disabled={processing}
+                                        >
+                                            {identity.firma_registrada
+                                                ? 'Actualizar firma'
+                                                : 'Guardar firma'}
                                         </Button>
                                     </>
                                 )}

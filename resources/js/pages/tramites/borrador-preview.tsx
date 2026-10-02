@@ -77,7 +77,9 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                                 className="h-[720px] w-full rounded-md border bg-muted"
                             />
                         ) : borrador.contenido ? (
-                            <p className="break-words whitespace-pre-wrap">{borrador.contenido}</p>
+                            <p className="break-words whitespace-pre-wrap">
+                                {borrador.contenido}
+                            </p>
                         ) : (
                             <p>
                                 Esta versión histórica no tiene texto de vista

@@ -185,9 +185,9 @@ export default function EntregasAdmin({ tramites, medios }: Props) {
                     <CardHeader>
                         <CardTitle>Medios de entrega</CardTitle>
                         <CardDescription>
-                            Presencial, correo electrónico y descarga del sistema
-                            siempre están disponibles. La evidencia se aplica a
-                            nuevos registros de entrega.
+                            Presencial, correo electrónico y descarga del
+                            sistema siempre están disponibles. La evidencia se
+                            aplica a nuevos registros de entrega.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">

@@ -37,6 +37,11 @@ jobs:
       - name: Prepare CI database
         run: touch database/database.sqlite
 
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@12.6.0 --activate
+
       - name: Setup Application
         run: composer setup
 

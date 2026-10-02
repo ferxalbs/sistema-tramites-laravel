@@ -7,11 +7,16 @@ export default function TramiteStatusBadge({
     estado: string;
     label: string;
 }) {
-    const variant = estado === 'rechazado'
-        ? 'destructive'
-        : ['aprobado', 'entregado', 'cerrado'].includes(estado)
-            ? 'default'
-            : ['en_revision', 'digitalizado', 'documento_final_generado'].includes(estado)
+    const variant =
+        estado === 'rechazado'
+            ? 'destructive'
+            : ['aprobado', 'entregado', 'cerrado'].includes(estado)
+              ? 'default'
+              : [
+                      'en_revision',
+                      'digitalizado',
+                      'documento_final_generado',
+                  ].includes(estado)
                 ? 'outline'
                 : 'secondary';
 

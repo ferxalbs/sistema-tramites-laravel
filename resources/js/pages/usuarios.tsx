@@ -1,7 +1,6 @@
-import { Form, Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Search, Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,11 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    create,
-    edit,
-    index,
-} from '@/routes/admin/users';
+import { create, edit, index } from '@/routes/admin/users';
 
 type Status = 'activo' | 'pendiente' | 'inactivo' | 'rechazado';
 type UserRow = {
@@ -65,11 +60,7 @@ const statusOptions = [
 ];
 const dateFormatter = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' });
 
-export default function Usuarios({
-    users,
-    filters,
-    counts,
-}: Props) {
+export default function Usuarios({ users, filters, counts }: Props) {
     useFlashToast();
     const [query, setQuery] = useState(filters.q);
     const [role, setRole] = useState(filters.rol || 'todos');
@@ -213,10 +204,11 @@ export default function Usuarios({
                                                 </td>
                                                 <td className="p-3">
                                                     {user.rol === 'estudiante'
-                                                        ? user.condicion_academica ??
-                                                          'Perfil incompleto'
-                                                        : (roleLabels[user.rol] ??
-                                                          user.rol)}
+                                                        ? (user.condicion_academica ??
+                                                          'Perfil incompleto')
+                                                        : (roleLabels[
+                                                              user.rol
+                                                          ] ?? user.rol)}
                                                 </td>
                                                 <td className="p-3">
                                                     <Badge
@@ -310,7 +302,6 @@ export default function Usuarios({
                         )}
                     </CardContent>
                 </Card>
-
             </main>
         </>
     );

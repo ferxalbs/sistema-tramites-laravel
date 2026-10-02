@@ -38,7 +38,13 @@ type Props = {
     };
 };
 
-export default function Buscar({ query, status, reviewer, student, results }: Props) {
+export default function Buscar({
+    query,
+    status,
+    reviewer,
+    student,
+    results,
+}: Props) {
     const [text, setText] = useState(query);
 
     function submit(event: FormEvent<HTMLFormElement>) {
@@ -120,13 +126,18 @@ export default function Buscar({ query, status, reviewer, student, results }: Pr
                                                               },
                                                           )
                                                         : student
-                                                          ? TramiteEstudianteController.show({ tramite: expediente.id })
+                                                          ? TramiteEstudianteController.show(
+                                                                {
+                                                                    tramite:
+                                                                        expediente.id,
+                                                                },
+                                                            )
                                                           : TramiteController.show(
-                                                              {
-                                                                  tramite:
-                                                                      expediente.id,
-                                                              },
-                                                          )
+                                                                {
+                                                                    tramite:
+                                                                        expediente.id,
+                                                                },
+                                                            )
                                                 }
                                             >
                                                 {expediente.codigo}
@@ -154,7 +165,14 @@ export default function Buscar({ query, status, reviewer, student, results }: Pr
                                                     key={person.id}
                                                     className="py-3 first:pt-0"
                                                 >
-                                                    <Link className="font-medium text-primary hover:underline" href={adminUserEdit({ user: person.id })}>{person.name}</Link>
+                                                    <Link
+                                                        className="font-medium text-primary hover:underline"
+                                                        href={adminUserEdit({
+                                                            user: person.id,
+                                                        })}
+                                                    >
+                                                        {person.name}
+                                                    </Link>
                                                     <p className="text-sm text-muted-foreground">
                                                         {person.rol}
                                                     </p>

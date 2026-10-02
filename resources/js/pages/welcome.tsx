@@ -2,11 +2,9 @@ import { FormEvent, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
-    CheckCircle2,
     Clock,
     FileCheck2,
     FileSearch,
-    FileText,
     HelpCircle,
     QrCode,
     Search,
@@ -38,7 +36,9 @@ export default function Welcome() {
         e.preventDefault();
         const clean = quickCode.trim().toUpperCase();
         if (clean) {
-            router.visit(`/verificar-documento?codigo=${encodeURIComponent(clean)}`);
+            router.visit(
+                `/verificar-documento?codigo=${encodeURIComponent(clean)}`,
+            );
         }
     };
 
@@ -66,26 +66,31 @@ export default function Welcome() {
                             </Link>
 
                             <nav className="flex items-center gap-4">
-                                <div className="hidden md:flex items-center gap-6 text-sm">
+                                <div className="hidden items-center gap-6 text-sm md:flex">
                                     <Link
                                         href="/verificar-documento"
-                                        className="text-muted-foreground hover:text-foreground transition-colors"
+                                        className="text-muted-foreground transition-colors hover:text-foreground"
                                     >
                                         Verificar Documento
                                     </Link>
                                     <Link
                                         href="/ayuda"
-                                        className="text-muted-foreground hover:text-foreground transition-colors"
+                                        className="text-muted-foreground transition-colors hover:text-foreground"
                                     >
                                         Centro de Ayuda
                                     </Link>
                                 </div>
 
-                                <Separator orientation="vertical" className="hidden md:block h-6" />
+                                <Separator
+                                    orientation="vertical"
+                                    className="hidden h-6 md:block"
+                                />
 
                                 <div className="flex items-center gap-2">
                                     {auth.user ? (
-                                        <Button render={<Link href={dashboard()} />}>
+                                        <Button
+                                            render={<Link href={dashboard()} />}
+                                        >
                                             Ir al Panel
                                             <ArrowRight />
                                         </Button>
@@ -98,7 +103,9 @@ export default function Welcome() {
                                                 Iniciar Sesión
                                             </Button>
                                             <Button
-                                                render={<Link href={register()} />}
+                                                render={
+                                                    <Link href={register()} />
+                                                }
                                             >
                                                 Registrarse
                                             </Button>
@@ -116,24 +123,37 @@ export default function Welcome() {
                             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
                                 {/* Left Column: Headline, Description, Primary CTAs & Value Props */}
                                 <div className="flex flex-col items-start gap-6 lg:col-span-7">
-                                    <Badge variant="secondary" className="gap-2 py-1 px-3">
+                                    <Badge
+                                        variant="secondary"
+                                        className="gap-2 px-3 py-1"
+                                    >
                                         <ShieldCheck className="size-4 text-primary" />
-                                        <span>Portal Oficial de Trámites y Gestión Documental</span>
+                                        <span>
+                                            Portal Oficial de Trámites y Gestión
+                                            Documental
+                                        </span>
                                     </Badge>
 
-                                    <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-foreground text-balance">
-                                        Gestión y seguimiento de tus trámites en un solo lugar
+                                    <h1 className="text-4xl font-extrabold tracking-tight text-balance text-foreground sm:text-5xl lg:text-6xl">
+                                        Gestión y seguimiento de tus trámites en
+                                        un solo lugar
                                     </h1>
 
-                                    <p className="max-w-2xl text-lg sm:text-xl text-muted-foreground text-balance leading-relaxed">
-                                        Presenta tus documentos en Mesa de Partes. El personal registra tu expediente para que puedas consultar su avance y verificar la autenticidad del documento oficial.
+                                    <p className="max-w-2xl text-lg leading-relaxed text-balance text-muted-foreground sm:text-xl">
+                                        Presenta tus documentos en Mesa de
+                                        Partes. El personal registra tu
+                                        expediente para que puedas consultar su
+                                        avance y verificar la autenticidad del
+                                        documento oficial.
                                     </p>
 
                                     <div className="flex flex-wrap items-center gap-4 pt-2">
                                         {auth.user ? (
                                             <Button
                                                 size="lg"
-                                                render={<Link href={dashboard()} />}
+                                                render={
+                                                    <Link href={dashboard()} />
+                                                }
                                             >
                                                 Acceder a mis Trámites
                                                 <ArrowRight />
@@ -142,7 +162,9 @@ export default function Welcome() {
                                             <>
                                                 <Button
                                                     size="lg"
-                                                    render={<Link href={login()} />}
+                                                    render={
+                                                        <Link href={login()} />
+                                                    }
                                                 >
                                                     Consultar mis Expedientes
                                                     <ArrowRight />
@@ -150,7 +172,9 @@ export default function Welcome() {
                                                 <Button
                                                     variant="outline"
                                                     size="lg"
-                                                    render={<Link href="/ayuda" />}
+                                                    render={
+                                                        <Link href="/ayuda" />
+                                                    }
                                                 >
                                                     Centro de Ayuda
                                                 </Button>
@@ -159,32 +183,35 @@ export default function Welcome() {
                                     </div>
 
                                     {/* Highlights Row */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 border-t w-full text-left">
+                                    <div className="grid w-full grid-cols-1 gap-6 border-t pt-6 text-left sm:grid-cols-3">
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                                 <FileCheck2 className="size-4 text-primary" />
                                                 Recepción Presencial
                                             </span>
-                                            <span className="text-xs text-muted-foreground leading-normal">
-                                                Entrega tus documentos en Mesa de Partes.
+                                            <span className="text-xs leading-normal text-muted-foreground">
+                                                Entrega tus documentos en Mesa
+                                                de Partes.
                                             </span>
                                         </div>
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                                 <Clock className="size-4 text-primary" />
                                                 En Tiempo Real
                                             </span>
-                                            <span className="text-xs text-muted-foreground leading-normal">
-                                                Alertas y seguimiento del avance de tu trámite.
+                                            <span className="text-xs leading-normal text-muted-foreground">
+                                                Alertas y seguimiento del avance
+                                                de tu trámite.
                                             </span>
                                         </div>
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                                 <QrCode className="size-4 text-primary" />
                                                 Validación QR
                                             </span>
-                                            <span className="text-xs text-muted-foreground leading-normal">
-                                                Comprobación pública de autenticidad documental.
+                                            <span className="text-xs leading-normal text-muted-foreground">
+                                                Comprobación pública de
+                                                autenticidad documental.
                                             </span>
                                         </div>
                                     </div>
@@ -194,27 +221,41 @@ export default function Welcome() {
                                 <div className="lg:col-span-5">
                                     <Card className="w-full">
                                         <CardHeader>
-                                            <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-2">
+                                            <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                                 <FileSearch className="size-5" />
                                             </div>
-                                            <CardTitle className="text-xl">Verificación de Documento</CardTitle>
+                                            <CardTitle className="text-xl">
+                                                Verificación de Documento
+                                            </CardTitle>
                                             <CardDescription className="text-sm leading-relaxed">
-                                                Comprueba de manera inmediata la autenticidad y validez oficial de resoluciones, constancias o certificados institucionales.
+                                                Comprueba de manera inmediata la
+                                                autenticidad y validez oficial
+                                                de resoluciones, constancias o
+                                                certificados institucionales.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent>
-                                            <form onSubmit={handleQuickVerify} className="flex flex-col gap-4">
+                                            <form
+                                                onSubmit={handleQuickVerify}
+                                                className="flex flex-col gap-4"
+                                            >
                                                 <div className="flex flex-col gap-2">
                                                     <span className="text-xs font-medium text-foreground">
-                                                        Código de Verificación Alfanumérico
+                                                        Código de Verificación
+                                                        Alfanumérico
                                                     </span>
                                                     <div className="flex gap-2">
                                                         <Input
                                                             type="text"
                                                             value={quickCode}
-                                                            onChange={(e) => setQuickCode(e.target.value)}
+                                                            onChange={(e) =>
+                                                                setQuickCode(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
                                                             placeholder="Ej. A1B2-C3D4-E5F6-7890"
-                                                            className="font-mono uppercase text-sm"
+                                                            className="font-mono text-sm uppercase"
                                                             required
                                                         />
                                                         <Button type="submit">
@@ -223,16 +264,21 @@ export default function Welcome() {
                                                         </Button>
                                                     </div>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground leading-normal">
-                                                    El código figura en el pie de página o bajo el código QR de todo documento emitido oficialmente.
+                                                <p className="text-xs leading-normal text-muted-foreground">
+                                                    El código figura en el pie
+                                                    de página o bajo el código
+                                                    QR de todo documento emitido
+                                                    oficialmente.
                                                 </p>
                                             </form>
                                         </CardContent>
-                                        <CardFooter className="justify-between text-xs text-muted-foreground border-t pt-4">
-                                            <span>Servicio de consulta ciudadana</span>
+                                        <CardFooter className="justify-between border-t pt-4 text-xs text-muted-foreground">
+                                            <span>
+                                                Servicio de consulta ciudadana
+                                            </span>
                                             <Link
                                                 href="/verificar-documento"
-                                                className="text-primary hover:underline font-medium"
+                                                className="font-medium text-primary hover:underline"
                                             >
                                                 Módulo completo →
                                             </Link>
@@ -247,51 +293,72 @@ export default function Welcome() {
                         {/* Services Grid Section */}
                         <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
                             <div className="mb-12 flex flex-col gap-2 text-left">
-                                <Badge variant="outline" className="w-fit gap-1.5">
+                                <Badge
+                                    variant="outline"
+                                    className="w-fit gap-1.5"
+                                >
                                     <Sparkles className="size-3.5 text-primary" />
                                     <span>Servicios Integrados</span>
                                 </Badge>
-                                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
+                                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                                     Servicios del Sistema de Trámites
                                 </h2>
-                                <p className="max-w-3xl text-base text-muted-foreground leading-relaxed">
-                                    Herramientas diseñadas para agilizar la gestión de solicitudes académicas y administrativas con total trazabilidad.
+                                <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">
+                                    Herramientas diseñadas para agilizar la
+                                    gestión de solicitudes académicas y
+                                    administrativas con total trazabilidad.
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                                 <Card>
                                     <CardHeader>
-                                        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                        <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                             <Clock className="size-5" />
                                         </div>
-                                        <CardTitle className="text-lg">Seguimiento Continuo</CardTitle>
+                                        <CardTitle className="text-lg">
+                                            Seguimiento Continuo
+                                        </CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Conoce la etapa de tu expediente: derivación entre oficinas, dictámenes técnicos y emisión del documento final.
+                                            Conoce la etapa de tu expediente:
+                                            derivación entre oficinas,
+                                            dictámenes técnicos y emisión del
+                                            documento final.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
 
                                 <Card>
                                     <CardHeader>
-                                        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                        <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                             <QrCode className="size-5" />
                                         </div>
-                                        <CardTitle className="text-lg">Autenticación con QR</CardTitle>
+                                        <CardTitle className="text-lg">
+                                            Autenticación con QR
+                                        </CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Cada documento generado cuenta con un identificador único y firma institucional accesible para verificación pública sin autenticación previa.
+                                            Cada documento generado cuenta con
+                                            un identificador único y firma
+                                            institucional accesible para
+                                            verificación pública sin
+                                            autenticación previa.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
 
                                 <Card>
                                     <CardHeader>
-                                        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                        <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                             <HelpCircle className="size-5" />
                                         </div>
-                                        <CardTitle className="text-lg">Mesa de Ayuda y Guías</CardTitle>
+                                        <CardTitle className="text-lg">
+                                            Mesa de Ayuda y Guías
+                                        </CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Accede a requisitos actualizados, preguntas frecuentes y canales de soporte directo ante cualquier duda o contingencia en tu trámite.
+                                            Accede a requisitos actualizados,
+                                            preguntas frecuentes y canales de
+                                            soporte directo ante cualquier duda
+                                            o contingencia en tu trámite.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
@@ -306,47 +373,62 @@ export default function Welcome() {
                                 <Badge variant="outline" className="w-fit">
                                     Flujo de Trabajo
                                 </Badge>
-                                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
+                                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                                     ¿Cómo se gestiona tu trámite?
                                 </h2>
-                                <p className="max-w-2xl text-base text-muted-foreground leading-relaxed">
-                                    La recepción presencial inicia un proceso documentado y trazable.
+                                <p className="max-w-2xl text-base leading-relaxed text-muted-foreground">
+                                    La recepción presencial inicia un proceso
+                                    documentado y trazable.
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                                 <Card>
                                     <CardHeader>
-                                        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
+                                        <div className="mb-2 flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                                             1
                                         </div>
-                                        <CardTitle className="text-base">Presenta tus Documentos</CardTitle>
+                                        <CardTitle className="text-base">
+                                            Presenta tus Documentos
+                                        </CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Entrega los requisitos en Mesa de Partes. El personal interno registra tu solicitud y te asigna un expediente.
+                                            Entrega los requisitos en Mesa de
+                                            Partes. El personal interno registra
+                                            tu solicitud y te asigna un
+                                            expediente.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
 
                                 <Card>
                                     <CardHeader>
-                                        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
+                                        <div className="mb-2 flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                                             2
                                         </div>
-                                        <CardTitle className="text-base">Revisión y Dictamen</CardTitle>
+                                        <CardTitle className="text-base">
+                                            Revisión y Dictamen
+                                        </CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Las unidades responsables revisan tu solicitud y emiten observaciones o aprobación.
+                                            Las unidades responsables revisan tu
+                                            solicitud y emiten observaciones o
+                                            aprobación.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
 
                                 <Card>
                                     <CardHeader>
-                                        <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2">
+                                        <div className="mb-2 flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                                             3
                                         </div>
-                                        <CardTitle className="text-base">Entrega y Confirmación</CardTitle>
+                                        <CardTitle className="text-base">
+                                            Entrega y Confirmación
+                                        </CardTitle>
                                         <CardDescription className="text-sm leading-relaxed">
-                                            Recibe el documento por el canal institucional y confirma su recepción. El código QR permite verificar su autenticidad.
+                                            Recibe el documento por el canal
+                                            institucional y confirma su
+                                            recepción. El código QR permite
+                                            verificar su autenticidad.
                                         </CardDescription>
                                     </CardHeader>
                                 </Card>
@@ -359,18 +441,20 @@ export default function Welcome() {
                         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
                             <div className="flex items-center gap-2">
                                 <AppLogoIcon className="size-4 text-primary" />
-                                <span>Sistema de Trámites y Gestión Documental</span>
+                                <span>
+                                    Sistema de Trámites y Gestión Documental
+                                </span>
                             </div>
                             <div className="flex items-center gap-6">
                                 <Link
                                     href="/verificar-documento"
-                                    className="hover:text-foreground transition-colors"
+                                    className="transition-colors hover:text-foreground"
                                 >
                                     Verificación Pública
                                 </Link>
                                 <Link
                                     href="/ayuda"
-                                    className="hover:text-foreground transition-colors"
+                                    className="transition-colors hover:text-foreground"
                                 >
                                     Centro de Ayuda
                                 </Link>

@@ -8,6 +8,7 @@ Registro de cambios del Sistema de Trámites. Actualizado el **2 de octubre de 2
 - Las tres migraciones del 2 de octubre se aplicaron correctamente en SQLite local. Su aplicación en la base de producción debe verificarse después del despliegue.
 - La suite completa terminó con **164 pruebas aprobadas, 6 omitidas y 3057 aserciones**. Las seis pruebas omitidas requieren una base Turso remota desechable.
 - `pnpm run types:check` y `pnpm run build` pasaron. Las pruebas locales no demuestran por sí solas el funcionamiento completo de producción.
+- La revisión estática PHPStan existente aún tiene 529 hallazgos en el proyecto, principalmente en el adaptador Turso y modelos Eloquent. Se mantiene como trabajo pendiente; la verificación continua ejecuta las pruebas funcionales y los chequeos de frontend que sí tienen una línea base limpia.
 - El envío real de correos está implementado, pero no se puede activar ni comprobar con el correo institucional hasta conocer y configurar sus datos SMTP y su secreto en Railway.
 - Los PDF oficiales de justificación de tardanza y constancia de prácticas están bloqueados hasta recibir los modelos aprobados. Sus FUT pueden registrarse y revisarse.
 - El servidor local responde en `http://127.0.0.1:8000/login` (HTTP 200). Las cuentas de demostración Administrador, Docente y Estudiante conservan su contraseña local conocida; la cuenta histórica Asistente quedó inactiva.

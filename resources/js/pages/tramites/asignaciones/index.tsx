@@ -205,7 +205,9 @@ export default function AsignacionesIndex({
                                                 {tramite.asunto}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
-                                                {tramite.persona_nombre ?? 'Documento institucional'} ·{' '}
+                                                {tramite.persona_nombre ??
+                                                    'Documento institucional'}{' '}
+                                                ·{' '}
                                                 {formatDate(
                                                     tramite.fecha_recepcion,
                                                 )}

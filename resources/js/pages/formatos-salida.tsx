@@ -47,18 +47,24 @@ export default function FormatosSalida({
                         Formatos de salida
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Los formatos se mantienen disponibles. Aquí puedes revisar sus plantillas finales publicadas.
+                        Los formatos se mantienen disponibles. Aquí puedes
+                        revisar sus plantillas finales publicadas.
                     </p>
                 </header>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {formatos.map((formato) => {
                         const versiones = plantillasFinales.filter(
-                            (plantilla) => plantilla.tipo_documento_salida === formato.codigo,
+                            (plantilla) =>
+                                plantilla.tipo_documento_salida ===
+                                formato.codigo,
                         );
 
                         return (
-                            <Card key={formato.id} className="transition-all hover:border-foreground/20">
+                            <Card
+                                key={formato.id}
+                                className="transition-all hover:border-foreground/20"
+                            >
                                 <CardHeader>
                                     <CardTitle>{formato.codigo}</CardTitle>
                                     <CardDescription>
@@ -68,20 +74,27 @@ export default function FormatosSalida({
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid gap-5">
-                                    <section aria-label={`Plantillas publicadas para ${formato.nombre}`}>
+                                    <section
+                                        aria-label={`Plantillas publicadas para ${formato.nombre}`}
+                                    >
                                         <h2 className="mb-2 text-sm font-medium">
                                             Versiones finales publicadas
                                         </h2>
                                         {versiones.length === 0 ? (
                                             <p className="text-sm text-muted-foreground">
-                                                Todavía no hay una plantilla final publicada para este formato.
+                                                Todavía no hay una plantilla
+                                                final publicada para este
+                                                formato.
                                             </p>
                                         ) : (
                                             <ul className="space-y-1 text-sm">
                                                 {versiones.map((plantilla) => (
                                                     <li key={plantilla.id}>
-                                                        {plantilla.nombre} · v{plantilla.version}
-                                                        {plantilla.modalidad ? ` · ${plantilla.modalidad}` : ''}
+                                                        {plantilla.nombre} · v
+                                                        {plantilla.version}
+                                                        {plantilla.modalidad
+                                                            ? ` · ${plantilla.modalidad}`
+                                                            : ''}
                                                     </li>
                                                 ))}
                                             </ul>
@@ -89,17 +102,24 @@ export default function FormatosSalida({
                                         <Button
                                             className="mt-3"
                                             variant="outline"
-                                            render={<Link href={templatesIndex()} />}
+                                            render={
+                                                <Link href={templatesIndex()} />
+                                            }
                                         >
                                             Administrar plantillas
                                         </Button>
                                     </section>
 
-                                    <Form {...update.form({ format: formato.id })} disableWhileProcessing>
+                                    <Form
+                                        {...update.form({ format: formato.id })}
+                                        disableWhileProcessing
+                                    >
                                         {({ errors, processing }) => (
                                             <>
                                                 <div className="grid gap-3">
-                                                    <Label htmlFor={`nombre-${formato.id}`}>
+                                                    <Label
+                                                        htmlFor={`nombre-${formato.id}`}
+                                                    >
                                                         Nombre
                                                     </Label>
                                                     <Input
@@ -108,22 +128,38 @@ export default function FormatosSalida({
                                                         required
                                                         minLength={2}
                                                         maxLength={120}
-                                                        defaultValue={formato.nombre}
+                                                        defaultValue={
+                                                            formato.nombre
+                                                        }
                                                     />
-                                                    <InputError message={errors.nombre} />
-                                                    <Label htmlFor={`descripcion-${formato.id}`}>
+                                                    <InputError
+                                                        message={errors.nombre}
+                                                    />
+                                                    <Label
+                                                        htmlFor={`descripcion-${formato.id}`}
+                                                    >
                                                         Descripción
                                                     </Label>
                                                     <Input
                                                         id={`descripcion-${formato.id}`}
                                                         name="descripcion"
                                                         maxLength={255}
-                                                        defaultValue={formato.descripcion ?? ''}
+                                                        defaultValue={
+                                                            formato.descripcion ??
+                                                            ''
+                                                        }
                                                     />
-                                                    <InputError message={errors.descripcion} />
+                                                    <InputError
+                                                        message={
+                                                            errors.descripcion
+                                                        }
+                                                    />
                                                 </div>
                                                 <CardFooter className="px-0 pb-0">
-                                                    <Button type="submit" disabled={processing}>
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={processing}
+                                                    >
                                                         Guardar cambios
                                                     </Button>
                                                 </CardFooter>

@@ -13,7 +13,7 @@ export default function AppLogo() {
                 <span className="truncate font-semibold tracking-tight">
                     {name || 'Sistema de Trámites'}
                 </span>
-                <span className="text-[11px] text-muted-foreground truncate mt-0.5">
+                <span className="mt-0.5 truncate text-[11px] text-muted-foreground">
                     Gestión Institucional
                 </span>
             </div>

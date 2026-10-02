@@ -22,7 +22,9 @@ type SupportProps = {
 export default function SupportWidget() {
     const { support } = usePage<{ support: SupportProps }>().props;
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-    const topic = selectedTopic ? support.assistant_topics[selectedTopic] : null;
+    const topic = selectedTopic
+        ? support.assistant_topics[selectedTopic]
+        : null;
 
     return (
         <Dialog
@@ -30,7 +32,9 @@ export default function SupportWidget() {
                 if (!open) setSelectedTopic(null);
             }}
         >
-            <DialogTrigger render={<Button className="fixed right-4 bottom-4 shadow-lg" />}>
+            <DialogTrigger
+                render={<Button className="fixed right-4 bottom-4 shadow-lg" />}
+            >
                 <CircleHelp data-icon="inline-start" />
                 ¿Necesitas ayuda?
             </DialogTrigger>
@@ -44,45 +48,62 @@ export default function SupportWidget() {
 
                 {topic ? (
                     <div className="flex flex-col gap-4 py-2">
-                        <h3 className="text-base font-semibold">{topic.question}</h3>
-                        <p className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
+                        <h3 className="text-base font-semibold">
+                            {topic.question}
+                        </h3>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
                             {topic.answer}
                         </p>
-                        {selectedTopic === 'whatsapp' && support.whatsapp_url && (
-                            <Button
-                                render={
-                                    <a
-                                        href={support.whatsapp_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    />
-                                }
-                            >
-                                Abrir WhatsApp
-                            </Button>
-                        )}
+                        {selectedTopic === 'whatsapp' &&
+                            support.whatsapp_url && (
+                                <Button
+                                    render={
+                                        <a
+                                            href={support.whatsapp_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        />
+                                    }
+                                >
+                                    Abrir WhatsApp
+                                </Button>
+                            )}
                         <div className="flex gap-2 pt-2">
-                            <Button type="button" variant="outline" onClick={() => setSelectedTopic(null)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSelectedTopic(null)}
+                            >
                                 Volver
                             </Button>
-                            <Button type="button" variant="ghost" onClick={() => setSelectedTopic(null)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setSelectedTopic(null)}
+                            >
                                 Reiniciar
                             </Button>
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-2 py-2" role="list" aria-label="Preguntas de ayuda">
-                        {Object.entries(support.assistant_topics).map(([key, item]) => (
-                            <button
-                                key={key}
-                                type="button"
-                                className="flex w-full items-center justify-between rounded-xl border border-border/80 bg-card p-3 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                                onClick={() => setSelectedTopic(key)}
-                            >
-                                <span>{item.question}</span>
-                                <ChevronRight className="ml-2 size-4 shrink-0 text-muted-foreground" />
-                            </button>
-                        ))}
+                    <div
+                        className="flex flex-col gap-2 py-2"
+                        role="list"
+                        aria-label="Preguntas de ayuda"
+                    >
+                        {Object.entries(support.assistant_topics).map(
+                            ([key, item]) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    className="flex w-full items-center justify-between rounded-xl border border-border/80 bg-card p-3 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                                    onClick={() => setSelectedTopic(key)}
+                                >
+                                    <span>{item.question}</span>
+                                    <ChevronRight className="ml-2 size-4 shrink-0 text-muted-foreground" />
+                                </button>
+                            ),
+                        )}
                     </div>
                 )}
 
@@ -93,7 +114,9 @@ export default function SupportWidget() {
                     >
                         Preguntas frecuentes
                     </Link>
-                    <DialogClose render={<Button variant="secondary" size="sm" />}>
+                    <DialogClose
+                        render={<Button variant="secondary" size="sm" />}
+                    >
                         Cerrar
                     </DialogClose>
                 </DialogFooter>

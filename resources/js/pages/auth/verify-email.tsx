@@ -20,22 +20,28 @@ export default function VerifyEmail({ status }: { status?: string }) {
             <Head title="Verificación de Correo" />
 
             {status === 'verification-link-sent' && (
-                <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
-                    Se ha enviado un nuevo enlace de verificación al correo electrónico que proporcionaste durante el registro.
+                <div className="mb-4 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
+                    Se ha enviado un nuevo enlace de verificación al correo
+                    electrónico que proporcionaste durante el registro.
                 </div>
             )}
 
-            <Card className="w-full shadow-sm border-border/80">
+            <Card className="w-full border-border/80 shadow-sm">
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-xl font-bold tracking-tight">
                         Verificación de Correo
                     </CardTitle>
                     <CardDescription className="text-sm">
-                        Por favor verifica tu correo electrónico haciendo clic en el enlace que te acabamos de enviar.
+                        Por favor verifica tu correo electrónico haciendo clic
+                        en el enlace que te acabamos de enviar.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
-                    <Form id="verify-email-form" {...send.form()} className="text-center">
+                    <Form
+                        id="verify-email-form"
+                        {...send.form()}
+                        className="text-center"
+                    >
                         {({ processing }) => (
                             <Button
                                 type="submit"

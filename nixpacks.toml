@@ -1,6 +1,12 @@
 # Fallback configuration for Nixpacks builder
 [phases.setup]
-nixPkgs = ["php83", "php83Extensions.ffi", "php83Packages.composer", "nodejs_22", "corepack"]
+nixPkgs = [
+    "php83",
+    "php83Extensions.ffi",
+    "php83Packages.composer",
+    "nodejs_22",
+    "corepack",
+]
 
 [phases.install]
 cmds = [
@@ -8,13 +14,11 @@ cmds = [
     "composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader",
     "corepack enable",
     "corepack prepare pnpm@12.6.0 --activate",
-    "pnpm install --frozen-lockfile"
+    "pnpm install --frozen-lockfile",
 ]
 
 [phases.build]
-cmds = [
-    "pnpm run build"
-]
+cmds = ["pnpm run build"]
 
 [start]
 cmd = "sh docker/entrypoint.sh"

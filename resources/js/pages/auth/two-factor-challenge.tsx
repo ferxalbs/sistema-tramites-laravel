@@ -7,7 +7,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
@@ -57,7 +56,7 @@ export default function TwoFactorChallenge() {
         <>
             <Head title="Autenticación de dos factores" />
 
-            <Card className="w-full shadow-sm border-border/80">
+            <Card className="w-full border-border/80 shadow-sm">
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-xl font-bold tracking-tight">
                         {authConfigContent.title}
@@ -96,14 +95,18 @@ export default function TwoFactorChallenge() {
                                                 name="code"
                                                 maxLength={OTP_MAX_LENGTH}
                                                 value={code}
-                                                onChange={(value) => setCode(value)}
+                                                onChange={(value) =>
+                                                    setCode(value)
+                                                }
                                                 disabled={processing}
                                                 pattern={REGEXP_ONLY_DIGITS}
                                                 autoFocus
                                             >
                                                 <InputOTPGroup>
                                                     {Array.from(
-                                                        { length: OTP_MAX_LENGTH },
+                                                        {
+                                                            length: OTP_MAX_LENGTH,
+                                                        },
                                                         (_, index) => (
                                                             <InputOTPSlot
                                                                 key={index}
@@ -119,7 +122,10 @@ export default function TwoFactorChallenge() {
                                 )}
 
                                 <div className="text-center text-xs text-muted-foreground">
-                                    <span>¿Problemas con el código? También puedes </span>
+                                    <span>
+                                        ¿Problemas con el código? También
+                                        puedes{' '}
+                                    </span>
                                     <button
                                         type="button"
                                         className="cursor-pointer text-primary underline underline-offset-4 hover:opacity-80"
@@ -134,7 +140,7 @@ export default function TwoFactorChallenge() {
                                 <Button
                                     type="submit"
                                     form="two-factor-form"
-                                    className="w-full mt-2"
+                                    className="mt-2 w-full"
                                     disabled={processing}
                                 >
                                     {processing ? (

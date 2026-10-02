@@ -88,7 +88,9 @@ export default function Plantillas({
                             Plantillas documentales
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Cada versión conserva su contenido. Publicar una versión la ofrece para nuevos borradores y desactiva las anteriores.
+                            Cada versión conserva su contenido. Publicar una
+                            versión la ofrece para nuevos borradores y desactiva
+                            las anteriores.
                         </p>
                     </div>
                     <Button
@@ -110,7 +112,10 @@ export default function Plantillas({
                 )}
 
                 {/* Listado de Plantillas */}
-                <section className="flex flex-col gap-4" aria-label="Listado de plantillas">
+                <section
+                    className="flex flex-col gap-4"
+                    aria-label="Listado de plantillas"
+                >
                     <div className="flex items-center justify-between">
                         <h2 className="text-base font-semibold text-foreground">
                             Plantillas registradas ({plantillas.length})
@@ -119,12 +124,13 @@ export default function Plantillas({
 
                     {plantillas.length === 0 ? (
                         <Card className="flex flex-col items-center justify-center p-8 text-center">
-                            <FileText className="size-10 text-muted-foreground mb-3" />
-                            <h3 className="font-semibold text-base text-foreground">
+                            <FileText className="mb-3 size-10 text-muted-foreground" />
+                            <h3 className="text-base font-semibold text-foreground">
                                 No hay plantillas registradas
                             </h3>
-                            <p className="text-sm text-muted-foreground max-w-sm mt-1 mb-4">
-                                Cree su primera plantilla para comenzar a generar documentos en los trámites.
+                            <p className="mt-1 mb-4 max-w-sm text-sm text-muted-foreground">
+                                Cree su primera plantilla para comenzar a
+                                generar documentos en los trámites.
                             </p>
                             <Button onClick={() => setShowNewForm(true)}>
                                 <Plus data-icon="inline-start" />
@@ -165,7 +171,8 @@ function NuevaPlantillaCard({
                             Crear nueva plantilla
                         </CardTitle>
                         <CardDescription>
-                            Se guarda inactiva inicialmente para revisar sus variables y campos antes de publicarla.
+                            Se guarda inactiva inicialmente para revisar sus
+                            variables y campos antes de publicarla.
                         </CardDescription>
                     </div>
                     <Badge variant="outline">Borrador</Badge>
@@ -176,144 +183,192 @@ function NuevaPlantillaCard({
                     <>
                         <CardContent>
                             <FieldGroup className="gap-5">
-                            {/* Grid 2 Columnas para metadatos */}
-                            <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <Field id="codigo-nuevo" label="Código único" error={errors.codigo}>
-                                    <Input
+                                {/* Grid 2 Columnas para metadatos */}
+                                <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <Field
                                         id="codigo-nuevo"
-                                        name="codigo"
-                                        placeholder="EJ: INF_CONFORMIDAD_01"
-                                        pattern="[A-Z0-9_]+"
-                                        minLength={3}
-                                        maxLength={80}
-                                        required
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        Mayúsculas, números y guiones bajos.
-                                    </p>
-                                </Field>
-
-                                <Field id="nombre-nuevo" label="Nombre de la plantilla" error={errors.nombre}>
-                                    <Input
-                                        id="nombre-nuevo"
-                                        name="nombre"
-                                        placeholder="Informe de Conformidad de Trámite"
-                                        minLength={3}
-                                        maxLength={160}
-                                        required
-                                    />
-                                </Field>
-
-                                <ShadcnField data-invalid={errors.tipo_documento_salida ? true : undefined}>
-                                    <FieldLabel htmlFor="formato-nuevo">Formato de salida</FieldLabel>
-                                    <Select
-                                        name="tipo_documento_salida"
-                                        items={formatos.map((item) => ({
-                                            value: item.codigo,
-                                            label: item.nombre,
-                                        }))}
-                                        required
+                                        label="Código único"
+                                        error={errors.codigo}
                                     >
-                                        <SelectTrigger
-                                            id="formato-nuevo"
-                                            className="w-full"
-                                            aria-describedby={errors.tipo_documento_salida ? 'formato-nuevo-error' : undefined}
-                                            aria-invalid={errors.tipo_documento_salida ? true : undefined}
-                                        >
-                                            <SelectValue placeholder="Selecciona formato" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectGroup>
-                                                {formatos.map((item) => (
-                                                    <SelectItem
-                                                        key={item.codigo}
-                                                        value={item.codigo}
-                                                    >
-                                                        {item.nombre}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
-                                    <FieldError id="formato-nuevo-error">{errors.tipo_documento_salida}</FieldError>
-                                </ShadcnField>
+                                        <Input
+                                            id="codigo-nuevo"
+                                            name="codigo"
+                                            placeholder="EJ: INF_CONFORMIDAD_01"
+                                            pattern="[A-Z0-9_]+"
+                                            minLength={3}
+                                            maxLength={80}
+                                            required
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Mayúsculas, números y guiones bajos.
+                                        </p>
+                                    </Field>
 
-                                <ShadcnField data-invalid={errors.modalidad ? true : undefined}>
-                                    <FieldLabel htmlFor="modalidad-nueva">Modalidad</FieldLabel>
-                                    <Select
-                                        name="modalidad"
-                                        defaultValue="sin_modalidad"
-                                        items={[
-                                            {
-                                                value: 'sin_modalidad',
-                                                label: 'Sin modalidad',
-                                            },
-                                            ...modalidades.map((item) => ({
+                                    <Field
+                                        id="nombre-nuevo"
+                                        label="Nombre de la plantilla"
+                                        error={errors.nombre}
+                                    >
+                                        <Input
+                                            id="nombre-nuevo"
+                                            name="nombre"
+                                            placeholder="Informe de Conformidad de Trámite"
+                                            minLength={3}
+                                            maxLength={160}
+                                            required
+                                        />
+                                    </Field>
+
+                                    <ShadcnField
+                                        data-invalid={
+                                            errors.tipo_documento_salida
+                                                ? true
+                                                : undefined
+                                        }
+                                    >
+                                        <FieldLabel htmlFor="formato-nuevo">
+                                            Formato de salida
+                                        </FieldLabel>
+                                        <Select
+                                            name="tipo_documento_salida"
+                                            items={formatos.map((item) => ({
                                                 value: item.codigo,
                                                 label: item.nombre,
-                                            })),
-                                        ]}
-                                    >
-                                        <SelectTrigger
-                                            id="modalidad-nueva"
-                                            className="w-full"
-                                            aria-describedby={errors.modalidad ? 'modalidad-nueva-error' : undefined}
-                                            aria-invalid={errors.modalidad ? true : undefined}
+                                            }))}
+                                            required
                                         >
-                                            <SelectValue placeholder="Sin modalidad" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectGroup>
-                                                <SelectItem value="sin_modalidad">
-                                                    Sin modalidad
-                                                </SelectItem>
-                                                {modalidades.map((item) => (
-                                                    <SelectItem
-                                                        key={item.codigo}
-                                                        value={item.codigo}
-                                                    >
-                                                        {item.nombre}
+                                            <SelectTrigger
+                                                id="formato-nuevo"
+                                                className="w-full"
+                                                aria-describedby={
+                                                    errors.tipo_documento_salida
+                                                        ? 'formato-nuevo-error'
+                                                        : undefined
+                                                }
+                                                aria-invalid={
+                                                    errors.tipo_documento_salida
+                                                        ? true
+                                                        : undefined
+                                                }
+                                            >
+                                                <SelectValue placeholder="Selecciona formato" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectGroup>
+                                                    {formatos.map((item) => (
+                                                        <SelectItem
+                                                            key={item.codigo}
+                                                            value={item.codigo}
+                                                        >
+                                                            {item.nombre}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError id="formato-nuevo-error">
+                                            {errors.tipo_documento_salida}
+                                        </FieldError>
+                                    </ShadcnField>
+
+                                    <ShadcnField
+                                        data-invalid={
+                                            errors.modalidad ? true : undefined
+                                        }
+                                    >
+                                        <FieldLabel htmlFor="modalidad-nueva">
+                                            Modalidad
+                                        </FieldLabel>
+                                        <Select
+                                            name="modalidad"
+                                            defaultValue="sin_modalidad"
+                                            items={[
+                                                {
+                                                    value: 'sin_modalidad',
+                                                    label: 'Sin modalidad',
+                                                },
+                                                ...modalidades.map((item) => ({
+                                                    value: item.codigo,
+                                                    label: item.nombre,
+                                                })),
+                                            ]}
+                                        >
+                                            <SelectTrigger
+                                                id="modalidad-nueva"
+                                                className="w-full"
+                                                aria-describedby={
+                                                    errors.modalidad
+                                                        ? 'modalidad-nueva-error'
+                                                        : undefined
+                                                }
+                                                aria-invalid={
+                                                    errors.modalidad
+                                                        ? true
+                                                        : undefined
+                                                }
+                                            >
+                                                <SelectValue placeholder="Sin modalidad" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectGroup>
+                                                    <SelectItem value="sin_modalidad">
+                                                        Sin modalidad
                                                     </SelectItem>
-                                                ))}
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
-                                    <FieldError id="modalidad-nueva-error">{errors.modalidad}</FieldError>
-                                </ShadcnField>
-                            </FieldGroup>
+                                                    {modalidades.map((item) => (
+                                                        <SelectItem
+                                                            key={item.codigo}
+                                                            value={item.codigo}
+                                                        >
+                                                            {item.nombre}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError id="modalidad-nueva-error">
+                                            {errors.modalidad}
+                                        </FieldError>
+                                    </ShadcnField>
+                                </FieldGroup>
 
-                            <Field id="descripcion-nueva" label="Descripción (opcional)" error={errors.descripcion}>
-                                <Input
+                                <Field
                                     id="descripcion-nueva"
-                                    name="descripcion"
-                                    placeholder="Indique brevemente el propósito de esta plantilla..."
-                                    maxLength={255}
-                                />
-                            </Field>
+                                    label="Descripción (opcional)"
+                                    error={errors.descripcion}
+                                >
+                                    <Input
+                                        id="descripcion-nueva"
+                                        name="descripcion"
+                                        placeholder="Indique brevemente el propósito de esta plantilla..."
+                                        maxLength={255}
+                                    />
+                                </Field>
 
-                            <Field
-                                id="contenido-nuevo"
-                                label={(
-                                    <>
-                                        <span>Contenido estructurado</span>
-                                        <span className="text-xs font-mono text-muted-foreground">
-                                            Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
-                                        </span>
-                                    </>
-                                )}
-                                error={errors.contenido}
-                            >
-                                <Textarea
+                                <Field
                                     id="contenido-nuevo"
-                                    name="contenido"
-                                    rows={6}
-                                    maxLength={60000}
-                                    required
-                                    defaultValue={
-                                        '<article><h1>{{NUMERO_DOCUMENTO_PREVIO}}</h1><p>{{CONTENIDO_PRINCIPAL}}</p></article>'
+                                    label={
+                                        <>
+                                            <span>Contenido estructurado</span>
+                                            <span className="font-mono text-xs text-muted-foreground">
+                                                Variables:{' '}
+                                                {'{{NUMERO_DOCUMENTO_PREVIO}}'},{' '}
+                                                {'{{CONTENIDO_PRINCIPAL}}'}
+                                            </span>
+                                        </>
                                     }
-                                />
-                            </Field>
+                                    error={errors.contenido}
+                                >
+                                    <Textarea
+                                        id="contenido-nuevo"
+                                        name="contenido"
+                                        rows={6}
+                                        maxLength={60000}
+                                        required
+                                        defaultValue={
+                                            '<article><h1>{{NUMERO_DOCUMENTO_PREVIO}}</h1><p>{{CONTENIDO_PRINCIPAL}}</p></article>'
+                                        }
+                                    />
+                                </Field>
                             </FieldGroup>
                         </CardContent>
                         <CardFooter className="flex items-center justify-end gap-3 border-t border-border/50 pt-4">
@@ -347,7 +402,10 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                         <CardTitle className="text-base font-semibold text-foreground">
                             {plantilla.nombre}
                         </CardTitle>
-                        <Badge variant="outline" className="font-mono text-xs font-semibold">
+                        <Badge
+                            variant="outline"
+                            className="font-mono text-xs font-semibold"
+                        >
                             v{plantilla.version}
                         </Badge>
                         {plantilla.activa ? (
@@ -366,16 +424,25 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                     </span>
                 </div>
                 <CardDescription className="text-xs">
-                    Formato: <strong className="text-foreground">{plantilla.tipo_documento_salida}</strong>
+                    Formato:{' '}
+                    <strong className="text-foreground">
+                        {plantilla.tipo_documento_salida}
+                    </strong>
                     {plantilla.modalidad && (
-                        <span> · Modalidad: <strong className="text-foreground">{plantilla.modalidad}</strong></span>
+                        <span>
+                            {' '}
+                            · Modalidad:{' '}
+                            <strong className="text-foreground">
+                                {plantilla.modalidad}
+                            </strong>
+                        </span>
                     )}
                     <span> · Estado: {plantilla.estado}</span>
                 </CardDescription>
             </CardHeader>
 
             {plantilla.descripcion && (
-                <CardContent className="pb-3 pt-0">
+                <CardContent className="pt-0 pb-3">
                     <p className="text-sm text-muted-foreground">
                         {plantilla.descripcion}
                     </p>
@@ -428,7 +495,10 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                     </Form>
                 </div>
 
-                <Collapsible open={isVersionOpen} onOpenChange={setIsVersionOpen}>
+                <Collapsible
+                    open={isVersionOpen}
+                    onOpenChange={setIsVersionOpen}
+                >
                     <CollapsibleTrigger
                         render={
                             <Button size="sm" variant="ghost">
@@ -455,7 +525,8 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                     Generar versión {plantilla.version + 1}
                                 </h4>
                                 <p className="text-xs text-muted-foreground">
-                                    Crea una copia editable de esta plantilla para modificar su estructura o contenido.
+                                    Crea una copia editable de esta plantilla
+                                    para modificar su estructura o contenido.
                                 </p>
                             </div>
                         </div>
@@ -467,7 +538,11 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                             {({ errors, processing }) => (
                                 <FieldGroup className="gap-4">
                                     <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <Field id={`nombre-${plantilla.id}`} label="Nombre de la nueva versión" error={errors.nombre}>
+                                        <Field
+                                            id={`nombre-${plantilla.id}`}
+                                            label="Nombre de la nueva versión"
+                                            error={errors.nombre}
+                                        >
                                             <Input
                                                 id={`nombre-${plantilla.id}`}
                                                 name="nombre"
@@ -478,8 +553,16 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                             />
                                         </Field>
 
-                                        <ShadcnField data-invalid={errors.publicar ? true : undefined}>
-                                            <FieldLabel htmlFor={`publicar-${plantilla.id}`}>
+                                        <ShadcnField
+                                            data-invalid={
+                                                errors.publicar
+                                                    ? true
+                                                    : undefined
+                                            }
+                                        >
+                                            <FieldLabel
+                                                htmlFor={`publicar-${plantilla.id}`}
+                                            >
                                                 Estado inicial de publicación
                                             </FieldLabel>
                                             <Select
@@ -500,31 +583,51 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                                 <SelectTrigger
                                                     id={`publicar-${plantilla.id}`}
                                                     className="w-full"
-                                                    aria-describedby={errors.publicar ? `publicar-${plantilla.id}-error` : undefined}
-                                                    aria-invalid={errors.publicar ? true : undefined}
+                                                    aria-describedby={
+                                                        errors.publicar
+                                                            ? `publicar-${plantilla.id}-error`
+                                                            : undefined
+                                                    }
+                                                    aria-invalid={
+                                                        errors.publicar
+                                                            ? true
+                                                            : undefined
+                                                    }
                                                 >
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectGroup>
                                                         <SelectItem value="0">
-                                                            Guardar borrador (inactiva)
+                                                            Guardar borrador
+                                                            (inactiva)
                                                         </SelectItem>
                                                         <SelectItem value="1">
-                                                            Publicar y activar inmediatamente
+                                                            Publicar y activar
+                                                            inmediatamente
                                                         </SelectItem>
                                                     </SelectGroup>
                                                 </SelectContent>
                                             </Select>
-                                            <FieldError id={`publicar-${plantilla.id}-error`}>{errors.publicar}</FieldError>
+                                            <FieldError
+                                                id={`publicar-${plantilla.id}-error`}
+                                            >
+                                                {errors.publicar}
+                                            </FieldError>
                                         </ShadcnField>
                                     </FieldGroup>
 
-                                    <Field id={`descripcion-${plantilla.id}`} label="Descripción o notas de cambio" error={errors.descripcion}>
+                                    <Field
+                                        id={`descripcion-${plantilla.id}`}
+                                        label="Descripción o notas de cambio"
+                                        error={errors.descripcion}
+                                    >
                                         <Input
                                             id={`descripcion-${plantilla.id}`}
                                             name="descripcion"
-                                            defaultValue={plantilla.descripcion ?? ''}
+                                            defaultValue={
+                                                plantilla.descripcion ?? ''
+                                            }
                                             maxLength={255}
                                             placeholder="Detalle los cambios respecto a la versión anterior..."
                                         />
@@ -532,14 +635,22 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
 
                                     <Field
                                         id={`contenido-${plantilla.id}`}
-                                        label={(
+                                        label={
                                             <>
-                                                <span>Contenido HTML de la nueva versión</span>
-                                                <span className="text-xs font-mono text-muted-foreground">
-                                                    Variables: {'{{NUMERO_DOCUMENTO_PREVIO}}'}, {'{{CONTENIDO_PRINCIPAL}}'}
+                                                <span>
+                                                    Contenido HTML de la nueva
+                                                    versión
+                                                </span>
+                                                <span className="font-mono text-xs text-muted-foreground">
+                                                    Variables:{' '}
+                                                    {
+                                                        '{{NUMERO_DOCUMENTO_PREVIO}}'
+                                                    }
+                                                    ,{' '}
+                                                    {'{{CONTENIDO_PRINCIPAL}}'}
                                                 </span>
                                             </>
-                                        )}
+                                        }
                                         error={errors.contenido}
                                     >
                                         <Textarea
@@ -557,7 +668,9 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setIsVersionOpen(false)}
+                                            onClick={() =>
+                                                setIsVersionOpen(false)
+                                            }
                                         >
                                             Cancelar
                                         </Button>
@@ -567,7 +680,8 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                                             disabled={processing}
                                         >
                                             <History data-icon="inline-start" />
-                                            Crear versión {plantilla.version + 1}
+                                            Crear versión{' '}
+                                            {plantilla.version + 1}
                                         </Button>
                                     </div>
                                 </FieldGroup>
@@ -613,7 +727,10 @@ function Field({
     });
 
     return (
-        <ShadcnField className="gap-2" data-invalid={invalid ? true : undefined}>
+        <ShadcnField
+            className="gap-2"
+            data-invalid={invalid ? true : undefined}
+        >
             <FieldLabel htmlFor={id}>{label}</FieldLabel>
             {control}
             <FieldError id={errorId}>{error}</FieldError>

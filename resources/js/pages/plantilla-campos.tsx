@@ -91,7 +91,10 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                                 Campos: {plantilla.nombre}
                             </h1>
-                            <Badge variant="outline" className="font-mono text-xs font-semibold">
+                            <Badge
+                                variant="outline"
+                                className="font-mono text-xs font-semibold"
+                            >
                                 v{plantilla.version}
                             </Badge>
                             <Badge variant="secondary" className="text-xs">
@@ -99,13 +102,14 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                             </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            Código: <code className="font-mono font-semibold text-foreground">{plantilla.codigo}</code> · {campos.length} campos configurados
+                            Código:{' '}
+                            <code className="font-mono font-semibold text-foreground">
+                                {plantilla.codigo}
+                            </code>{' '}
+                            · {campos.length} campos configurados
                         </p>
                     </div>
-                    <Button
-                        variant="outline"
-                        render={<Link href={index()} />}
-                    >
+                    <Button variant="outline" render={<Link href={index()} />}>
                         <ArrowLeft data-icon="inline-start" />
                         Volver a plantillas
                     </Button>
@@ -121,7 +125,10 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                                     Versión bloqueada para edición
                                 </CardTitle>
                                 <CardDescription className="text-xs text-muted-foreground">
-                                    Esta versión ya ha sido utilizada en trámites registrados. Para modificar variables o campos, cree una nueva versión desde la lista de plantillas.
+                                    Esta versión ya ha sido utilizada en
+                                    trámites registrados. Para modificar
+                                    variables o campos, cree una nueva versión
+                                    desde la lista de plantillas.
                                 </CardDescription>
                             </div>
                         </CardHeader>
@@ -131,26 +138,38 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                 {/* Listado de Campos */}
                 <div className="flex flex-col gap-4">
                     {campos.map((campo, index) => (
-                        <Card key={campo.id} className="transition-all hover:border-foreground/20">
+                        <Card
+                            key={campo.id}
+                            className="transition-all hover:border-foreground/20"
+                        >
                             <CardHeader className="pb-3">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="outline" className="font-mono text-xs font-semibold">
+                                        <Badge
+                                            variant="outline"
+                                            className="font-mono text-xs font-semibold"
+                                        >
                                             #{campo.orden}
                                         </Badge>
                                         <CardTitle className="text-base font-semibold text-foreground">
                                             {campo.etiqueta}
                                         </CardTitle>
-                                        <code className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                                             {campo.clave_variable}
                                         </code>
                                         {campo.activo ? (
-                                            <Badge variant="default" className="text-xs">
+                                            <Badge
+                                                variant="default"
+                                                className="text-xs"
+                                            >
                                                 <Check data-icon="inline-start" />
                                                 Activo
                                             </Badge>
                                         ) : (
-                                            <Badge variant="secondary" className="text-xs">
+                                            <Badge
+                                                variant="secondary"
+                                                className="text-xs"
+                                            >
                                                 Inactivo
                                             </Badge>
                                         )}
@@ -166,7 +185,11 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                                                 })}
                                                 disableWhileProcessing
                                             >
-                                                <input type="hidden" name="direccion" value="up" />
+                                                <input
+                                                    type="hidden"
+                                                    name="direccion"
+                                                    value="up"
+                                                />
                                                 <Button
                                                     type="submit"
                                                     size="icon-sm"
@@ -175,7 +198,9 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                                                     title="Mover arriba"
                                                 >
                                                     <ArrowUp className="size-4" />
-                                                    <span className="sr-only">Subir orden</span>
+                                                    <span className="sr-only">
+                                                        Subir orden
+                                                    </span>
                                                 </Button>
                                             </Form>
                                             <Form
@@ -185,16 +210,25 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                                                 })}
                                                 disableWhileProcessing
                                             >
-                                                <input type="hidden" name="direccion" value="down" />
+                                                <input
+                                                    type="hidden"
+                                                    name="direccion"
+                                                    value="down"
+                                                />
                                                 <Button
                                                     type="submit"
                                                     size="icon-sm"
                                                     variant="ghost"
-                                                    disabled={index === campos.length - 1}
+                                                    disabled={
+                                                        index ===
+                                                        campos.length - 1
+                                                    }
                                                     title="Mover abajo"
                                                 >
                                                     <ArrowDown className="size-4" />
-                                                    <span className="sr-only">Bajar orden</span>
+                                                    <span className="sr-only">
+                                                        Bajar orden
+                                                    </span>
                                                 </Button>
                                             </Form>
                                         </div>
@@ -212,70 +246,114 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                                 {({ errors, processing }) => (
                                     <>
                                         <CardContent className="flex flex-col gap-4">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                                 <div className="flex flex-col gap-2">
-                                                    <Label htmlFor={`etiqueta-${campo.id}`}>
+                                                    <Label
+                                                        htmlFor={`etiqueta-${campo.id}`}
+                                                    >
                                                         Etiqueta visible
                                                     </Label>
                                                     <Input
                                                         id={`etiqueta-${campo.id}`}
                                                         name="etiqueta"
-                                                        defaultValue={campo.etiqueta}
+                                                        defaultValue={
+                                                            campo.etiqueta
+                                                        }
                                                         minLength={2}
                                                         maxLength={160}
                                                         required
                                                         disabled={usada}
                                                     />
-                                                    <InputError message={errors.etiqueta} />
+                                                    <InputError
+                                                        message={
+                                                            errors.etiqueta
+                                                        }
+                                                    />
                                                 </div>
 
                                                 <div className="flex flex-col gap-2">
-                                                    <Label htmlFor={`grupo-${campo.id}`}>
+                                                    <Label
+                                                        htmlFor={`grupo-${campo.id}`}
+                                                    >
                                                         Grupo / Sección
                                                     </Label>
                                                     <Input
                                                         id={`grupo-${campo.id}`}
                                                         name="grupo"
-                                                        defaultValue={campo.grupo}
+                                                        defaultValue={
+                                                            campo.grupo
+                                                        }
                                                         maxLength={80}
                                                         required
                                                         disabled={usada}
                                                     />
-                                                    <InputError message={errors.grupo} />
+                                                    <InputError
+                                                        message={errors.grupo}
+                                                    />
                                                 </div>
 
                                                 <div className="flex flex-col gap-2">
-                                                    <Label htmlFor={`tipo-${campo.id}`}>
+                                                    <Label
+                                                        htmlFor={`tipo-${campo.id}`}
+                                                    >
                                                         Tipo de dato
                                                     </Label>
                                                     <Select
                                                         name="tipo_campo"
-                                                        defaultValue={campo.tipo_campo}
-                                                        items={tipos.map((tipo) => ({
-                                                            value: tipo,
-                                                            label: tipo.replaceAll('_', ' '),
-                                                        }))}
+                                                        defaultValue={
+                                                            campo.tipo_campo
+                                                        }
+                                                        items={tipos.map(
+                                                            (tipo) => ({
+                                                                value: tipo,
+                                                                label: tipo.replaceAll(
+                                                                    '_',
+                                                                    ' ',
+                                                                ),
+                                                            }),
+                                                        )}
                                                         required
                                                         disabled={usada}
                                                     >
-                                                        <SelectTrigger id={`tipo-${campo.id}`} className="w-full">
+                                                        <SelectTrigger
+                                                            id={`tipo-${campo.id}`}
+                                                            className="w-full"
+                                                        >
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             <SelectGroup>
-                                                                {tipos.map((tipo) => (
-                                                                    <SelectItem key={tipo} value={tipo}>
-                                                                        {tipo.replaceAll('_', ' ')}
-                                                                    </SelectItem>
-                                                                ))}
+                                                                {tipos.map(
+                                                                    (tipo) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                tipo
+                                                                            }
+                                                                            value={
+                                                                                tipo
+                                                                            }
+                                                                        >
+                                                                            {tipo.replaceAll(
+                                                                                '_',
+                                                                                ' ',
+                                                                            )}
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
                                                             </SelectGroup>
                                                         </SelectContent>
                                                     </Select>
-                                                    <InputError message={errors.tipo_campo} />
+                                                    <InputError
+                                                        message={
+                                                            errors.tipo_campo
+                                                        }
+                                                    />
                                                 </div>
 
                                                 <div className="flex flex-col gap-2">
-                                                    <Label htmlFor={`maximo-${campo.id}`}>
+                                                    <Label
+                                                        htmlFor={`maximo-${campo.id}`}
+                                                    >
                                                         Longitud máxima
                                                     </Label>
                                                     <Input
@@ -284,59 +362,105 @@ export default function PlantillaCampos({ plantilla, usada, campos }: Props) {
                                                         type="number"
                                                         min={1}
                                                         max={60000}
-                                                        defaultValue={campo.longitud_maxima ?? ''}
+                                                        defaultValue={
+                                                            campo.longitud_maxima ??
+                                                            ''
+                                                        }
                                                         placeholder="Sin límite"
                                                         disabled={usada}
                                                     />
-                                                    <InputError message={errors.longitud_maxima} />
+                                                    <InputError
+                                                        message={
+                                                            errors.longitud_maxima
+                                                        }
+                                                    />
                                                 </div>
 
                                                 <div className="flex flex-col gap-2 sm:col-span-2">
-                                                    <Label htmlFor={`ayuda-${campo.id}`}>
-                                                        Texto de ayuda (tooltip / placeholder)
+                                                    <Label
+                                                        htmlFor={`ayuda-${campo.id}`}
+                                                    >
+                                                        Texto de ayuda (tooltip
+                                                        / placeholder)
                                                     </Label>
                                                     <Input
                                                         id={`ayuda-${campo.id}`}
                                                         name="texto_ayuda"
-                                                        defaultValue={campo.texto_ayuda ?? ''}
+                                                        defaultValue={
+                                                            campo.texto_ayuda ??
+                                                            ''
+                                                        }
                                                         maxLength={255}
                                                         placeholder="Indicación para quien llena este campo..."
                                                         disabled={usada}
                                                     />
-                                                    <InputError message={errors.texto_ayuda} />
+                                                    <InputError
+                                                        message={
+                                                            errors.texto_ayuda
+                                                        }
+                                                    />
                                                 </div>
                                             </div>
 
                                             {/* Opciones booleanas en cuadrícula de 4 */}
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/40">
-                                                {banderas.map(({ name, label }) => (
-                                                    <div key={name} className="flex flex-col gap-1.5">
-                                                        <Label htmlFor={`${name}-${campo.id}`} className="text-xs">
-                                                            {label}
-                                                        </Label>
-                                                        <Select
-                                                            name={name}
-                                                            defaultValue={campo[name] ? '1' : '0'}
-                                                            items={[
-                                                                { value: '1', label: 'Sí' },
-                                                                { value: '0', label: 'No' },
-                                                            ]}
-                                                            required
-                                                            disabled={usada}
+                                            <div className="grid grid-cols-2 gap-3 border-t border-border/40 pt-2 sm:grid-cols-4">
+                                                {banderas.map(
+                                                    ({ name, label }) => (
+                                                        <div
+                                                            key={name}
+                                                            className="flex flex-col gap-1.5"
                                                         >
-                                                            <SelectTrigger id={`${name}-${campo.id}`} className="w-full">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectGroup>
-                                                                    <SelectItem value="1">Sí</SelectItem>
-                                                                    <SelectItem value="0">No</SelectItem>
-                                                                </SelectGroup>
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <InputError message={errors[name]} />
-                                                    </div>
-                                                ))}
+                                                            <Label
+                                                                htmlFor={`${name}-${campo.id}`}
+                                                                className="text-xs"
+                                                            >
+                                                                {label}
+                                                            </Label>
+                                                            <Select
+                                                                name={name}
+                                                                defaultValue={
+                                                                    campo[name]
+                                                                        ? '1'
+                                                                        : '0'
+                                                                }
+                                                                items={[
+                                                                    {
+                                                                        value: '1',
+                                                                        label: 'Sí',
+                                                                    },
+                                                                    {
+                                                                        value: '0',
+                                                                        label: 'No',
+                                                                    },
+                                                                ]}
+                                                                required
+                                                                disabled={usada}
+                                                            >
+                                                                <SelectTrigger
+                                                                    id={`${name}-${campo.id}`}
+                                                                    className="w-full"
+                                                                >
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectGroup>
+                                                                        <SelectItem value="1">
+                                                                            Sí
+                                                                        </SelectItem>
+                                                                        <SelectItem value="0">
+                                                                            No
+                                                                        </SelectItem>
+                                                                    </SelectGroup>
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <InputError
+                                                                message={
+                                                                    errors[name]
+                                                                }
+                                                            />
+                                                        </div>
+                                                    ),
+                                                )}
                                             </div>
                                         </CardContent>
 

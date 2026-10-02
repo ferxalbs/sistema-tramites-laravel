@@ -161,13 +161,13 @@ export default function Dashboard({
 
     const hasActiveFilters = Boolean(
         current.desde ||
-            current.hasta ||
-            current.clasificacion ||
-            current.programa ||
-            current.tipo ||
-            current.estado ||
-            current.revisor ||
-            current.medio,
+        current.hasta ||
+        current.clasificacion ||
+        current.programa ||
+        current.tipo ||
+        current.estado ||
+        current.revisor ||
+        current.medio,
     );
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
@@ -214,7 +214,8 @@ export default function Dashboard({
                             {titles[role]}
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Expedientes, indicadores de gestión y actividad en tiempo real.
+                            Expedientes, indicadores de gestión y actividad en
+                            tiempo real.
                         </p>
                     </div>
                     <Button variant="outline" render={<Link href={listHref} />}>
@@ -231,11 +232,15 @@ export default function Dashboard({
                             Filtrar indicadores
                         </CardTitle>
                         <CardDescription>
-                            Ajuste el rango de fechas y parámetros para segmentar las estadísticas.
+                            Ajuste el rango de fechas y parámetros para
+                            segmentar las estadísticas.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={submitFilters} className="flex flex-col gap-5">
+                        <form
+                            onSubmit={submitFilters}
+                            className="flex flex-col gap-5"
+                        >
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="filter-desde">Desde</Label>
@@ -270,7 +275,10 @@ export default function Dashboard({
                                     value={current.clasificacion}
                                     options={classificationOptions}
                                     onChange={(clasificacion) =>
-                                        setCurrent({ ...current, clasificacion })
+                                        setCurrent({
+                                            ...current,
+                                            clasificacion,
+                                        })
                                     }
                                 />
                                 <DashboardSelect
@@ -392,13 +400,15 @@ export default function Dashboard({
                         <CardHeader>
                             <CardTitle>Actividad reciente</CardTitle>
                             <CardDescription>
-                                Últimos movimientos y actualizaciones en expedientes
+                                Últimos movimientos y actualizaciones en
+                                expedientes
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {activity.length === 0 ? (
                                 <p className="py-6 text-center text-sm text-muted-foreground">
-                                    No hay actividad reciente disponible para los filtros aplicados.
+                                    No hay actividad reciente disponible para
+                                    los filtros aplicados.
                                 </p>
                             ) : (
                                 <div className="flex flex-col divide-y divide-border/60">
@@ -441,11 +451,13 @@ export default function Dashboard({
                                                 </Badge>
                                                 {item.fecha && (
                                                     <time
-                                                        className="whitespace-nowrap text-xs text-muted-foreground"
+                                                        className="text-xs whitespace-nowrap text-muted-foreground"
                                                         dateTime={item.fecha}
                                                     >
                                                         {dateTimeFormatter.format(
-                                                            new Date(item.fecha),
+                                                            new Date(
+                                                                item.fecha,
+                                                            ),
                                                         )}
                                                     </time>
                                                 )}
@@ -484,10 +496,16 @@ export default function Dashboard({
                                                 {month.periodo}
                                             </span>
                                             <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="tabular-nums">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="tabular-nums"
+                                                >
                                                     {month.registrados} reg.
                                                 </Badge>
-                                                <Badge variant="secondary" className="tabular-nums">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="tabular-nums"
+                                                >
                                                     {month.cerrados} cerr.
                                                 </Badge>
                                             </div>
@@ -626,7 +644,7 @@ function BarList({ title, items }: { title: string; items: ChartItem[] }) {
                                     <span className="font-medium text-foreground">
                                         {item.nombre}
                                     </span>
-                                    <span className="tabular-nums font-semibold text-muted-foreground">
+                                    <span className="font-semibold text-muted-foreground tabular-nums">
                                         {item.total}
                                     </span>
                                 </div>

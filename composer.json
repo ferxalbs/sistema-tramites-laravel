@@ -50,8 +50,8 @@
             "@php artisan key:generate",
             "@php artisan migrate --force",
             "@php artisan db:seed --no-interaction --force",
-            "npm install",
-            "npm run build"
+            "pnpm install --frozen-lockfile",
+            "pnpm run build"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
@@ -65,9 +65,9 @@
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
-            "npm run check",
-            "npm run types:check",
-            "@test"
+            "pnpm run check",
+            "pnpm run types:check",
+            "@php artisan test"
         ],
         "types:check": [
             "phpstan analyse"
