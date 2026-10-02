@@ -99,9 +99,6 @@ type TramiteDetail = {
     fecha_recepcion: string;
     fecha_llegada_oficina: string | null;
     fecha_presentacion_original: string | null;
-    numero_expediente_externo: string | null;
-    area_procedencia: string | null;
-    persona_entrega_documento: string | null;
     observacion_recepcion: string | null;
     folios: number | null;
     personas_relacionadas: Array<{
@@ -787,27 +784,6 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                                   tramite.fecha_presentacion_original,
                                               )
                                             : 'No registrada'
-                                    }
-                                />
-                                <Detail
-                                    label="Referencia física externa"
-                                    value={
-                                        tramite.numero_expediente_externo ??
-                                        'No registrada'
-                                    }
-                                />
-                                <Detail
-                                    label="Área de procedencia"
-                                    value={
-                                        tramite.area_procedencia ??
-                                        'No registrada'
-                                    }
-                                />
-                                <Detail
-                                    label="Persona que entregó"
-                                    value={
-                                        tramite.persona_entrega_documento ??
-                                        'No registrada'
                                     }
                                 />
                                 <Detail

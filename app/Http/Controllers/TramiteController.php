@@ -50,7 +50,6 @@ class TramiteController extends Controller
 
             $query->where(function (Builder $query) use ($term): void {
                 $query->where('codigo', 'like', $term)
-                    ->orWhere('numero_expediente_externo', 'like', $term)
                     ->orWhere('persona_nombre', 'like', $term)
                     ->orWhere('persona_identificador', 'like', $term)
                     ->orWhere('asunto', 'like', $term);
@@ -188,7 +187,7 @@ class TramiteController extends Controller
                 'id', 'codigo', 'clasificacion', 'tipo_documento', 'persona_nombre', 'persona_identificador', 'solicitante_correo', 'solicitante_celular',
                 'formato_salida', 'modalidad_documento',
                 'propietario_id', 'programa_estudio_id', 'destino_tipo', 'destino_nombre', 'destino_docente_id', 'asunto', 'descripcion', 'prioridad', 'folios',
-                'numero_expediente_externo', 'area_procedencia', 'persona_entrega_documento', 'observacion_recepcion',
+                'observacion_recepcion',
             ]) + [
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d\TH:i')
                     ?? $tramite->fecha_recepcion->format('Y-m-d\T00:00'),
@@ -529,9 +528,6 @@ class TramiteController extends Controller
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
                 'fecha_llegada_oficina' => $tramite->fecha_llegada_oficina?->format('Y-m-d H:i'),
                 'fecha_presentacion_original' => $tramite->fecha_presentacion_original?->toDateString(),
-                'numero_expediente_externo' => $tramite->numero_expediente_externo,
-                'area_procedencia' => $tramite->area_procedencia,
-                'persona_entrega_documento' => $tramite->persona_entrega_documento,
                 'observacion_recepcion' => $tramite->observacion_recepcion,
                 'folios' => $tramite->folios,
                 ...$this->receptionLists($tramite),
