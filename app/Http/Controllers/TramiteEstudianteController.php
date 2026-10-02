@@ -58,6 +58,10 @@ class TramiteEstudianteController extends Controller
             ->first();
         $documentoFinal = $tramite->documentoFinalActual()->where('estado', 'emitido')->first();
         $entrega = $tramite->entregaActual()->with('medio')->first();
+        $puedeDescargarDocumento = $documentoFinal !== null
+            && $entrega !== null
+            && (int) $entrega->documento_final_id === (int) $documentoFinal->id
+            && in_array($entrega->estado, ['registrada', 'confirmada'], true);
         $informeCierre = $tramite->informeCierre()->first();
 
         $hitosPublicos = [
@@ -145,6 +149,9 @@ class TramiteEstudianteController extends Controller
             ],
             'documento_final' => $documentoFinal === null ? null : [
                 'numero' => $documentoFinal->numero_documento,
+                ...($puedeDescargarDocumento ? [
+                    'url_descarga' => route('tramites.documento-final.descargar', [$tramite->id, $documentoFinal->id]),
+                ] : []),
             ],
             'documentos_recepcion' => $tramite->documentos()->orderBy('id')->get(['id', 'nombre_original', 'categoria', 'version', 'vigente'])
                 ->map(fn ($documento): array => [
@@ -162,7 +169,10 @@ class TramiteEstudianteController extends Controller
                 'fecha_entrega' => $entrega->fecha_entrega?->toIso8601String(),
                 'confirmado' => $entrega->confirmado,
             ],
-            'puede_confirmar_entrega' => $tramite->estado === 'listo_entrega' && $entrega !== null && ! $entrega->confirmado,
+            'puede_confirmar_entrega' => $tramite->estado === 'listo_entrega'
+                && $entrega !== null
+                && $entrega->estado === 'registrada'
+                && ! $entrega->confirmado,
             'informe_cierre' => $informeCierre === null ? null : [
                 'numero_paginas' => $informeCierre->numero_paginas,
                 'url_descarga' => route('tramites.informes-cierre.descargar', [$tramite->id, $informeCierre->id]),

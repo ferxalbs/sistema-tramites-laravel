@@ -42,7 +42,7 @@ type Props = {
         seccion: string | null;
         obligatoria: boolean;
     }>;
-    documento_final: { numero: string } | null;
+    documento_final: { numero: string; url_descarga?: string } | null;
     documentos_recepcion: Array<{
         id: number;
         nombre: string;
@@ -201,6 +201,19 @@ export default function EstudianteTramiteShow({
                                 Número {documento_final.numero}
                             </CardDescription>
                         </CardHeader>
+                        {documento_final.url_descarga && (
+                            <CardContent>
+                                <a
+                                    href={documento_final.url_descarga}
+                                    className={buttonVariants({
+                                        variant: 'outline',
+                                    })}
+                                >
+                                    <Download data-icon="inline-start" />{' '}
+                                    Descargar PDF
+                                </a>
+                            </CardContent>
+                        )}
                     </Card>
                 )}
 

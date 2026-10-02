@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\EmitTramiteFinalDocumentRequest;
 use App\Models\Tramite;
 use App\Models\TramiteDocumentoFinal;
+use App\Models\TramiteEntrega;
 use App\Models\TramiteEvento;
 use App\Models\TramiteRondaRevision;
 use App\Models\User;
@@ -172,7 +173,16 @@ class TramiteDocumentoFinalController extends Controller
             ->where('asignaciones.revisor_id', $actor->id)
             ->where('asignaciones.destino', 'docente')
             ->exists();
-        $authorized = $personal || $revisorAsignado;
+        $titularConEntrega = $actor->rol === 'estudiante'
+            && (int) $tramite->propietario_id === (int) $actor->id
+            && $vigente
+            && TramiteEntrega::query()
+                ->where('tramite_id', $tramite->id)
+                ->where('documento_final_id', $documento->id)
+                ->where('activa', true)
+                ->whereIn('estado', ['registrada', 'confirmada'])
+                ->exists();
+        $authorized = $personal || $revisorAsignado || $titularConEntrega;
 
         if (! $authorized) {
             TramiteEvento::query()->create([
