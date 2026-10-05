@@ -108,7 +108,8 @@ test('dashboard limits teacher metrics to assigned expedientes and shows staff t
         ->has('adminCharts.monthly', 1)
         ->has('adminCharts.types')
         ->has('adminCharts.load')
-        ->has('adminCharts.users'));
+        ->where('adminCharts.users', fn ($users): bool => ! collect($users)
+            ->contains(fn ($user): bool => str_contains($user['nombre'], 'asistente'))));
 });
 
 test('dashboard filters metrics and rejects unknown states', function () {

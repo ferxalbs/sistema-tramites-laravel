@@ -33,6 +33,10 @@ class SaveTramiteDraft
             throw ValidationException::withMessages(['plantilla_id' => 'La plantilla ya no está disponible.']);
         }
 
+        if (! TramiteTemplateEligibility::allows($tramite, $plantilla)) {
+            throw ValidationException::withMessages(['plantilla_id' => 'Esta plantilla no corresponde al tipo de trámite seleccionado.']);
+        }
+
         $preparar = (bool) $datos['preparar'];
         $destinatarios = $this->destinatarios($datos['destinatarios'] ?? []);
         $personas = $this->personasMencionadas($datos['personas_mencionadas'] ?? []);

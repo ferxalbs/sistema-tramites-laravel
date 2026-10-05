@@ -160,6 +160,7 @@ type Props = {
     modo: 'borrador' | 'corregir';
     tramite: TramiteSummary;
     hoy: string;
+    modelo_oficial_pendiente?: boolean;
     plantillas: Plantilla[];
     usuarios: StaffUser[];
     destinatarios_sugeridos: RecipientSuggestion[];
@@ -174,6 +175,7 @@ export default function TramiteBorrador({
     modo,
     tramite,
     hoy,
+    modelo_oficial_pendiente = false,
     plantillas,
     usuarios,
     destinatarios_sugeridos,
@@ -187,7 +189,9 @@ export default function TramiteBorrador({
         Record<number, string>
     >({});
     const form = useForm<DraftForm>({
-        plantilla_id: borrador?.plantilla_id ?? plantillas[0]?.id ?? 0,
+        plantilla_id:
+            borrador?.plantilla_id ??
+            (plantillas.length === 1 ? plantillas[0].id : 0),
         remitente_id: borrador?.remitente_id ?? usuarios[0]?.id ?? null,
         firmante_id: borrador?.firmante_id ?? usuarios[0]?.id ?? null,
         fecha_documento: borrador?.fecha_documento ?? hoy,
@@ -225,10 +229,9 @@ export default function TramiteBorrador({
         campos:
             borrador?.campos ??
             Object.fromEntries(
-                (plantillas[0]?.campos ?? []).map((campo) => [
-                    campo.clave,
-                    campo.predeterminado,
-                ]),
+                (plantillas.length === 1 ? plantillas[0].campos : []).map(
+                    (campo) => [campo.clave, campo.predeterminado],
+                ),
             ),
     });
 
@@ -456,6 +459,14 @@ export default function TramiteBorrador({
                                         ? 'La plantilla y su versión se conservan. Los cambios se guardarán como una versión nueva.'
                                         : 'El borrador se guarda como una nueva versión y no reserva numeración oficial.'}
                                 </CardDescription>
+                                {modelo_oficial_pendiente && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Este trámite aún no tiene un modelo
+                                        oficial aprobado. Puedes preparar un
+                                        borrador interno para revisión, pero la
+                                        emisión del PDF final está bloqueada.
+                                    </p>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 <FieldGroup className="grid gap-5 sm:grid-cols-2">
@@ -1275,7 +1286,8 @@ export default function TramiteBorrador({
                                         variant="outline"
                                         disabled={
                                             form.processing ||
-                                            plantillas.length === 0
+                                            plantillas.length === 0 ||
+                                            !form.data.plantilla_id
                                         }
                                     >
                                         {form.processing ? (
@@ -1289,7 +1301,8 @@ export default function TramiteBorrador({
                                         type="button"
                                         disabled={
                                             form.processing ||
-                                            plantillas.length === 0
+                                            plantillas.length === 0 ||
+                                            !form.data.plantilla_id
                                         }
                                         onClick={() => guardar(true)}
                                     >

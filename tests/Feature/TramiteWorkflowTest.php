@@ -52,6 +52,45 @@ test('unapproved institutional models cannot consume an official document number
     expect(TramiteNumeracionDocumental::query()->count())->toBe(0);
 });
 
+test('draft templates match the request and the titling model cannot be used for practice', function () {
+    $this->seed(TramitePlantillaSeeder::class);
+    $admin = User::factory()->create(['rol' => 'administrador']);
+    $practice = Tramite::factory()->create(['tipo_documento' => 'CONSTANCIA_PRACTICA']);
+    $titling = Tramite::factory()->create(['tipo_documento' => 'CONSTANCIA_MODALIDAD_TITULACION']);
+    $memo = Tramite::factory()->create(['tipo_documento' => 'MEMORANDO_SIMPLE']);
+    $titlingTemplate = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_MODALIDAD_TITULACION')->sole();
+    $memoTemplate = TramitePlantilla::query()->where('codigo', 'MEMORANDO_SIMPLE')->sole();
+
+    $this->actingAs($admin)->get(route('tramites.borradores.create', $practice))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('modelo_oficial_pendiente', true)
+            ->has('plantillas', 3)
+            ->missing('plantillas.3'));
+
+    $this->post(route('tramites.borradores.store', $practice), [
+        'plantilla_id' => $titlingTemplate->id,
+        'fecha_documento' => now()->toDateString(),
+        'lugar' => 'Lima',
+        'asunto' => 'Prácticas',
+        'preparar' => false,
+    ])->assertSessionHasErrors('plantilla_id');
+    expect($practice->borradores()->count())->toBe(0);
+
+    $this->get(route('tramites.borradores.create', $titling))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('modelo_oficial_pendiente', false)
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $titlingTemplate->id));
+
+    $this->get(route('tramites.borradores.create', $memo))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $memoTemplate->id));
+});
+
 test('administrators edit classifications while reception requires active codes', function () {
     $admin = User::factory()->create(['rol' => 'administrador']);
     $officeAdmin = User::factory()->create(['rol' => 'administrador']);
