@@ -393,6 +393,10 @@ function NuevaPlantillaCard({
 
 function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
     const [isVersionOpen, setIsVersionOpen] = useState(false);
+    const esReferencial = [
+        'JUSTIFICACION_TARDANZA_REFERENCIAL',
+        'CONSTANCIA_PRACTICA_REFERENCIAL',
+    ].includes(plantilla.codigo);
 
     return (
         <Card className="transition-all hover:border-foreground/20">
@@ -408,7 +412,11 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                         >
                             v{plantilla.version}
                         </Badge>
-                        {plantilla.activa ? (
+                        {esReferencial ? (
+                            <Badge variant="secondary" className="text-xs">
+                                Solo borrador
+                            </Badge>
+                        ) : plantilla.activa ? (
                             <Badge variant="default" className="text-xs">
                                 <Check data-icon="inline-start" />
                                 Activa
@@ -478,6 +486,7 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                         <Button
                             type="submit"
                             size="sm"
+                            disabled={esReferencial}
                             variant={plantilla.activa ? 'ghost' : 'secondary'}
                         >
                             {plantilla.activa ? (
@@ -496,12 +505,16 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                 </div>
 
                 <Collapsible
-                    open={isVersionOpen}
+                    open={esReferencial ? false : isVersionOpen}
                     onOpenChange={setIsVersionOpen}
                 >
                     <CollapsibleTrigger
                         render={
-                            <Button size="sm" variant="ghost">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={esReferencial}
+                            >
                                 <History data-icon="inline-start" />
                                 Nueva versión
                                 {isVersionOpen ? (
@@ -516,7 +529,10 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
             </CardFooter>
 
             {/* Sub-formulario desplegable para crear siguiente versión */}
-            <Collapsible open={isVersionOpen} onOpenChange={setIsVersionOpen}>
+            <Collapsible
+                open={esReferencial ? false : isVersionOpen}
+                onOpenChange={setIsVersionOpen}
+            >
                 <CollapsibleContent>
                     <div className="border-t border-border/60 bg-muted/20 p-4 sm:p-6">
                         <div className="mb-4 flex items-center justify-between">

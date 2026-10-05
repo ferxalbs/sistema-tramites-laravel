@@ -81,12 +81,11 @@ class TramiteBorradorController extends Controller
             'hoy' => now()->toDateString(),
             'modelo_oficial_pendiente' => in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true),
             'plantillas' => TramitePlantilla::query()
-                ->where('estado', 'publicada')
                 ->where('activa', true)
                 ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
                 ->orderBy('nombre')
-                ->get(['id', 'codigo', 'nombre', 'descripcion', 'tipo_documento_salida', 'modalidad'])
-                ->filter(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::allows($tramite, $plantilla))
+                ->get(['id', 'codigo', 'nombre', 'descripcion', 'tipo_documento_salida', 'modalidad', 'estado', 'activa'])
+                ->filter(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::availableForDraft($tramite, $plantilla))
                 ->values()
                 ->map(fn (TramitePlantilla $plantilla): array => [
                     'id' => $plantilla->id,

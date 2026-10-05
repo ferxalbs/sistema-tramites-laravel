@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TramitePlantilla;
+use App\Services\Tramites\TramiteTemplateEligibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,7 @@ class TramitePlantillaController extends Controller
         }
 
         $source = TramitePlantilla::query()->where('tipo_documento_salida', $formato)
+            ->where('estado', 'publicada')
             ->where('modalidad', $modalidad)->orderByDesc('activa')->orderByDesc('version')->first();
 
         if ($source === null) {
@@ -98,6 +100,10 @@ class TramitePlantillaController extends Controller
 
     public function version(Request $request, TramitePlantilla $plantilla): RedirectResponse
     {
+        if (TramiteTemplateEligibility::isReferentialTemplate($plantilla)) {
+            throw ValidationException::withMessages(['plantilla' => 'Este modelo referencial solo sirve para pruebas de borrador hasta contar con la versión institucional aprobada.']);
+        }
+
         $request->merge([
             'nombre' => trim((string) $request->input('nombre', '')),
             'descripcion' => trim((string) $request->input('descripcion', '')),
@@ -160,6 +166,10 @@ class TramitePlantillaController extends Controller
 
     public function state(Request $request, TramitePlantilla $plantilla): RedirectResponse
     {
+        if (TramiteTemplateEligibility::isReferentialTemplate($plantilla)) {
+            throw ValidationException::withMessages(['plantilla' => 'No se puede publicar ni desactivar este modelo referencial desde el catálogo.']);
+        }
+
         $data = $request->validate(['activa' => ['required', 'boolean']]);
         $activa = (bool) $data['activa'];
 

@@ -25,7 +25,6 @@ class SaveTramiteDraft
     {
         $plantilla = TramitePlantilla::query()
             ->whereKey($datos['plantilla_id'])
-            ->where('estado', 'publicada')
             ->where('activa', true)
             ->first();
 
@@ -33,7 +32,7 @@ class SaveTramiteDraft
             throw ValidationException::withMessages(['plantilla_id' => 'La plantilla ya no está disponible.']);
         }
 
-        if (! TramiteTemplateEligibility::allows($tramite, $plantilla)) {
+        if (! TramiteTemplateEligibility::availableForDraft($tramite, $plantilla)) {
             throw ValidationException::withMessages(['plantilla_id' => 'Esta plantilla no corresponde al tipo de trámite seleccionado.']);
         }
 
@@ -454,7 +453,7 @@ class SaveTramiteDraft
                 ]))),
                 $personas,
             )),
-            'DOCUMENTOS_ADJUNTOS' => implode('; ', array_map(static fn (array $adjunto): string => $adjunto['nombre']
+            'DOCUMENTOS_ADJUNTOS' => $adjuntos === [] ? 'Ninguno registrado' : implode('; ', array_map(static fn (array $adjunto): string => $adjunto['nombre']
                 .' — '.str_replace('_', ' ', $adjunto['categoria']).' · versión '.$adjunto['version'], $adjuntos)),
             'DATOS_ESTUDIANTE_OPCIONALES' => implode('; ', $academicos),
             'REMITENTE_NOMBRE' => (string) ($remitente->name ?? ''),

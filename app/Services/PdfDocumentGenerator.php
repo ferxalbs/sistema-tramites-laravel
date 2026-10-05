@@ -777,8 +777,11 @@ class PdfDocumentGenerator
         }
 
         foreach ($paginas as $indice => &$pagina) {
+            $codigoTexto = trim($codigo) === ''
+                ? 'Borrador sin numeración oficial'
+                : 'Código de verificación '.$codigo;
             $pagina[] = [
-                'text' => $expediente.' · Código de verificación '.$codigo.' · Página '.($indice + 1).' de '.count($paginas),
+                'text' => $expediente.' · '.$codigoTexto.' · Página '.($indice + 1).' de '.count($paginas),
                 'size' => 7,
                 'bold' => false,
                 'y' => 38.0,

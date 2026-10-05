@@ -56,17 +56,33 @@ test('draft templates match the request and the titling model cannot be used for
     $this->seed(TramitePlantillaSeeder::class);
     $admin = User::factory()->create(['rol' => 'administrador']);
     $practice = Tramite::factory()->create(['tipo_documento' => 'CONSTANCIA_PRACTICA']);
+    $tardiness = Tramite::factory()->create(['tipo_documento' => 'JUSTIFICACION_TARDANZA']);
     $titling = Tramite::factory()->create(['tipo_documento' => 'CONSTANCIA_MODALIDAD_TITULACION']);
     $memo = Tramite::factory()->create(['tipo_documento' => 'MEMORANDO_SIMPLE']);
     $titlingTemplate = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_MODALIDAD_TITULACION')->sole();
     $memoTemplate = TramitePlantilla::query()->where('codigo', 'MEMORANDO_SIMPLE')->sole();
+    $practiceTemplate = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_PRACTICA_REFERENCIAL')->sole();
+    $tardinessTemplate = TramitePlantilla::query()->where('codigo', 'JUSTIFICACION_TARDANZA_REFERENCIAL')->sole();
 
     $this->actingAs($admin)->get(route('tramites.borradores.create', $practice))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('modelo_oficial_pendiente', true)
-            ->has('plantillas', 3)
-            ->missing('plantillas.3'));
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $practiceTemplate->id));
+
+    $this->get(route('tramites.borradores.create', $tardiness))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('modelo_oficial_pendiente', true)
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $tardinessTemplate->id));
+
+    $this->patch(route('admin.templates.state', $practiceTemplate), ['activa' => false])
+        ->assertSessionHasErrors('plantilla');
+    $this->post(route('admin.templates.version', $practiceTemplate), ['publicar' => true])
+        ->assertSessionHasErrors('plantilla');
+    expect($practiceTemplate->fresh()->estado)->toBe('borrador');
 
     $this->post(route('tramites.borradores.store', $practice), [
         'plantilla_id' => $titlingTemplate->id,
@@ -76,6 +92,28 @@ test('draft templates match the request and the titling model cannot be used for
         'preparar' => false,
     ])->assertSessionHasErrors('plantilla_id');
     expect($practice->borradores()->count())->toBe(0);
+
+    $this->post(route('tramites.borradores.store', $practice), [
+        'plantilla_id' => $practiceTemplate->id,
+        'fecha_documento' => now()->toDateString(),
+        'lugar' => 'Lima',
+        'asunto' => 'Prácticas',
+        'contenido_principal' => 'Texto de evaluación para revisar en la oficina.',
+        'campos' => [
+            'CENTRO_PRACTICAS' => 'Centro de prueba',
+            'MODULO_PRACTICAS' => 'Módulo I',
+            'PERIODO_INICIO' => '2026-09-01',
+            'PERIODO_FIN' => '2026-09-30',
+            'HORAS_PRACTICAS' => '120',
+        ],
+        'preparar' => false,
+    ])->assertSessionHasNoErrors();
+
+    $draft = $practice->borradores()->sole();
+    expect($draft->contenido_renderizado)->toContain('MODELO REFERENCIAL', 'Centro de prueba', '120')
+        ->and(TramiteNumeracionDocumental::query()->count())->toBe(0);
+    $this->get(route('tramites.borradores.pdf', [$practice, $draft]))
+        ->assertOk()->assertHeader('Content-Type', 'application/pdf');
 
     $this->get(route('tramites.borradores.create', $titling))
         ->assertOk()

@@ -461,10 +461,11 @@ export default function TramiteBorrador({
                                 </CardDescription>
                                 {modelo_oficial_pendiente && (
                                     <p className="text-sm text-muted-foreground">
-                                        Este trámite aún no tiene un modelo
-                                        oficial aprobado. Puedes preparar un
-                                        borrador interno para revisión, pero la
-                                        emisión del PDF final está bloqueada.
+                                        Este trámite usa un modelo referencial
+                                        para preparar y revisar el borrador. La
+                                        vista previa PDF indica «NO OFICIAL»; la
+                                        emisión final espera el modelo aprobado
+                                        por el instituto.
                                     </p>
                                 )}
                             </CardHeader>
@@ -472,7 +473,11 @@ export default function TramiteBorrador({
                                 <FieldGroup className="grid gap-5 sm:grid-cols-2">
                                     <FormSelect
                                         id="plantilla_id"
-                                        label="Plantilla publicada"
+                                        label={
+                                            modelo_oficial_pendiente
+                                                ? 'Modelo referencial'
+                                                : 'Plantilla publicada'
+                                        }
                                         value={form.data.plantilla_id}
                                         options={plantillas.map(
                                             (plantilla) => ({

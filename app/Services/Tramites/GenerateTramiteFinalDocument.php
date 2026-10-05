@@ -188,8 +188,14 @@ class GenerateTramiteFinalDocument
             hash('sha256', $firmaImagen ?? ''),
             false,
         );
+        $contenido = (string) ($snapshot['contenido_renderizado'] ?? '');
+        if (in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true)
+            && ! str_starts_with($contenido, 'MODELO REFERENCIAL')) {
+            $contenido = "MODELO REFERENCIAL — NO OFICIAL\n\n".$contenido;
+        }
         $pdf = $this->pdfDocumentGenerator->generate([
             ...$snapshot,
+            'contenido_renderizado' => $contenido,
             'firma_imagen' => $firmaImagen,
         ]);
 
