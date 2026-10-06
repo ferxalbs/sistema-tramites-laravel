@@ -3724,6 +3724,17 @@ test('public document verification normalizes valid codes and exposes only appro
 });
 
 test('public document verification returns a neutral result for malformed and unknown codes', function () {
+    $this->actingAs(User::factory()->create(['rol' => 'administrador']))
+        ->get(route('documentos.verificar'))
+        ->assertOk()
+        ->assertCookieMissing(config('session.cookie'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('documentos/verificacion-publica')
+            ->where('auth.user', null)
+            ->where('notificationUnreadCount', 0)
+            ->where('codigo', '')
+            ->where('resultado', null));
+
     foreach (['FFFF-FFFF-FFFF-FFFF', '<script>alert(1)</script>'] as $codigo) {
         $this->get(route('documentos.verificar', ['codigo' => $codigo]))
             ->assertOk()

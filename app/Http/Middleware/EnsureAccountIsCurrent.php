@@ -17,6 +17,13 @@ class EnsureAccountIsCurrent
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Verification is stateless, including when a remember cookie is present.
+        if ($request->routeIs('documentos.verificar')) {
+            $request->setUserResolver(static fn () => null);
+
+            return $next($request);
+        }
+
         $user = $request->user();
 
         if ($user instanceof User) {
