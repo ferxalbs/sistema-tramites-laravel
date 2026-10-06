@@ -1,6 +1,5 @@
-import { Head } from '@inertiajs/react';
+import { Head, setLayoutProps } from '@inertiajs/react';
 import { Download } from 'lucide-react';
-import type { ReactElement } from 'react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +12,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
 
 type Props = {
     tramite: { id: number; codigo: string };
@@ -32,6 +30,22 @@ type Props = {
 };
 
 export default function BorradorPreview({ tramite, borrador }: Props) {
+    setLayoutProps({
+        breadcrumbs: [
+            {
+                title: 'Expediente',
+                href: TramiteController.show({ tramite: tramite.id }),
+            },
+            {
+                title: `Vista previa (v${borrador.version})`,
+                href: TramiteBorradorController.show.url({
+                    tramite: tramite.id,
+                    borrador: borrador.id,
+                }),
+            },
+        ],
+    });
+
     return (
         <>
             <Head title={`Borrador v${borrador.version} · ${tramite.codigo}`} />
@@ -114,25 +128,3 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
         </>
     );
 }
-
-BorradorPreview.layout = (page: ReactElement<Props>) => (
-    <AppLayout
-        breadcrumbs={[
-            {
-                title: 'Expediente',
-                href: TramiteController.show({
-                    tramite: page.props.tramite.id,
-                }),
-            },
-            {
-                title: `Vista previa (v${page.props.borrador.version})`,
-                href: TramiteBorradorController.show.url({
-                    tramite: page.props.tramite.id,
-                    borrador: page.props.borrador.id,
-                }),
-            },
-        ]}
-    >
-        {page}
-    </AppLayout>
-);
