@@ -177,10 +177,17 @@ class GenerateTramiteFinalDocument
         $firmaImagen = Storage::disk('local')->exists($rutaFirma)
             ? Storage::disk('local')->get($rutaFirma)
             : null;
+        $ronda = TramiteRondaRevision::query()
+            ->where('tramite_id', $tramite->id)
+            ->where('borrador_id', $borrador->id)
+            ->whereIn('estado', ['aprobado', 'rechazado'])
+            ->where('activa', false)
+            ->orderByDesc('numero_ronda')
+            ->first();
         $snapshot = $this->crearSnapshot(
             $tramite,
             $borrador,
-            null,
+            $ronda,
             $remitente,
             $firmante,
             'VISTA PREVIA (SIN NUMERAR)',
@@ -537,7 +544,7 @@ class GenerateTramiteFinalDocument
             'personas_titulo' => str_contains(mb_strtolower($borrador->asunto), 'ingres')
                 ? 'Las personas que ingresarán son:'
                 : 'Personas relacionadas:',
-            'es_vista_previa' => $ronda === null,
+            'es_vista_previa' => $codigoVerificacion === '',
         ];
     }
 

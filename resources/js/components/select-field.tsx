@@ -86,9 +86,3 @@ export default function SelectField({
         </Field>
     );
 }
-
-TramiteCreate.layout = {
-    breadcrumbs: [
-        { title: 'Bandeja de trámites', href: TramiteController.index() },
-    ],
-};

@@ -2460,9 +2460,15 @@ function createApprovedTramiteForNumberingTest(string $tipoDocumentoSalida = 'in
     return [$officeAdmin, $tramite];
 }
 
-test('memorandum preview and emission retain saved staff names and positions', function () {
+test('memorandum preview and emission retain saved staff names and positions', function (string $decision) {
     [$admin, $tramite] = createApprovedTramiteForNumberingTest('memorando', 'simple');
     $borrador = $tramite->borradores()->sole();
+    $tramite->update(['estado' => $decision]);
+    TramiteRondaRevision::query()->where('borrador_id', $borrador->id)->sole()->update([
+        'estado' => $decision,
+        'conclusion' => str_repeat('Fundamento ficticio detallado para comprobar la paginacion del rechazo. ', 32),
+        'comentario_publico' => 'Documento rechazado con fundamento publico de prueba.',
+    ]);
 
     foreach ([
         'REMITENTE_NOMBRE' => 'Remitente original',
@@ -2501,9 +2507,16 @@ test('memorandum preview and emission retain saved staff names and positions', f
         expect(str_contains($bytes, 'Firmante original'))->toBeTrue();
         expect(str_contains($bytes, 'Cargo original del firmante'))->toBeTrue();
         expect(str_contains($bytes, 'Firmante cambiado'))->toBeFalse();
+        if ($decision === 'rechazado') {
+            expect(str_contains($bytes, 'Fundamento ficticio detallado'))->toBeTrue();
+            expect(str_contains($bytes, 'Documento rechazado con fundamento publico de prueba.'))->toBeTrue();
+        }
     }
     expect($documento->numero_paginas)->toBe($preview['paginas']);
-});
+    if ($decision === 'rechazado') {
+        expect($preview['paginas'])->toBeGreaterThan(1);
+    }
+})->with(['aprobado', 'rechazado']);
 
 test('simple and multiple memorandum series keep distinct configured numbers', function () {
     [$simpleAssistant, $simpleTramite] = createApprovedTramiteForNumberingTest('memorando', 'simple');
@@ -3500,7 +3513,7 @@ test('official PDF draws a QR for the configured public verification URL and omi
 });
 
 test('memorandum layout follows the canonical output type when its template is renamed', function () {
-    $multiple = app(PdfDocumentGenerator::class)->generate([
+    $multipleDocument = [
         'institucion' => 'Instituto Seoane',
         'tipo_documento' => 'Autorización de ingreso',
         'tipo_documento_salida' => 'memorando',
@@ -3516,6 +3529,13 @@ test('memorandum layout follows the canonical output type when its template is r
         'personas' => [],
         'firmante' => 'Dirección académica',
         'codigo_verificacion' => '',
+    ];
+    $multiple = app(PdfDocumentGenerator::class)->generate($multipleDocument);
+    $rejected = app(PdfDocumentGenerator::class)->generate([
+        ...$multipleDocument,
+        'decision' => 'rechazado',
+        'conclusion' => 'Falta una evidencia requerida de prueba.',
+        'comentario_publico' => 'Su documento fue rechazado en esta prueba.',
     ]);
     $simple = app(PdfDocumentGenerator::class)->generate([
         'institucion' => 'Instituto Seoane',
@@ -3562,6 +3582,10 @@ test('memorandum layout follows the canonical output type when its template is r
     $titulo = (string) iconv('UTF-8', 'Windows-1252//TRANSLIT', 'MEMORANDO MÚLTIPLE');
     $tituloSimple = 'MEMORANDUM';
 
+    expect($rejected['bytes'])->toContain('Rechazado')
+        ->toContain('Falta una evidencia requerida de prueba.')
+        ->toContain('Su documento fue rechazado en esta prueba.');
+    expect($multiple['bytes'])->not->toContain('Rechazado');
     expect($multiple['bytes'])->toContain($titulo)
         ->toContain('INSTITUTO DE EDUCACI');
     expect(strpos($multiple['bytes'], '(De)'))->toBeLessThan(strpos($multiple['bytes'], '(A)'));

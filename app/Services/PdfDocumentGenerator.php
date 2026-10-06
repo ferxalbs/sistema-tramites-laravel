@@ -275,6 +275,21 @@ class PdfDocumentGenerator
             }
         }
 
+        if (($documento['decision'] ?? null) === 'rechazado') {
+            foreach ([
+                'Resultado de la evaluación' => 'Rechazado',
+                'Fundamento' => $documento['conclusion'] ?? null,
+                'Comunicación al interesado' => $documento['comentario_publico'] ?? null,
+            ] as $etiqueta => $contenido) {
+                if (filled($contenido)) {
+                    $this->agregarMemoTexto($items, $etiqueta, $tamanoCuerpo, true, false, 4, 495, false, $altoCuerpo);
+                    foreach ($this->separarTexto((string) $contenido) as $parrafo) {
+                        $this->agregarMemoTexto($items, $parrafo, $tamanoCuerpo, false, false, 8, 495, false, $altoCuerpo);
+                    }
+                }
+            }
+        }
+
         $personasDetalle = is_array($documento['personas_detalle'] ?? null)
             ? $documento['personas_detalle']
             : [];

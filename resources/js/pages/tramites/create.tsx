@@ -1488,3 +1488,9 @@ function Field({
         </ShadcnField>
     );
 }
+
+TramiteCreate.layout = {
+    breadcrumbs: [
+        { title: 'Bandeja de trámites', href: TramiteController.index() },
+    ],
+};
