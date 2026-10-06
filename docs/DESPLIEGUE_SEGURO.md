@@ -19,3 +19,12 @@
 ## Estado al 2 de octubre de 2026
 
 La configuración del volumen, sus respaldos, el respaldo de Turso y la prueba de conservación entre dos despliegues **siguen pendientes** porque esta sesión solo tiene acceso al repositorio GitHub. El código y la prueba local de fallo de migración están listos, pero subir el commit no constituye una verificación de persistencia en Railway.
+
+## Verificación del 6 de octubre de 2026
+
+- Se obtuvo un respaldo privado de Turso antes del montaje y se restauró en una base SQLite desechable: `integrity_check` correcto, cero infracciones en `foreign_key_check`, 102 tablas y 49 migraciones. La copia queda fuera del repositorio, con permisos locales 0600.
+- La inspección anterior al montaje encontró cero expedientes y cero archivos privados documentales; no se ocultaron PDF, firmas ni evidencias históricas existentes.
+- Se adjuntó `sistema-tramites-laravel-volume` a `/app/storage/app/private`. `findmnt` confirmó el montaje ext4 en esa ruta. `storage:verify-persistence --write` escribió y leyó el marcador; aún debe cotejarse tras el siguiente despliegue.
+- `migrate:status` mostró ejecutadas las migraciones actuales. El dominio publicado permitió acceder, con la sesión autorizada, a Notificaciones y Bandeja de trámites.
+- Railway mostró que crear respaldos automáticos y PITR requiere el plan Pro. No se modificó el plan. El respaldo manual de la base no reemplaza una política de copias de los archivos privados del volumen.
+- Permanecen pendientes la conservación entre despliegues, las descargas de archivos creados antes de ellos y el recorrido completo del documento publicado y su QR.

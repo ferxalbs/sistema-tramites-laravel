@@ -1,6 +1,15 @@
 # Changelog
 
-Registro de cambios del Sistema de Trámites. Actualizado el **5 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
+Registro de cambios del Sistema de Trámites. Actualizado el **6 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
+
+## 2026-10-06 — Validación del preset y almacenamiento publicado
+
+- Se conservaron los cambios de los commits `4cc2f94` y `03ee98d` en `main`. El preset nuevo había retirado la compatibilidad de `Button render` con enlaces y añadido imports CSS duplicados; se restauró la compatibilidad y se corrigió el formato de sus archivos. Se conservaron sus fuentes y su diseño.
+- La vista previa usa `setLayoutProps` de Inertia 3 para sus breadcrumbs. La función anterior de layout dejaba la página en blanco aunque TypeScript pasara; Chrome confirmó ahora el PDF privado, su advertencia provisional y la navegación del expediente sin errores de consola.
+- `pnpm run check` pasó: 120 archivos con formato correcto y 103 archivos sin avisos de lint. `pnpm run types:check` y el build con PHP 8.5 en PATH pasaron. La suite local ejecutada en esta sesión terminó con 171 aprobadas, 6 remotas omitidas y 3210 aserciones. Las omitidas no certifican Turso remoto.
+- Antes de montar el volumen se respaldó Turso y se restauró la copia en SQLite desechable: 102 tablas, 49 migraciones, integridad correcta y cero violaciones de claves foráneas. El respaldo privado permanece fuera de Git. No había expedientes ni archivos privados documentales en el contenedor inspeccionado.
+- Railway tiene un volumen montado en `/app/storage/app/private`; la consola confirmó el montaje ext4 y lectura/escritura mediante un marcador privado. La comprobación de conservación entre despliegues y el recorrido documental publicado siguen pendientes hasta registrar sus resultados.
+- Se verificó en el dominio publicado el acceso autenticado a Notificaciones y Bandeja de trámites. Esto no acredita todavía emisión, descarga, QR ni cierre en producción. Los respaldos automáticos del volumen están restringidos al plan Pro mostrado por Railway; no se cambió el plan.
 
 ## Estado actual — auditoría del 2026-10-05
 
@@ -150,7 +159,7 @@ Estos cambios están en los commits posteriores a `8c44879` y anteriores a `339e
 - **Interfaz:** ajustes de componentes Base UI/shadcn, menús, páginas de autenticación y organización de los paneles.
 - El detalle de alcance, evidencias y limitaciones de estas etapas está en [docs/MIGRACION_PARIDAD.md](docs/MIGRACION_PARIDAD.md).
 
-## Pendientes actualizados al 2026-10-05
+## Pendientes actualizados al 2026-10-06
 
 ### Funcionamiento publicado y datos reales
 
@@ -174,7 +183,7 @@ Estos cambios están en los commits posteriores a `8c44879` y anteriores a `339e
 
 - [x] Unificar el identificador docente con el DNI en altas, ediciones y perfiles existentes mediante la migración local del 2 de octubre. Falta aplicar esa migración en el entorno publicado.
 - [ ] Completar la maquetación comparativa de los PDF frente a los Word institucionales. Los encabezados exactos ya están identificados por hash y la estructura de Memorando está cubierta por pruebas locales, pero la equivalencia visual completa y la identidad tipográfica no están certificadas.
-- [ ] Hacer que la emisión de la constancia de titulación consuma el cuerpo completo de `contenido_renderizado` y ampliar el snapshot para conservarlo; actualmente solo se conserva su hash y el PDF final puede perder ese cuerpo.
+- [x] Hacer que la emisión de la constancia de titulación consuma el cuerpo completo de `contenido_renderizado` y conservarlo en la instantánea. El PDF del egresado ficticio se comprobó localmente; la fidelidad visual con la fotografía y el recorrido publicado siguen pendientes.
 - [ ] Revisar las diferencias de presentación de plantillas respecto del sistema de origen: el renderizado conserva texto escapado, pero no toda su presentación HTML limitada. No reconstruir versiones antiguas sin instantánea a partir de datos actuales.
 - [ ] Implementar y validar la lógica institucional que todavía no existe para destinatario de primera hora de tardanzas, inasistencias a todos los docentes correspondientes y revisión de viabilidad, aforo, supervisor, aprobación y constancia de prácticas.
 - [ ] Clasificar los avisos de pruebas y los diagnósticos históricos de PHPStan/React Doctor que permanecen en páginas y servicios grandes. La última verificación de TypeScript pasó.
