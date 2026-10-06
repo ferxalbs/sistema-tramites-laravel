@@ -56,7 +56,9 @@ export default function Notificaciones({ notifications, filters }: Props) {
                             <Button
                                 type="submit"
                                 variant="outline"
-                                disabled={processing || notifications.total === 0}
+                                disabled={
+                                    processing || notifications.total === 0
+                                }
                                 className="w-full sm:w-auto"
                             >
                                 <CheckCheck className="mr-2 h-4 w-4" />
@@ -142,7 +144,7 @@ export default function Notificaciones({ notifications, filters }: Props) {
                 {/* Notifications List */}
                 <div className="flex flex-col gap-4">
                     {notifications.data.length === 0 ? (
-                        <div className="flex min-h-[380px] select-none flex-col items-center justify-center rounded-xl border border-dashed bg-card/40 p-8 text-center">
+                        <div className="flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed bg-card/40 p-8 text-center select-none">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                                 <Inbox className="h-8 w-8 text-muted-foreground" />
                             </div>
