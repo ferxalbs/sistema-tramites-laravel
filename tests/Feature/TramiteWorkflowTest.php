@@ -52,6 +52,87 @@ test('unapproved institutional models cannot consume an official document number
     expect(TramiteNumeracionDocumental::query()->count())->toBe(0);
 });
 
+test('draft templates match the request and the titling model cannot be used for practice', function () {
+    $this->seed(TramitePlantillaSeeder::class);
+    $admin = User::factory()->create(['rol' => 'administrador']);
+    $practice = Tramite::factory()->create(['tipo_documento' => 'CONSTANCIA_PRACTICA']);
+    $tardiness = Tramite::factory()->create(['tipo_documento' => 'JUSTIFICACION_TARDANZA']);
+    $titling = Tramite::factory()->create(['tipo_documento' => 'CONSTANCIA_MODALIDAD_TITULACION']);
+    $memo = Tramite::factory()->create([
+        'tipo_documento' => 'MEMORANDO_SIMPLE',
+        'formato_salida' => 'memorando',
+        'modalidad_documento' => 'simple',
+    ]);
+    $titlingTemplate = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_MODALIDAD_TITULACION')->sole();
+    $memoTemplate = TramitePlantilla::query()->where('codigo', 'MEMORANDO_SIMPLE')->sole();
+    $practiceTemplate = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_PRACTICA_REFERENCIAL')->sole();
+    $tardinessTemplate = TramitePlantilla::query()->where('codigo', 'JUSTIFICACION_TARDANZA_REFERENCIAL')->sole();
+
+    $this->actingAs($admin)->get(route('tramites.borradores.create', $practice))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('modelo_oficial_pendiente', true)
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $practiceTemplate->id));
+
+    $this->get(route('tramites.borradores.create', $tardiness))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('modelo_oficial_pendiente', true)
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $tardinessTemplate->id));
+
+    $this->patch(route('admin.templates.state', $practiceTemplate), ['activa' => false])
+        ->assertSessionHasErrors('plantilla');
+    $this->post(route('admin.templates.version', $practiceTemplate), ['publicar' => true])
+        ->assertSessionHasErrors('plantilla');
+    expect($practiceTemplate->fresh()->estado)->toBe('borrador');
+
+    $this->post(route('tramites.borradores.store', $practice), [
+        'plantilla_id' => $titlingTemplate->id,
+        'fecha_documento' => now()->toDateString(),
+        'lugar' => 'Lima',
+        'asunto' => 'Prácticas',
+        'preparar' => false,
+    ])->assertSessionHasErrors('plantilla_id');
+    expect($practice->borradores()->count())->toBe(0);
+
+    $this->post(route('tramites.borradores.store', $practice), [
+        'plantilla_id' => $practiceTemplate->id,
+        'fecha_documento' => now()->toDateString(),
+        'lugar' => 'Lima',
+        'asunto' => 'Prácticas',
+        'contenido_principal' => 'Texto de evaluación para revisar en la oficina.',
+        'campos' => [
+            'CENTRO_PRACTICAS' => 'Centro de prueba',
+            'MODULO_PRACTICAS' => 'Módulo I',
+            'PERIODO_INICIO' => '2026-09-01',
+            'PERIODO_FIN' => '2026-09-30',
+            'HORAS_PRACTICAS' => '120',
+        ],
+        'preparar' => false,
+    ])->assertSessionHasNoErrors();
+
+    $draft = $practice->borradores()->sole();
+    expect($draft->contenido_renderizado)->toContain('MODELO REFERENCIAL', 'Centro de prueba', '120')
+        ->and(TramiteNumeracionDocumental::query()->count())->toBe(0);
+    $this->get(route('tramites.borradores.pdf', [$practice, $draft]))
+        ->assertOk()->assertHeader('Content-Type', 'application/pdf');
+
+    $this->get(route('tramites.borradores.create', $titling))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('modelo_oficial_pendiente', false)
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $titlingTemplate->id));
+
+    $this->get(route('tramites.borradores.create', $memo))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('plantillas', 1)
+            ->where('plantillas.0.id', $memoTemplate->id));
+});
+
 test('administrators edit classifications while reception requires active codes', function () {
     $admin = User::factory()->create(['rol' => 'administrador']);
     $officeAdmin = User::factory()->create(['rol' => 'administrador']);
@@ -233,7 +314,10 @@ test('institutional reports and memorandums register without a request applicant
             ->and($tramite->formato_salida)->toBe($formato)
             ->and($tramite->modalidad_documento)->toBe($modalidad)
             ->and($tramite->estado)->toBe('digitalizado');
-        $compatible = TramitePlantilla::query()->where('tipo_documento_salida', $formato)->where('modalidad', $modalidad)->sole();
+        $compatible = TramitePlantilla::query()->where('tipo_documento_salida', $formato)
+            ->where('modalidad', $modalidad)
+            ->where('estado', 'publicada')
+            ->sole();
         $compatible->update(['nombre' => 'Modelo institucional renombrado '.$tipo]);
         $this->get(route('tramites.borradores.create', $tramite))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->has('plantillas', 1)->where('plantillas.0.id', $compatible->id));
@@ -4002,7 +4086,7 @@ test('office administrator registers multiple independent documents in one physi
     expect(Tramite::query()->where('asunto', 'Ingreso físico con anexos')->where('estado', 'recibido_oficina')->count())->toBe(1);
 });
 
-test('physical reception requires confirmation and preserves arrival and provenance details', function () {
+test('physical reception requires confirmation and preserves document dates', function () {
     $officeAdmin = User::factory()->create(['rol' => 'administrador']);
     $student = User::factory()->create(['rol' => 'estudiante', 'dni' => '90000009']);
     $programa = ProgramaEstudio::factory()->create();
@@ -4021,17 +4105,12 @@ test('physical reception requires confirmation and preserves arrival and provena
         'prioridad' => 'alta',
         'fecha_llegada_oficina' => '2026-09-28T16:45',
         'fecha_presentacion_original' => '2026-09-27',
-        'numero_expediente_externo' => 'EXT-2026/42 #B',
-        'area_procedencia' => 'Coordinación Académica',
-        'persona_entrega_documento' => 'Apoderada de prueba',
         'observacion_recepcion' => 'Se cotejó el documento físico.',
         'folios' => 8,
     ];
 
     $this->actingAs($officeAdmin)->post(route('tramites.store'), $payload)->assertSessionHasErrors('confirmar_recepcion');
     $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '0'])->assertSessionHasErrors('confirmar_recepcion');
-    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'numero_expediente_externo' => 'EXT@42'])
-        ->assertSessionHasErrors('numero_expediente_externo');
     $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'fecha_llegada_oficina' => '2026-02-31T16:45'])
         ->assertSessionHasErrors('fecha_llegada_oficina');
     $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1', 'folios' => 5001])
@@ -4040,15 +4119,21 @@ test('physical reception requires confirmation and preserves arrival and provena
         ->assertSessionHasErrors('descripcion');
     expect(Tramite::query()->where('asunto', $payload['asunto'])->count())->toBe(0);
 
-    $this->post(route('tramites.store'), [...$payload, 'confirmar_recepcion' => '1'])->assertRedirect();
+    $this->post(route('tramites.store'), [
+        ...$payload,
+        'confirmar_recepcion' => '1',
+        'numero_expediente_externo' => 'Dato de un cliente anterior',
+        'area_procedencia' => 'Dato de un cliente anterior',
+        'persona_entrega_documento' => 'Dato de un cliente anterior',
+    ])->assertRedirect();
     $tramite = Tramite::query()->where('asunto', $payload['asunto'])->sole();
     expect($tramite->fecha_recepcion->toDateString())->toBe('2026-09-28')
         ->and($tramite->programa_estudio_id)->toBe($programa->id)
         ->and($tramite->fecha_llegada_oficina->format('Y-m-d H:i'))->toBe('2026-09-28 16:45')
         ->and($tramite->fecha_presentacion_original->toDateString())->toBe('2026-09-27')
-        ->and($tramite->numero_expediente_externo)->toBe('EXT-2026/42 #B')
-        ->and($tramite->area_procedencia)->toBe('Coordinación Académica')
-        ->and($tramite->persona_entrega_documento)->toBe('Apoderada de prueba')
+        ->and($tramite->numero_expediente_externo)->toBeNull()
+        ->and($tramite->area_procedencia)->toBeNull()
+        ->and($tramite->persona_entrega_documento)->toBeNull()
         ->and($tramite->observacion_recepcion)->toBe('Se cotejó el documento físico.')
         ->and($tramite->prioridad)->toBe('alta');
     $perfil->update(['programa_estudio_id' => $otroPrograma->id]);
@@ -4057,12 +4142,14 @@ test('physical reception requires confirmation and preserves arrival and provena
         ->assertInertia(fn (Assert $page) => $page
             ->where('tramite.fecha_llegada_oficina', '2026-09-28 16:45')
             ->where('tramite.programa', $programa->nombre)
-            ->where('tramite.numero_expediente_externo', 'EXT-2026/42 #B')
+            ->missing('tramite.numero_expediente_externo')
+            ->missing('tramite.area_procedencia')
+            ->missing('tramite.persona_entrega_documento')
             ->where('tramite.observacion_recepcion', 'Se cotejó el documento físico.')
             ->etc());
-    $this->get(route('tramites.index', ['q' => 'EXT-2026/42']))->assertOk()
+    $this->get(route('tramites.index', ['q' => 'Ingreso físico confirmado']))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('tramites.data.0.id', $tramite->id)->etc());
-    $this->get(route('search.index', ['q' => 'EXT-2026/42']))->assertOk()
+    $this->get(route('search.index', ['q' => 'Ingreso físico confirmado']))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('results.expedientes.0.id', $tramite->id)->etc());
 
     $administrativePayload = [
@@ -4180,9 +4267,6 @@ test('office administrator edits reception data before assignment with validatio
         'prioridad' => 'urgente',
         'fecha_llegada_oficina' => '2026-09-29T11:30',
         'fecha_presentacion_original' => '2026-09-28',
-        'numero_expediente_externo' => 'EXP-2026/29 #A',
-        'area_procedencia' => 'Dirección Académica',
-        'persona_entrega_documento' => 'Representante autorizado',
         'observacion_recepcion' => 'Documento original visto en oficina.',
         'folios' => 4,
     ];
@@ -4224,9 +4308,6 @@ test('office administrator edits reception data before assignment with validatio
         ->and($actualizado->fecha_recepcion->toDateString())->toBe('2026-09-29')
         ->and($actualizado->fecha_llegada_oficina->format('Y-m-d H:i'))->toBe('2026-09-29 11:30')
         ->and($actualizado->fecha_presentacion_original->toDateString())->toBe('2026-09-28')
-        ->and($actualizado->numero_expediente_externo)->toBe('EXP-2026/29 #A')
-        ->and($actualizado->area_procedencia)->toBe('Dirección Académica')
-        ->and($actualizado->persona_entrega_documento)->toBe('Representante autorizado')
         ->and($actualizado->observacion_recepcion)->toBe('Documento original visto en oficina.');
     $evento = $tramite->eventos()->where('accion', 'edicion_recepcion')->sole();
     expect($evento->usuario_id)->toBe($officeAdmin->id)

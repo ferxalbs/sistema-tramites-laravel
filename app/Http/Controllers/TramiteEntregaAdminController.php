@@ -38,8 +38,8 @@ class TramiteEntregaAdminController extends Controller
                 ->whereIn('codigo', TramiteMedioEntrega::CODIGOS_DISPONIBLES)
                 ->orderBy('id')
                 ->get([
-                'id', 'codigo', 'nombre', 'tipo', 'requiere_evidencia',
-            ]),
+                    'id', 'codigo', 'nombre', 'tipo', 'requiere_evidencia',
+                ]),
         ]);
     }
 
@@ -80,5 +80,4 @@ class TramiteEntregaAdminController extends Controller
 
         return to_route('admin.deliveries.index')->with('success', 'Medio de entrega actualizado.');
     }
-
 }

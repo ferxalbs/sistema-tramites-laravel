@@ -104,9 +104,6 @@ type Props = {
         prioridad: string;
         fecha_llegada_oficina: string;
         fecha_presentacion_original: string | null;
-        numero_expediente_externo: string | null;
-        area_procedencia: string | null;
-        persona_entrega_documento: string | null;
         observacion_recepcion: string | null;
         folios: number | null;
         personas_relacionadas: Array<{
@@ -926,55 +923,6 @@ export default function TramiteCreate({
                                                     tramite?.fecha_presentacion_original ??
                                                     ''
                                                 }
-                                            />
-                                        </Field>
-                                        <Field
-                                            id="numero_expediente_externo"
-                                            label="Referencia física externa"
-                                            error={
-                                                errors.numero_expediente_externo
-                                            }
-                                        >
-                                            <Input
-                                                id="numero_expediente_externo"
-                                                name="numero_expediente_externo"
-                                                defaultValue={
-                                                    tramite?.numero_expediente_externo ??
-                                                    ''
-                                                }
-                                                maxLength={80}
-                                            />
-                                        </Field>
-                                        <Field
-                                            id="area_procedencia"
-                                            label="Área de procedencia"
-                                            error={errors.area_procedencia}
-                                        >
-                                            <Input
-                                                id="area_procedencia"
-                                                name="area_procedencia"
-                                                defaultValue={
-                                                    tramite?.area_procedencia ??
-                                                    ''
-                                                }
-                                                maxLength={160}
-                                            />
-                                        </Field>
-                                        <Field
-                                            id="persona_entrega_documento"
-                                            label="Persona que entrega el documento"
-                                            error={
-                                                errors.persona_entrega_documento
-                                            }
-                                        >
-                                            <Input
-                                                id="persona_entrega_documento"
-                                                name="persona_entrega_documento"
-                                                defaultValue={
-                                                    tramite?.persona_entrega_documento ??
-                                                    ''
-                                                }
-                                                maxLength={180}
                                             />
                                         </Field>
                                     </FieldGroup>

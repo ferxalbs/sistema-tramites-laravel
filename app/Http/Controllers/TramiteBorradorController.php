@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Tramites\GenerateTramiteFinalDocument;
 use App\Services\Tramites\PrepareTramiteForAssignment;
 use App\Services\Tramites\SaveTramiteDraft;
+use App\Services\Tramites\TramiteTemplateEligibility;
 use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -80,8 +81,8 @@ class TramiteBorradorController extends Controller
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
             ],
             'hoy' => now()->toDateString(),
+            'modelo_oficial_pendiente' => in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true),
             'plantillas' => TramitePlantilla::query()
-                ->where('estado', 'publicada')
                 ->where('activa', true)
                 ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
                 ->when(! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento), function (Builder $query) use ($tramite): void {
@@ -89,7 +90,9 @@ class TramiteBorradorController extends Controller
                         ->where('modalidad', $tramite->modalidad_documento);
                 })
                 ->orderBy('nombre')
-                ->get(['id', 'codigo', 'nombre', 'descripcion', 'modalidad'])
+                ->get(['id', 'codigo', 'nombre', 'descripcion', 'tipo_documento_salida', 'modalidad', 'estado', 'activa'])
+                ->filter(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::availableForDraft($tramite, $plantilla))
+                ->values()
                 ->map(fn (TramitePlantilla $plantilla): array => [
                     'id' => $plantilla->id,
                     'codigo' => $plantilla->codigo,

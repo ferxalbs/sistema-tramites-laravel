@@ -41,7 +41,6 @@ class GlobalSearchController extends Controller
                 ->when($isStudent, fn (Builder $builder): Builder => $builder->where('propietario_id', $actor->id))
                 ->where(function (Builder $builder) use ($like): void {
                     $builder->whereRaw("codigo LIKE ? ESCAPE '!'", [$like])
-                        ->orWhereRaw("numero_expediente_externo LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("asunto LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("tipo_documento LIKE ? ESCAPE '!'", [$like])
                         ->orWhereRaw("persona_nombre LIKE ? ESCAPE '!'", [$like])

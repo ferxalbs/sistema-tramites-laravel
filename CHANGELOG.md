@@ -17,6 +17,14 @@ Registro de cambios del Sistema de Trámites. Actualizado el **6 de octubre de 2
 
 - La validación publicada detectó un 500 en la ruta pública de verificación con una cuenta recordada: `EnsureAccountIsCurrent` intentaba acceder a una sesión que esa ruta excluye. Ahora la ruta mantiene contexto público sin resolver la cuenta recordada; no comparte usuario ni contador de notificaciones. La prueba existente cubre también acceso sin código desde una cuenta autenticada, sin cookie de sesión. Las tres pruebas de verificación pública pasaron con 101 aserciones.
 
+## 2026-10-05 — Revisión local del recorrido
+
+- Se aplicó en la base local la migración pendiente del catálogo de destinatarios institucionales tras verificar un respaldo de la base. La pantalla de inicio y el acceso de administración responden en `http://127.0.0.1:8000`; el editor de borradores abre sin error.
+- El editor solo ofrece la plantilla de constancia de titulación para ese tipo de trámite. Informe y Memorandos muestran las plantillas de su formato y modalidad. Las demás solicitudes pueden usar borradores internos, pero deben elegir explícitamente una plantilla; el servidor rechaza una plantilla incompatible aunque se envíe fuera de la interfaz.
+- Para justificación de tardanza y constancia de prácticas, el editor indica que falta el modelo oficial y que la emisión final permanece bloqueada. La corrección se verificó en el navegador local, con una prueba funcional específica y con la suite del flujo.
+- El gráfico de usuarios ya no presenta el rol Asistente retirado; su cuenta histórica permanece inactiva y conservada en la base.
+- Quedan pendientes los modelos oficiales de tardanza y prácticas, los datos SMTP institucionales, las firmas y cuentas de los docentes reales y la prueba de persistencia y migraciones en el alojamiento. No se modificó Railway.
+
 ## Estado actual — auditoría del 2026-10-05
 
 - La auditoría partió de `bc0da38`, sin reconstruir los cambios publicados. Durante la sesión se añadió en `main` el commit ajeno `c00ee71`; se conservó su trabajo. No se crearon ramas ni worktrees.

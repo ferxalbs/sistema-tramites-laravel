@@ -95,13 +95,55 @@ class TramitePlantillaSeeder extends Seeder
                 'estado' => 'publicada',
                 'activa' => true,
             ],
+            [
+                'codigo' => 'JUSTIFICACION_TARDANZA_REFERENCIAL',
+                'version' => 1,
+                'nombre' => 'Justificación de tardanza · modelo referencial',
+                'descripcion' => 'Solo para preparar y revisar borradores. Requiere cotejo con el modelo aprobado por el IESTP.',
+                'tipo_documento_salida' => 'informe',
+                'modalidad' => null,
+                'contenido' => "MODELO REFERENCIAL — NO OFICIAL\n\nEVALUACIÓN DE JUSTIFICACIÓN DE TARDANZA\n\nEstudiante: {{ESTUDIANTE_NOMBRE}}\nDNI: {{DNI}}\nPrograma: {{PROGRAMA_ESTUDIO}}\nFecha de tardanza: {{FECHA_TARDANZA}}\nUnidad didáctica: {{UNIDAD_DIDACTICA}}\nMotivo declarado: {{MOTIVO_TARDANZA}}\nDocumentos revisados: {{DOCUMENTOS_ADJUNTOS}}\n\n{{CONTENIDO_PRINCIPAL}}\n\n{{LUGAR_FECHA}}\n\n{{FIRMANTE}}",
+                'requiere_firma_fisica' => false,
+                'permite_no_firma' => true,
+                'estado' => 'borrador',
+                'activa' => true,
+            ],
+            [
+                'codigo' => 'CONSTANCIA_PRACTICA_REFERENCIAL',
+                'version' => 1,
+                'nombre' => 'Constancia de prácticas · modelo referencial',
+                'descripcion' => 'Solo para preparar y revisar borradores. La oficina debe confirmar quién emite y firma la constancia.',
+                'tipo_documento_salida' => 'constancia',
+                'modalidad' => null,
+                'contenido' => "MODELO REFERENCIAL — NO OFICIAL\n\nCONSTANCIA DE PRÁCTICAS\n\nEstudiante: {{ESTUDIANTE_NOMBRE}}\nDNI: {{DNI}}\nPrograma: {{PROGRAMA_ESTUDIO}}\nCentro de prácticas: {{CENTRO_PRACTICAS}}\nMódulo: {{MODULO_PRACTICAS}}\nPeriodo: {{PERIODO_INICIO}} al {{PERIODO_FIN}}\nHoras acreditadas: {{HORAS_PRACTICAS}}\nDocumentos revisados: {{DOCUMENTOS_ADJUNTOS}}\n\n{{CONTENIDO_PRINCIPAL}}\n\n{{LUGAR_FECHA}}\n\n{{FIRMANTE}}",
+                'requiere_firma_fisica' => false,
+                'permite_no_firma' => true,
+                'estado' => 'borrador',
+                'activa' => true,
+            ],
         ] as $plantilla) {
             $modelo = TramitePlantilla::query()->firstOrCreate(
                 ['codigo' => $plantilla['codigo'], 'version' => $plantilla['version']],
                 $plantilla,
             );
 
-            foreach ($campos as [$clave, $etiqueta, $grupo, $tipo, $predeterminado, $fuente, $obligatorio, $confirmacion, $html, $orden, $maximo]) {
+            $camposModelo = match ($plantilla['codigo']) {
+                'JUSTIFICACION_TARDANZA_REFERENCIAL' => [
+                    ['FECHA_TARDANZA', 'Fecha de tardanza', 'Datos de tardanza', 'fecha', null, null, 1, 0, 0, 70, 10],
+                    ['UNIDAD_DIDACTICA', 'Unidad didáctica', 'Datos de tardanza', 'texto_corto', null, null, 1, 0, 0, 71, 160],
+                    ['MOTIVO_TARDANZA', 'Motivo declarado', 'Datos de tardanza', 'texto_largo', null, null, 1, 0, 0, 72, 2000],
+                ],
+                'CONSTANCIA_PRACTICA_REFERENCIAL' => [
+                    ['CENTRO_PRACTICAS', 'Centro de prácticas', 'Datos de prácticas', 'texto_corto', null, null, 1, 0, 0, 70, 180],
+                    ['MODULO_PRACTICAS', 'Módulo', 'Datos de prácticas', 'texto_corto', null, null, 1, 0, 0, 71, 180],
+                    ['PERIODO_INICIO', 'Inicio del periodo', 'Datos de prácticas', 'fecha', null, null, 1, 0, 0, 72, 10],
+                    ['PERIODO_FIN', 'Fin del periodo', 'Datos de prácticas', 'fecha', null, null, 1, 0, 0, 73, 10],
+                    ['HORAS_PRACTICAS', 'Horas acreditadas', 'Datos de prácticas', 'numero', null, null, 1, 0, 0, 74, 6],
+                ],
+                default => [],
+            };
+
+            foreach (array_merge($campos, $camposModelo) as [$clave, $etiqueta, $grupo, $tipo, $predeterminado, $fuente, $obligatorio, $confirmacion, $html, $orden, $maximo]) {
                 DB::table('tramite_plantilla_campos')->insertOrIgnore([
                     'plantilla_id' => $modelo->id,
                     'clave_variable' => $clave,

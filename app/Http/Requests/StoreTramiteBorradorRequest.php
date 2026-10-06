@@ -49,7 +49,7 @@ class StoreTramiteBorradorRequest extends FormRequest
             'personas_mencionadas.*.dni' => ['nullable', 'digits:8'],
             'adjuntos' => ['nullable', 'array', 'max:50'],
             'adjuntos.*' => ['integer', 'distinct'],
-            'campos' => ['nullable', 'array', 'max:26'],
+            'campos' => ['nullable', 'array', 'max:40'],
             'campos.*' => ['nullable', 'string', 'max:60000'],
             'preparar' => ['required', 'boolean'],
             'confirmar_fecha_anterior' => ['nullable', 'boolean'],

@@ -154,6 +154,7 @@ class DashboardController extends Controller
                 ->get()
                 ->map(fn (TramiteAsignacion $row): array => ['nombre' => (string) $row->getAttribute('name'), 'total' => (int) $row->getAttribute('total')])->all();
             $users = User::query()
+                ->whereIn('rol', ['administrador', 'docente', 'estudiante'])
                 ->selectRaw('substr(created_at, 1, 7) as periodo, rol, COUNT(*) as total')
                 ->groupByRaw('substr(created_at, 1, 7), rol')
                 ->orderByDesc('periodo')
