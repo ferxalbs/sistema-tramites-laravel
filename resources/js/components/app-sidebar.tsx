@@ -1,9 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    BookOpen,
     Bell,
     BriefcaseBusiness,
-    CircleHelp,
     ClipboardCheck,
     ClipboardList,
     PackageCheck,
@@ -12,7 +10,6 @@ import {
     FolderGit2,
     LayoutGrid,
     Plus,
-    Search,
     Users,
 } from 'lucide-react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
@@ -20,7 +17,6 @@ import TramiteController from '@/actions/App/Http/Controllers/TramiteController'
 import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteEstudianteController';
 import TramiteEntregaAdminController from '@/actions/App/Http/Controllers/TramiteEntregaAdminController';
 import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -40,9 +36,7 @@ import { index as typesIndex } from '@/routes/admin/types';
 import { index as classificationsIndex } from '@/routes/admin/classifications';
 import { index as outputFormatsIndex } from '@/routes/admin/output-formats';
 import { index as templatesIndex } from '@/routes/admin/templates';
-import { index as searchIndex } from '@/routes/search';
 import { index as reportsIndex } from '@/routes/admin/reports';
-import { index as supportIndex } from '@/routes/support';
 import { index as notificationsIndex } from '@/routes/notificaciones';
 import type { Auth, NavItem } from '@/types';
 
@@ -50,19 +44,6 @@ type PageProps = {
     auth: Auth;
     notificationUnreadCount: number;
 };
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
 
 export function AppSidebar() {
     const { auth, notificationUnreadCount } = usePage<PageProps>().props;
@@ -172,20 +153,6 @@ export function AppSidebar() {
         });
     }
 
-    if (['estudiante', 'docente', 'administrador'].includes(auth.user.rol)) {
-        mainNavItems.push({
-            title: 'Buscar',
-            href: searchIndex(),
-            icon: Search,
-        });
-    }
-
-    mainNavItems.push({
-        title: 'Ayuda',
-        href: supportIndex(),
-        icon: CircleHelp,
-    });
-
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
@@ -206,7 +173,6 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

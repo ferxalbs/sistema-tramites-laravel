@@ -56,10 +56,7 @@ export default function Notificaciones({ notifications, filters }: Props) {
                             <Button
                                 type="submit"
                                 variant="outline"
-                                disabled={
-                                    processing ||
-                                    notifications.data.every((n) => n.leida)
-                                }
+                                disabled={processing || notifications.total === 0}
                                 className="w-full sm:w-auto"
                             >
                                 <CheckCheck className="mr-2 h-4 w-4" />
@@ -70,41 +67,30 @@ export default function Notificaciones({ notifications, filters }: Props) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <nav
                             aria-label="Estado de notificaciones"
-                            className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted p-1"
+                            className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1"
                         >
                             {[
                                 ['todas', 'Todas'],
                                 ['no_leidas', 'No leídas'],
                                 ['leidas', 'Leídas'],
                             ].map(([value, label]) => (
-                                <Button
+                                <Link
                                     key={value}
-                                    variant={
-                                        filters.estado === value
-                                            ? 'default'
-                                            : 'ghost'
-                                    }
-                                    size="sm"
+                                    href={target(value, filters.prioridad)}
+                                    preserveScroll
                                     className={cn(
-                                        'h-8 rounded-md px-3 text-sm',
-                                        filters.estado !== value &&
-                                            'text-muted-foreground',
+                                        'inline-flex h-8 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors',
+                                        filters.estado === value
+                                            ? 'bg-background text-foreground shadow-xs'
+                                            : 'text-muted-foreground hover:text-foreground',
                                     )}
-                                    render={
-                                        <Link
-                                            href={target(
-                                                value,
-                                                filters.prioridad,
-                                            )}
-                                        />
-                                    }
                                 >
                                     {label}
-                                </Button>
+                                </Link>
                             ))}
                         </nav>
 
@@ -112,9 +98,9 @@ export default function Notificaciones({ notifications, filters }: Props) {
 
                         <nav
                             aria-label="Prioridad"
-                            className="flex flex-wrap items-center gap-2"
+                            className="flex flex-wrap items-center gap-1.5"
                         >
-                            <span className="mr-1 ml-1 text-xs font-medium tracking-wider text-muted-foreground uppercase sm:ml-0">
+                            <span className="mr-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                 Prioridad:
                             </span>
                             {[
@@ -127,11 +113,12 @@ export default function Notificaciones({ notifications, filters }: Props) {
                                 <Link
                                     key={value}
                                     href={target(filters.estado, value)}
+                                    preserveScroll
                                     className={cn(
-                                        'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                                        'inline-flex h-7 items-center justify-center rounded-full px-3 text-xs font-medium transition-colors',
                                         filters.prioridad === value
                                             ? 'bg-primary text-primary-foreground'
-                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground',
                                     )}
                                 >
                                     {label}
@@ -139,22 +126,48 @@ export default function Notificaciones({ notifications, filters }: Props) {
                             ))}
                         </nav>
                     </div>
+
+                    {(filters.estado !== 'todas' ||
+                        filters.prioridad !== 'todas') && (
+                        <Link
+                            href={target('todas', 'todas')}
+                            preserveScroll
+                            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            Restablecer filtros
+                        </Link>
+                    )}
                 </div>
 
                 {/* Notifications List */}
                 <div className="flex flex-col gap-4">
                     {notifications.data.length === 0 ? (
-                        <div className="flex min-h-[400px] animate-in flex-col items-center justify-center rounded-xl border border-dashed bg-card/50 p-8 text-center fade-in-50">
-                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                                <Inbox className="h-10 w-10 text-muted-foreground" />
+                        <div className="flex min-h-[380px] select-none flex-col items-center justify-center rounded-xl border border-dashed bg-card/40 p-8 text-center">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                                <Inbox className="h-8 w-8 text-muted-foreground" />
                             </div>
-                            <h2 className="mt-6 text-xl font-semibold">
-                                Bandeja limpia
+                            <h2 className="mt-5 text-lg font-semibold tracking-tight">
+                                {filters.estado !== 'todas' ||
+                                filters.prioridad !== 'todas'
+                                    ? 'Sin resultados para estos filtros'
+                                    : 'Bandeja limpia'}
                             </h2>
                             <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
-                                No tienes notificaciones nuevas que coincidan
-                                con estos filtros. ¡Todo está al día!
+                                {filters.estado !== 'todas' ||
+                                filters.prioridad !== 'todas'
+                                    ? 'No tienes notificaciones que coincidan con la combinación de filtros seleccionada.'
+                                    : 'No tienes notificaciones registradas en tu cuenta. ¡Todo está al día!'}
                             </p>
+                            {(filters.estado !== 'todas' ||
+                                filters.prioridad !== 'todas') && (
+                                <Link
+                                    href={target('todas', 'todas')}
+                                    preserveScroll
+                                    className="mt-4 inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
+                                >
+                                    Ver todas las notificaciones
+                                </Link>
+                            )}
                         </div>
                     ) : (
                         <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
