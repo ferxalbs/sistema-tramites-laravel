@@ -139,14 +139,6 @@ export default function Welcome() {
                                         un solo lugar
                                     </h1>
 
-                                    <p className="max-w-2xl text-lg leading-relaxed text-balance text-muted-foreground sm:text-xl">
-                                        Presenta tus documentos en Mesa de
-                                        Partes. El personal registra tu
-                                        expediente para que puedas consultar su
-                                        avance y verificar la autenticidad del
-                                        documento oficial.
-                                    </p>
-
                                     <div className="flex flex-wrap items-center gap-4 pt-2">
                                         {auth.user ? (
                                             <Button
