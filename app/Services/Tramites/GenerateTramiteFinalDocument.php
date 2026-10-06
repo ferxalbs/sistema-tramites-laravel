@@ -484,10 +484,15 @@ class GenerateTramiteFinalDocument
         $cargos = DB::table('cargos_institucionales')
             ->whereIn('id', array_filter([$remitente->cargo_institucional_id, $firmante->cargo_institucional_id]))
             ->pluck('nombre', 'id');
-        $remitenteNombre = trim($remitente->name);
-        $firmanteNombre = trim($firmante->name);
-        $remitenteCargo = $cargos->get($remitente->cargo_institucional_id);
-        $firmanteCargo = $cargos->get($firmante->cargo_institucional_id);
+        $valoresGuardados = DB::table('tramite_borrador_valores as valor')
+            ->join('tramite_plantilla_campos as campo', 'campo.id', '=', 'valor.campo_id')
+            ->where('valor.borrador_id', $borrador->id)
+            ->whereIn('campo.clave_variable', ['REMITENTE_NOMBRE', 'FIRMANTE_NOMBRE', 'REMITENTE_CARGO', 'FIRMANTE_CARGO'])
+            ->pluck('valor.valor', 'campo.clave_variable');
+        $remitenteNombre = trim((string) $valoresGuardados->get('REMITENTE_NOMBRE', $remitente->name));
+        $firmanteNombre = trim((string) $valoresGuardados->get('FIRMANTE_NOMBRE', $firmante->name));
+        $remitenteCargo = $valoresGuardados->get('REMITENTE_CARGO', $cargos->get($remitente->cargo_institucional_id));
+        $firmanteCargo = $valoresGuardados->get('FIRMANTE_CARGO', $cargos->get($firmante->cargo_institucional_id));
         $roles = [
             'administrador' => 'Administración',
             'asistente' => 'Asistente de oficina',

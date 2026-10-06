@@ -10,7 +10,6 @@ import TramiteEstudianteController from '@/actions/App/Http/Controllers/TramiteE
 import TramiteEntregaController from '@/actions/App/Http/Controllers/TramiteEntregaController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteStatusBadge from '@/components/tramite-status-badge';
-import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
     Card,
@@ -21,7 +20,13 @@ import {
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+    Field,
+    FieldContent,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
 
 type Props = {
@@ -241,36 +246,70 @@ export default function EstudianteTramiteShow({
                                     })}
                                 >
                                     {({ errors, processing }) => (
-                                        <div className="space-y-3 border-t pt-4">
-                                            <div className="flex items-start gap-3">
+                                        <FieldGroup>
+                                            <Field
+                                                orientation="horizontal"
+                                                data-invalid={
+                                                    errors.confirmar
+                                                        ? true
+                                                        : undefined
+                                                }
+                                            >
                                                 <Checkbox
                                                     id="confirmar-recepcion"
                                                     name="confirmar"
                                                     value="1"
                                                     required
-                                                    aria-invalid={Boolean(
-                                                        errors.confirmar,
-                                                    )}
+                                                    aria-invalid={
+                                                        errors.confirmar
+                                                            ? true
+                                                            : undefined
+                                                    }
+                                                    aria-describedby={
+                                                        errors.confirmar
+                                                            ? 'confirmar-recepcion-error'
+                                                            : undefined
+                                                    }
                                                 />
-                                                <Label
-                                                    htmlFor="confirmar-recepcion"
-                                                    className="items-start leading-5"
-                                                >
-                                                    Confirmo que recibí el
-                                                    documento oficial.
-                                                </Label>
-                                            </div>
-                                            <InputError
-                                                message={errors.confirmar}
-                                            />
-                                            <Input
-                                                name="observacion"
-                                                placeholder="Observación opcional"
-                                                maxLength={1000}
-                                            />
-                                            <InputError
-                                                message={errors.observacion}
-                                            />
+                                                <FieldContent>
+                                                    <FieldLabel htmlFor="confirmar-recepcion">
+                                                        Confirmo que recibí el
+                                                        documento oficial.
+                                                    </FieldLabel>
+                                                    <FieldError id="confirmar-recepcion-error">
+                                                        {errors.confirmar}
+                                                    </FieldError>
+                                                </FieldContent>
+                                            </Field>
+                                            <Field
+                                                data-invalid={
+                                                    errors.observacion
+                                                        ? true
+                                                        : undefined
+                                                }
+                                            >
+                                                <FieldLabel htmlFor="observacion-recepcion">
+                                                    Observación (opcional)
+                                                </FieldLabel>
+                                                <Input
+                                                    id="observacion-recepcion"
+                                                    name="observacion"
+                                                    maxLength={1000}
+                                                    aria-invalid={
+                                                        errors.observacion
+                                                            ? true
+                                                            : undefined
+                                                    }
+                                                    aria-describedby={
+                                                        errors.observacion
+                                                            ? 'observacion-recepcion-error'
+                                                            : undefined
+                                                    }
+                                                />
+                                                <FieldError id="observacion-recepcion-error">
+                                                    {errors.observacion}
+                                                </FieldError>
+                                            </Field>
                                             <Button
                                                 type="submit"
                                                 disabled={processing}
@@ -282,7 +321,7 @@ export default function EstudianteTramiteShow({
                                                 )}
                                                 Confirmar recepción
                                             </Button>
-                                        </div>
+                                        </FieldGroup>
                                     )}
                                 </Form>
                             )}

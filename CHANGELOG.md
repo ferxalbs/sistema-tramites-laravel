@@ -1,8 +1,27 @@
 # Changelog
 
-Registro de cambios del Sistema de Trámites. Actualizado el **2 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
+Registro de cambios del Sistema de Trámites. Actualizado el **5 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
 
-## Estado actual — 2026-10-02
+## Estado actual — auditoría del 2026-10-05
+
+- La auditoría partió de `bc0da38`, sin reconstruir los cambios publicados. Durante la sesión se añadió en `main` el commit ajeno `c00ee71`; se conservó su trabajo. No se crearon ramas ni worktrees.
+- Los documentos internos solo ofrecen y aceptan plantillas de su formato y modalidad canónicos, incluso al guardar sin preparar. Se corrigió la selección inicial de una Constancia para un Memorando detectada en navegador.
+- Los nombres y cargos de remitente y firmante se toman de los valores guardados del borrador; editar después el perfil no cambia el texto que se revisó. Los PDF históricos no se regeneran.
+- Se compararon los Word oficiales: el simple conserva `A` antes de `De`; el múltiple usa `De` antes de `A` y su cierre queda alineado a la izquierda. El segundo Word contiene los memorandos 005 y 004 en una página horizontal. La aplicación genera cada documento por separado. Los encabezados conservan los recursos oficiales extraídos de los Word.
+- Los tamaños se cotejaron con el XML original: campos de 11 puntos y cuerpo/filas de personas de 12 en el simple; campos y cuerpo de 10 en el múltiple. Se reemplazó el factor aproximado de negrita por anchos de Helvetica-Bold para los caracteres cubiertos. Los caracteres sin métrica conservan una aproximación; Helvetica no es idéntica a Arial/Calibri del original. La estructura se cotejó, pero no se certifica identidad tipográfica o de márgenes.
+- La previsualización y emisión reservan el mismo espacio del QR, también para el contenido aprobado de Constancia e Informe. Los casos largos de prueba conservan la cantidad de páginas. Los memorandos de cotejo privado simple/múltiple tienen una página y el largo tres, tanto sin QR como con QR.
+- El inicio, registro, asignación, borrador, entrega y confirmación estudiantil usan composición nativa de los componentes existentes shadcn/Base UI (`Select`, `Field`, `FieldGroup`, `Checkbox`, `Card`). La validación de asignación se comprobó en navegador con `aria-invalid` y descripción del error. No se añadieron dependencias.
+- Chrome muestra el PDF privado del borrador guardado. Se retiró el `sandbox` que impedía al navegador cargar su visor PDF y se añadió una apertura directa del mismo PDF autenticado.
+- Navegador local, SQLite desechable y almacenamiento privado separado: Memorando simple registrado, observado por docente, corregido en versión nueva, aprobado, emitido, descargado, entregado, confirmado y cerrado; Constancia de titulación con autocompletado por DNI, FUT ficticio privado, aprobación, emisión, entrega presencial con evidencia, confirmación por la cuenta egresada y cierre. La cuenta egresada recibió 403 al abrir un expediente ajeno.
+- La Constancia final contiene el nombre, DNI, programa, modalidad y texto resuelto aprobado del egresado ficticio. Conserva un encabezado genérico; no reproduce todavía la presentación de la fotografía institucional. La instantánea conserva el texto y su huella.
+- El QR del Memorando emitido se leyó con un lector independiente y abrió una verificación válida sin sesión local. El QR de la Constancia también se decodificó. Esto no certifica el QR publicado en Railway.
+- Verificación final local: `PAO_DISABLE=1 vendor/bin/pest --display-all-issues` terminó con **170 pruebas aprobadas, 6 remotas omitidas y 3188 aserciones**; `bash tests/Deployment/entrypoint-failure.sh`, TypeScript, build y Pint de los PHP modificados pasaron. Las pruebas omitidas siguen sin demostrar integración ni concurrencia remota en Turso.
+- `pnpm run check` quedó bloqueado por el formato de `package.json` y `skills-lock.json` del commit ajeno, conservado sin cambios. PHPStan con `--memory-limit=1G` reportó 533 hallazgos; no pasó. React Doctor reportó 66/100 y ocho avisos: cuatro de complejidad de páginas existentes, dos por `iframe` sin sandbox para el visor PDF y dos por anclas de composición `Button render`; Chrome confirmó los nombres accesibles de esos botones. No se suprimieron reglas.
+- Railway: el despliegue `39224c7a-bffd-4920-b366-ec1cddf32d54` correspondiente a `bc0da38` figura activo/exitoso; las cuatro migraciones del 2 de octubre están aplicadas. El dominio público es `https://sistema-tramites-laravel-production.up.railway.app`.
+- La consola de producción mostró `/app/storage/app/private` sobre `overlay`, **sin volumen persistente**, y cero archivos privados excluyendo `.gitignore`. Las tablas consultadas no tienen documentos, documentos finales, firmas de trámite ni informes de cierre con ruta. Falta aprobar el volumen, respaldar la base, comprobar el marcador después de desplegar y recorrer la versión publicada con acceso autorizado. No se certifica persistencia ni se atribuyen estas pruebas locales a producción.
+- Auditoría funcional: `JUSTIFICACION_TARDANZA` no implementa destinatario de primera hora y no hay flujo `INASISTENCIA`; `CONSTANCIA_PRACTICA` es demostrativa, sin viabilidad, aforo o circuito de supervisor. La emisión de esos dos modelos permanece bloqueada. No se inventaron reglas institucionales ni se habilitó su emisión.
+
+## Estado registrado — 2026-10-02
 
 - El director y otros destinatarios institucionales ya tienen un catálogo administrable; las sugerencias del borrador leen ese catálogo y excluyen entradas inactivas. La ayuda delimita la revisión docente de la preparación y emisión administrativas.
 - El arranque rechaza base de datos ausente, migración fallida y un volumen Railway declarado en ruta incorrecta. Se agregó una prueba de fallo de arranque y un marcador para comprobar persistencia entre despliegues.
@@ -130,16 +149,16 @@ Estos cambios están en los commits posteriores a `8c44879` y anteriores a `339e
 - **Interfaz:** ajustes de componentes Base UI/shadcn, menús, páginas de autenticación y organización de los paneles.
 - El detalle de alcance, evidencias y limitaciones de estas etapas está en [docs/MIGRACION_PARIDAD.md](docs/MIGRACION_PARIDAD.md).
 
-## Pendientes al 2026-10-01
+## Pendientes actualizados al 2026-10-05
 
 ### Funcionamiento publicado y datos reales
 
-- [ ] Verificar que Railway haya desplegado `7b41f14` y, después de integrar los ajustes locales auditados, que el servicio arranque correctamente y permita iniciar sesión en la versión publicada.
-- [ ] Comprobar las migraciones nuevas en la base de producción, especialmente `2026_09_29_071000_add_internal_document_registration_types.php`. Su ejecución demostrada en esta sesión fue en SQLite local, no en Turso de producción.
+- [ ] Integrar y desplegar los ajustes locales auditados después de preparar la persistencia privada; verificar el nuevo commit y el acceso al sistema publicado.
+- [x] Comprobar las migraciones actuales en producción: `php artisan migrate:status --no-ansi` mostró aplicadas las migraciones hasta el 2 de octubre, incluida la de documentos internos del 29 de septiembre.
 - [ ] Verificar que firmas, adjuntos y PDF privados persistan después de reinicios y despliegues del servicio.
 - [ ] Recorrer en producción, con cuentas autorizadas y datos institucionales controlados, el flujo de cada rol: alta/edición, búsqueda por DNI, solicitud, Informe y Memorandos, revisión, firma, emisión, descarga, entrega y cierre.
 - [ ] Probar el QR con un lector independiente y la URL pública definitiva; comprobar los permisos de descarga y los efectos de anulación o sustitución en el entorno publicado.
-- [ ] Completar la prueba de navegador local en `http://127.0.0.1:18080`. La base, el almacenamiento privado, cuatro usuarios ficticios y la respuesta 200 de `/login` ya están preparados; falta certificar el recorrido completo en navegador.
+- [x] Recorrer localmente Memorando simple y Constancia de titulación hasta el cierre en `http://127.0.0.1:18081`, con tres cuentas ficticias, base desechable y almacenamiento privado separado. Rechazo y Memorando múltiple tienen pruebas automatizadas; sus recorridos completos no se certificaron en navegador.
 - [ ] Completar la integración remota de Turso: transacciones de negocio, rollback, numeración concurrente, timeouts y respuestas de escritura de resultado ambiguo. Las seis pruebas remotas omitidas siguen sin aportar evidencia nueva.
 
 ### Correo: reservado para una sesión futura por solicitud del usuario

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import ReceptionPreliminaryLists from '@/components/reception-preliminary-lists';
+import FormSelect from '@/components/select-field';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -202,6 +203,9 @@ export default function TramiteCreate({
             '',
     );
     const [buscarDocente, setBuscarDocente] = useState('');
+    const [programaId, setProgramaId] = useState(
+        String(tramite?.programa_estudio_id ?? ''),
+    );
     const [documentos, setDocumentos] = useState<
         Array<{ id: number; categoria: string }>
     >([]);
@@ -310,7 +314,7 @@ export default function TramiteCreate({
                             {tramite
                                 ? `Editar ${tramite.codigo}`
                                 : seleccion
-                                  ? `Digitalizar: ${seleccion.tipo_nombre}`
+                                  ? `${esDocumentoInstitucional ? 'Registrar' : 'Digitalizar'}: ${seleccion.tipo_nombre}`
                                   : 'Registrar trámite'}
                         </h1>
                         <p className="text-sm text-muted-foreground">
@@ -318,7 +322,7 @@ export default function TramiteCreate({
                                 ? 'Corrige los datos transcritos y de recepción. El código interno, el estado, los archivos y el historial se conservan.'
                                 : seleccion
                                   ? esDocumentoInstitucional
-                                      ? 'Registra los datos y adjunta el documento institucional. No se requieren datos de solicitante.'
+                                      ? 'Registra los datos del documento institucional. Puedes agregar archivos si corresponde; no se requieren datos de solicitante.'
                                       : 'Completa los datos que corresponden a este tipo de solicitud y adjunta el documento recibido.'
                                   : 'Selecciona el DNI y el tipo de trámite para abrir el formulario de digitalización.'}
                         </p>
@@ -598,46 +602,33 @@ export default function TramiteCreate({
                                                 seleccionado.
                                             </p>
                                         ) : (
-                                            <Field
+                                            <FormSelect
                                                 id="programa_estudio_id"
+                                                name="programa_estudio_id"
                                                 label="Programa de estudios"
+                                                value={programaId}
+                                                options={Object.fromEntries([
+                                                    [
+                                                        '',
+                                                        clasificacion ===
+                                                        'estudiantil'
+                                                            ? 'Selecciona el programa del FUT'
+                                                            : 'No aplica',
+                                                    ],
+                                                    ...programas.map(
+                                                        (programa) => [
+                                                            String(programa.id),
+                                                            programa.nombre,
+                                                        ],
+                                                    ),
+                                                ])}
                                                 error={
                                                     errors.programa_estudio_id
                                                 }
-                                            >
-                                                <select
-                                                    id="programa_estudio_id"
-                                                    name="programa_estudio_id"
-                                                    defaultValue={
-                                                        tramite?.programa_estudio_id ??
-                                                        ''
-                                                    }
-                                                    className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
-                                                >
-                                                    <option value="">
-                                                        {clasificacion ===
-                                                        'estudiantil'
-                                                            ? 'Selecciona el programa del FUT'
-                                                            : 'No aplica'}
-                                                    </option>
-                                                    {programas.map(
-                                                        (programa) => (
-                                                            <option
-                                                                key={
-                                                                    programa.id
-                                                                }
-                                                                value={
-                                                                    programa.id
-                                                                }
-                                                            >
-                                                                {
-                                                                    programa.nombre
-                                                                }
-                                                            </option>
-                                                        ),
-                                                    )}
-                                                </select>
-                                            </Field>
+                                                onValueChange={(value) =>
+                                                    setProgramaId(value ?? '')
+                                                }
+                                            />
                                         )}
                                         {!seleccion && (
                                             <FormSelect
@@ -1497,77 +1488,3 @@ function Field({
         </ShadcnField>
     );
 }
-
-function FormSelect({
-    id,
-    label,
-    name,
-    value,
-    options,
-    description,
-    error,
-    onValueChange,
-}: {
-    id: string;
-    label: string;
-    name: string;
-    value: string;
-    options: Record<string, string>;
-    description?: string;
-    error?: string;
-    onValueChange: (value: string | null) => void;
-}) {
-    const items = Object.entries(options).map(([optionValue, optionLabel]) => ({
-        value: optionValue,
-        label: optionLabel,
-    }));
-
-    return (
-        <ShadcnField data-invalid={error ? true : undefined}>
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
-            <Select
-                items={items}
-                name={name}
-                value={value}
-                onValueChange={onValueChange}
-            >
-                <SelectTrigger
-                    id={id}
-                    className="w-full"
-                    aria-describedby={
-                        [
-                            description ? `${id}-description` : undefined,
-                            error ? `${id}-error` : undefined,
-                        ]
-                            .filter(Boolean)
-                            .join(' ') || undefined
-                    }
-                    aria-invalid={error ? true : undefined}
-                >
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectGroup>
-                        {items.map((item) => (
-                            <SelectItem key={item.value} value={item.value}>
-                                {item.label}
-                            </SelectItem>
-                        ))}
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
-            {description && (
-                <FieldDescription id={`${id}-description`}>
-                    {description}
-                </FieldDescription>
-            )}
-            <FieldError id={`${id}-error`}>{error}</FieldError>
-        </ShadcnField>
-    );
-}
-
-TramiteCreate.layout = {
-    breadcrumbs: [
-        { title: 'Bandeja de trámites', href: TramiteController.index() },
-    ],
-};

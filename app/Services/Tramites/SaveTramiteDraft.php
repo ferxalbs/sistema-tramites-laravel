@@ -517,6 +517,14 @@ class SaveTramiteDraft
      */
     private function validarBorrador(Tramite $tramite, TramitePlantilla $plantilla, array $datos, array $destinatarios, bool $preparar): void
     {
+        if (! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento)
+            && ($plantilla->tipo_documento_salida !== $tramite->formato_salida
+                || $plantilla->modalidad !== $tramite->modalidad_documento)) {
+            throw ValidationException::withMessages([
+                'plantilla_id' => 'Seleccione una plantilla del formato y modalidad del documento institucional registrado.',
+            ]);
+        }
+
         if (! $preparar) {
             return;
         }

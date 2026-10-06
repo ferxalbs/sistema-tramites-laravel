@@ -2,17 +2,32 @@ import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
+    CardFooter,
     CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 
 type TipoTramite = {
@@ -48,7 +63,7 @@ export default function TramiteStart({ tipos }: Props) {
                     >
                         <ArrowLeft />
                     </Button>
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                         <p className="text-sm text-muted-foreground">
                             Registro documental
                         </p>
@@ -83,103 +98,156 @@ export default function TramiteStart({ tipos }: Props) {
                                         : 'Para registrar una solicitud, ingresa el DNI del solicitante. Los informes y memorandos se registran sin DNI.'}
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="grid gap-5">
-                                <div className="grid content-start gap-2">
-                                    <Label htmlFor="tipo_documento">
-                                        Tipo de registro
-                                    </Label>
-                                    <select
-                                        id="tipo_documento"
-                                        name="tipo_documento"
-                                        required
-                                        value={tipoDocumento}
-                                        onChange={(event) =>
-                                            setTipoDocumento(event.target.value)
-                                        }
-                                        className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                            <CardContent>
+                                <FieldGroup>
+                                    <Field
+                                        data-invalid={Boolean(
+                                            errors.tipo_documento,
+                                        )}
                                     >
-                                        <option value="" disabled>
-                                            Selecciona el tipo de registro
-                                        </option>
-                                        {solicitudes.length > 0 && (
-                                            <optgroup label="Solicitud">
-                                                {solicitudes.map((tipo) => (
-                                                    <option
-                                                        key={tipo.codigo}
-                                                        value={tipo.codigo}
-                                                    >
-                                                        {tipo.nombre}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                        {documentosInstitucionales.length >
-                                            0 && (
-                                            <optgroup label="Documento institucional">
-                                                {documentosInstitucionales.map(
-                                                    (tipo) => (
-                                                        <option
-                                                            key={tipo.codigo}
-                                                            value={tipo.codigo}
-                                                        >
-                                                            {tipo.nombre}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </optgroup>
-                                        )}
-                                    </select>
-                                    <InputError
-                                        message={errors.tipo_documento}
-                                    />
-                                </div>
-
-                                {tipoSeleccionado?.requiere_solicitante && (
-                                    <div className="grid content-start gap-2">
-                                        <Label htmlFor="dni">
-                                            DNI del solicitante
-                                        </Label>
-                                        <Input
-                                            id="dni"
-                                            name="dni"
-                                            type="text"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            pattern="[0-9]{8}"
-                                            minLength={8}
-                                            maxLength={8}
+                                        <FieldLabel htmlFor="tipo_documento">
+                                            Tipo de registro
+                                        </FieldLabel>
+                                        <Select
+                                            name="tipo_documento"
                                             required
-                                            placeholder="Ingresa los 8 dígitos"
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Si pertenece a un estudiante
-                                            registrado, el formulario mostrará
-                                            los datos de su perfil.
-                                        </p>
-                                        <InputError message={errors.dni} />
-                                    </div>
-                                )}
+                                            items={tipos.map((tipo) => ({
+                                                value: tipo.codigo,
+                                                label: tipo.nombre,
+                                            }))}
+                                            value={tipoDocumento || null}
+                                            onValueChange={(value) =>
+                                                setTipoDocumento(value ?? '')
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id="tipo_documento"
+                                                className="w-full"
+                                                aria-invalid={Boolean(
+                                                    errors.tipo_documento,
+                                                )}
+                                                aria-describedby={
+                                                    errors.tipo_documento
+                                                        ? 'tipo_documento-error'
+                                                        : undefined
+                                                }
+                                            >
+                                                <SelectValue placeholder="Selecciona el tipo de registro" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {solicitudes.length > 0 && (
+                                                    <SelectGroup>
+                                                        <SelectLabel>
+                                                            Solicitud
+                                                        </SelectLabel>
+                                                        {solicitudes.map(
+                                                            (tipo) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        tipo.codigo
+                                                                    }
+                                                                    value={
+                                                                        tipo.codigo
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        tipo.nombre
+                                                                    }
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectGroup>
+                                                )}
+                                                {documentosInstitucionales.length >
+                                                    0 && (
+                                                    <SelectGroup>
+                                                        <SelectLabel>
+                                                            Documento
+                                                            institucional
+                                                        </SelectLabel>
+                                                        {documentosInstitucionales.map(
+                                                            (tipo) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        tipo.codigo
+                                                                    }
+                                                                    value={
+                                                                        tipo.codigo
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        tipo.nombre
+                                                                    }
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectGroup>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError id="tipo_documento-error">
+                                            {errors.tipo_documento}
+                                        </FieldError>
+                                    </Field>
 
-                                <div className="flex justify-end">
-                                    <Button
-                                        type="submit"
-                                        disabled={
-                                            processing ||
-                                            tipoSeleccionado === undefined
-                                        }
-                                    >
-                                        {processing ? (
-                                            <Spinner />
-                                        ) : (
-                                            <ArrowRight data-icon="inline-start" />
-                                        )}
-                                        {tipoSeleccionado?.requiere_solicitante ===
-                                        false
-                                            ? 'Registrar documento'
-                                            : 'Digitalizar solicitud'}
-                                    </Button>
-                                </div>
+                                    {tipoSeleccionado?.requiere_solicitante && (
+                                        <Field
+                                            data-invalid={Boolean(errors.dni)}
+                                        >
+                                            <FieldLabel htmlFor="dni">
+                                                DNI del solicitante
+                                            </FieldLabel>
+                                            <Input
+                                                id="dni"
+                                                aria-invalid={Boolean(
+                                                    errors.dni,
+                                                )}
+                                                aria-describedby={
+                                                    errors.dni
+                                                        ? 'dni-description dni-error'
+                                                        : 'dni-description'
+                                                }
+                                                name="dni"
+                                                type="text"
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                pattern="[0-9]{8}"
+                                                minLength={8}
+                                                maxLength={8}
+                                                required
+                                                placeholder="Ingresa los 8 dígitos"
+                                            />
+                                            <FieldDescription id="dni-description">
+                                                Si pertenece a un estudiante
+                                                registrado, el formulario
+                                                mostrará los datos de su perfil.
+                                            </FieldDescription>
+                                            <FieldError id="dni-error">
+                                                {errors.dni}
+                                            </FieldError>
+                                        </Field>
+                                    )}
+                                </FieldGroup>
                             </CardContent>
+                            <CardFooter className="justify-end">
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        processing ||
+                                        tipoSeleccionado === undefined
+                                    }
+                                >
+                                    {processing ? (
+                                        <Spinner />
+                                    ) : (
+                                        <ArrowRight data-icon="inline-start" />
+                                    )}
+                                    {tipoSeleccionado?.requiere_solicitante ===
+                                    false
+                                        ? 'Registrar documento'
+                                        : 'Digitalizar solicitud'}
+                                </Button>
+                            </CardFooter>
                         </Card>
                     )}
                 </Form>

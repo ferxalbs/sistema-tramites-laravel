@@ -9,6 +9,7 @@ import {
 } from 'react';
 import TramiteAsignacionController from '@/actions/App/Http/Controllers/TramiteAsignacionController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
+import SelectField from '@/components/select-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -122,7 +123,7 @@ export default function AsignacionForm({
                     >
                         <ArrowLeft />
                     </Button>
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                         <p className="text-sm text-muted-foreground">
                             {tramite.codigo} ·{' '}
                             {tramite.persona_nombre ??
@@ -166,28 +167,24 @@ export default function AsignacionForm({
                     <CardContent>
                         <form onSubmit={enviar}>
                             <FieldGroup className="grid gap-5 md:grid-cols-2">
-                                <Field
+                                <SelectField
                                     id="destino"
                                     label="Destino"
                                     error={form.errors.destino}
-                                >
-                                    <select
-                                        id="destino"
-                                        className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                                        value={form.data.destino}
-                                        onChange={(event) => {
-                                            form.setData(
-                                                'destino',
-                                                event.target.value,
-                                            );
-                                            form.setData('revisor_id', null);
-                                            setBusquedaRevisor('');
-                                        }}
-                                    >
-                                        <option value="docente">Docente</option>
-                                        <option value="oficina">Oficina</option>
-                                    </select>
-                                </Field>
+                                    value={form.data.destino}
+                                    options={{
+                                        docente: 'Docente',
+                                        oficina: 'Oficina',
+                                    }}
+                                    onValueChange={(value) => {
+                                        form.setData(
+                                            'destino',
+                                            value ?? 'docente',
+                                        );
+                                        form.setData('revisor_id', null);
+                                        setBusquedaRevisor('');
+                                    }}
+                                />
                                 <FieldGroup className="gap-3">
                                     <Field
                                         id="buscar_revisor"
@@ -206,47 +203,34 @@ export default function AsignacionForm({
                                             maxLength={80}
                                         />
                                     </Field>
-                                    <Field
+                                    <SelectField
                                         id="revisor_id"
                                         label="Revisor activo"
                                         error={form.errors.revisor_id}
-                                    >
-                                        <select
-                                            id="revisor_id"
-                                            className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                                            required
-                                            value={form.data.revisor_id ?? ''}
-                                            onChange={(event) =>
-                                                form.setData(
-                                                    'revisor_id',
-                                                    event.target.value === ''
-                                                        ? null
-                                                        : Number(
-                                                              event.target
-                                                                  .value,
-                                                          ),
-                                                )
-                                            }
-                                        >
-                                            <option value="">
-                                                Seleccione un revisor
-                                            </option>
-                                            {candidatosFiltrados.map(
-                                                (revisor) => (
-                                                    <option
-                                                        key={revisor.id}
-                                                        value={revisor.id}
-                                                    >
-                                                        {revisor.name} · DNI{' '}
-                                                        {revisor.dni ??
-                                                            'sin registrar'}{' '}
-                                                        · {revisor.carga_activa}{' '}
-                                                        asignaciones activas
-                                                    </option>
+                                        required
+                                        value={
+                                            form.data.revisor_id === null
+                                                ? ''
+                                                : String(form.data.revisor_id)
+                                        }
+                                        options={{
+                                            '': 'Seleccione un revisor',
+                                            ...Object.fromEntries(
+                                                candidatosFiltrados.map(
+                                                    (revisor) => [
+                                                        String(revisor.id),
+                                                        `${revisor.name}${revisor.dni ? ` · DNI ${revisor.dni}` : ''} · ${revisor.carga_activa} activos`,
+                                                    ],
                                                 ),
-                                            )}
-                                        </select>
-                                    </Field>
+                                            ),
+                                        }}
+                                        onValueChange={(value) =>
+                                            form.setData(
+                                                'revisor_id',
+                                                value ? Number(value) : null,
+                                            )
+                                        }
+                                    />
                                     {candidatos.length === 0 ? (
                                         <p className="text-xs text-destructive">
                                             No hay revisores activos disponibles

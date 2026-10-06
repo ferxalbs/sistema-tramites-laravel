@@ -180,6 +180,8 @@ test('administrators edit retained types while retired types stay unavailable', 
 });
 
 test('institutional reports and memorandums register without a request applicant or DNI', function () {
+    $this->seed(TramitePlantillaSeeder::class);
+    $incompatible = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_MODALIDAD_TITULACION')->sole();
     $officeAdmin = User::factory()->create(['rol' => 'administrador']);
     $this->actingAs($officeAdmin)->get(route('tramites.create'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('tramites/start')
@@ -231,7 +233,26 @@ test('institutional reports and memorandums register without a request applicant
             ->and($tramite->formato_salida)->toBe($formato)
             ->and($tramite->modalidad_documento)->toBe($modalidad)
             ->and($tramite->estado)->toBe('digitalizado');
-        $this->get(route('tramites.borradores.create', $tramite))->assertOk();
+        $compatible = TramitePlantilla::query()->where('tipo_documento_salida', $formato)->where('modalidad', $modalidad)->sole();
+        $compatible->update(['nombre' => 'Modelo institucional renombrado '.$tipo]);
+        $this->get(route('tramites.borradores.create', $tramite))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('plantillas', 1)->where('plantillas.0.id', $compatible->id));
+        $draftPayload = [
+            'fecha_documento' => now()->toDateString(),
+            'lugar' => 'Lima',
+            'asunto' => $payload['asunto'],
+            'contenido_principal' => $payload['descripcion'],
+            'preparar' => false,
+        ];
+        $this->post(route('tramites.borradores.store', $tramite), [
+            ...$draftPayload, 'plantilla_id' => $incompatible->id,
+        ])->assertSessionHasErrors('plantilla_id');
+        $this->post(route('tramites.borradores.store', $tramite), [
+            ...$draftPayload, 'plantilla_id' => $compatible->id,
+        ])->assertSessionHasNoErrors();
+        expect($tramite->borradores()->count())->toBe(1);
+        expect($tramite->fresh()->formato_salida)->toBe($formato);
+        expect($tramite->fresh()->modalidad_documento)->toBe($modalidad);
     }
 
     $this->post(route('tramites.start'), [
@@ -286,7 +307,7 @@ test('office registers a scanned FUT without a student account and links an appr
 
 test('the final PDF includes the exact resolved body of a constancia', function () {
     $body = "CONSTANCIA DE MODALIDAD DE EXAMEN DE TITULACION\n\nAna Perez Soto, DNI 72345678, programa de Desarrollo de Sistemas.\n\nTexto especifico aprobado para esta constancia.\n\nDocente Firmante";
-    $pdf = app(PdfDocumentGenerator::class)->generate([
+    $document = [
         'institucion' => 'Instituto Manuel Seoane Corrales',
         'tipo_documento' => 'Constancia de titulación',
         'tipo_documento_salida' => 'constancia',
@@ -297,12 +318,23 @@ test('the final PDF includes the exact resolved body of a constancia', function 
         'firmante_cargo' => 'Coordinador',
         'decision' => 'aprobado',
         'contenido_renderizado' => $body,
-    ]);
+    ];
+    $pdf = app(PdfDocumentGenerator::class)->generate($document);
 
     expect($pdf['bytes'])->toStartWith('%PDF-')
         ->toContain('Ana Perez Soto')
         ->toContain('72345678')
         ->toContain('Texto especifico aprobado para esta constancia.');
+
+    $longBody = "CONSTANCIA\n".str_repeat("Texto aprobado de prueba para comprobar el espacio reservado al QR.\n", 30);
+    $preview = app(PdfDocumentGenerator::class)->generate([
+        ...$document, 'contenido_renderizado' => $longBody, 'codigo_verificacion' => '',
+    ]);
+    $issued = app(PdfDocumentGenerator::class)->generate([
+        ...$document, 'contenido_renderizado' => $longBody, 'codigo_verificacion' => 'AAAA-BBBB-CCCC-DDDD',
+    ]);
+    expect($issued['paginas'])->toBeGreaterThan(1)
+        ->and($preview['paginas'])->toBe($issued['paginas']);
 });
 
 test('email delivery sends the official PDF before marking the delivery as registered', function () {
@@ -2428,6 +2460,51 @@ function createApprovedTramiteForNumberingTest(string $tipoDocumentoSalida = 'in
     return [$officeAdmin, $tramite];
 }
 
+test('memorandum preview and emission retain saved staff names and positions', function () {
+    [$admin, $tramite] = createApprovedTramiteForNumberingTest('memorando', 'simple');
+    $borrador = $tramite->borradores()->sole();
+
+    foreach ([
+        'REMITENTE_NOMBRE' => 'Remitente original',
+        'REMITENTE_CARGO' => 'Cargo original del remitente',
+        'FIRMANTE_NOMBRE' => 'Firmante original',
+        'FIRMANTE_CARGO' => 'Cargo original del firmante',
+    ] as $clave => $valor) {
+        $campoId = DB::table('tramite_plantilla_campos')->insertGetId([
+            'plantilla_id' => $borrador->plantilla_id,
+            'clave_variable' => $clave,
+            'etiqueta' => $clave,
+            'grupo' => 'Responsables',
+            'tipo_campo' => 'texto_corto',
+            'activo' => true,
+        ]);
+        DB::table('tramite_borrador_valores')->insert([
+            'borrador_id' => $borrador->id,
+            'campo_id' => $campoId,
+            'usuario_id' => $admin->id,
+            'valor' => $valor,
+        ]);
+    }
+    $borrador->remitente->update(['name' => 'Remitente cambiado']);
+    $borrador->firmante->update(['name' => 'Firmante cambiado']);
+
+    $preview = app(GenerateTramiteFinalDocument::class)->preview($tramite, $borrador, $admin);
+    $documento = app(GenerateTramiteFinalDocument::class)->execute($tramite, $admin);
+    $pdf = Storage::disk('local')->get($documento->ruta);
+
+    expect($documento->contenido_snapshot['remitente_nombre'])->toBe('Remitente original');
+    expect($documento->contenido_snapshot['remitente_cargo'])->toBe('Cargo original del remitente');
+    expect($documento->contenido_snapshot['firmante_nombre'])->toBe('Firmante original');
+    expect($documento->contenido_snapshot['firmante_cargo'])->toBe('Cargo original del firmante');
+    foreach ([$preview['bytes'], $pdf] as $bytes) {
+        expect(str_contains($bytes, 'Remitente original'))->toBeTrue();
+        expect(str_contains($bytes, 'Firmante original'))->toBeTrue();
+        expect(str_contains($bytes, 'Cargo original del firmante'))->toBeTrue();
+        expect(str_contains($bytes, 'Firmante cambiado'))->toBeFalse();
+    }
+    expect($documento->numero_paginas)->toBe($preview['paginas']);
+});
+
 test('simple and multiple memorandum series keep distinct configured numbers', function () {
     [$simpleAssistant, $simpleTramite] = createApprovedTramiteForNumberingTest('memorando', 'simple');
     $this->actingAs($simpleAssistant)
@@ -3487,6 +3564,7 @@ test('memorandum layout follows the canonical output type when its template is r
 
     expect($multiple['bytes'])->toContain($titulo)
         ->toContain('INSTITUTO DE EDUCACI');
+    expect(strpos($multiple['bytes'], '(De)'))->toBeLessThan(strpos($multiple['bytes'], '(A)'));
     expect(is_string($crest))->toBeTrue();
     expect($multiple['bytes'])->toContain($crest);
     expect($simple['bytes'])->not->toContain($crest);
@@ -3494,10 +3572,31 @@ test('memorandum layout follows the canonical output type when its template is r
         ->toContain($tituloSimple)
         ->toContain('/Width 1248 /Height 116')
         ->toContain('/SMask');
+    expect(strpos($simple['bytes'], '(A)'))->toBeLessThan(strpos($simple['bytes'], '(De)'));
     expect($nonMemorando['bytes'])
         ->toContain('MEMORANDO MULTIPLE RENOMBRADO')
         ->not->toContain($titulo)
         ->not->toContain('INSTITUTO DE EDUCACI');
+});
+
+test('bold memorandum recipient names wrap within the field width', function () {
+    $pdf = app(PdfDocumentGenerator::class)->generate([
+        'institucion' => 'Instituto de prueba',
+        'tipo_documento_salida' => 'memorando',
+        'modalidad_documento' => 'simple',
+        'numero' => 'VISTA PREVIA',
+        'codigo_expediente' => 'EXP-PRUEBA',
+        'fecha_documento' => '05/10/2026',
+        'asunto' => 'Prueba de nombre largo',
+        'destinatarios_detalle' => [['nombres' => str_repeat('m', 52)]],
+        'remitente_nombre' => 'Remitente de prueba',
+        'firmante_nombre' => 'Firmante de prueba',
+        'codigo_verificacion' => '',
+    ]);
+
+    expect(str_contains($pdf['bytes'], str_repeat('m', 52)))->toBeFalse();
+    expect(str_contains($pdf['bytes'], '(: '.str_repeat('m', 41).')'))->toBeTrue();
+    expect(str_contains($pdf['bytes'], '(  '.str_repeat('m', 11).')'))->toBeTrue();
 });
 
 test('long memorandum keeps its closing and signature on the final page', function () {

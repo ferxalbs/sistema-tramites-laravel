@@ -189,7 +189,7 @@ class PdfDocumentGenerator
         }
 
         $qr = $this->matrizVerificacion((string) $documento['codigo_verificacion']);
-        $paginas = $this->distribuirEnPaginas($lineas, (string) $documento['codigo_expediente'], (string) $documento['codigo_verificacion'], $qr !== null);
+        $paginas = $this->distribuirEnPaginas($lineas, (string) $documento['codigo_expediente'], (string) $documento['codigo_verificacion'], true);
 
         return [
             'bytes' => $this->construirPdf($paginas, (string) $documento['numero'], (string) $documento['institucion'], $qr, $firmaImagen),
@@ -223,10 +223,13 @@ class PdfDocumentGenerator
         $modalidad = mb_strtolower(trim((string) ($documento['modalidad_documento'] ?? '')));
         $esMultiple = $modalidad === 'multiple'
             || ($modalidad === '' && (str_contains($tipo, 'MULTIPLE') || str_contains($tipo, 'MÚLTIPLE')));
+        $tamanoCampo = $esMultiple ? 10 : 11;
+        $tamanoCuerpo = $esMultiple ? 10 : 12;
+        $altoCuerpo = $tamanoCuerpo + 3;
         $titulo = $esMultiple
             ? 'MEMORANDO MÚLTIPLE'
             : 'MEMORANDUM';
-        $this->agregarMemoTexto($items, $titulo.' Nº '.$numero, 13, true, true, 8, 495, true);
+        $this->agregarMemoTexto($items, $titulo.' Nº '.$numero, 10, true, true, 8, 495, true);
 
         $destinatariosDetalle = is_array($documento['destinatarios_detalle'] ?? null)
             ? $documento['destinatarios_detalle']
@@ -243,26 +246,32 @@ class PdfDocumentGenerator
             )));
         $remitente = trim((string) ($documento['remitente_nombre'] ?? $documento['remitente'] ?? ''));
         $remitenteCargo = trim((string) ($documento['remitente_cargo'] ?? ''));
-        if ($destinatariosDetalle !== []) {
-            foreach ($destinatariosDetalle as $indice => $destinatario) {
-                $this->agregarMemoPersonaCampo($items, $indice === 0 ? 'A' : '', $destinatario);
-            }
-            $items[] = ['tipo' => 'espacio', 'alto' => 8];
-        } else {
-            $this->agregarMemoCampo($items, 'A', implode('; ', $destinatarios), 8, true);
-        }
-        $this->agregarMemoPersonaCampo($items, 'De', [
+        $remitenteDetalle = [
             'nombres' => $remitente,
             'apellidos' => null,
             'cargo' => $remitenteCargo,
-        ]);
-        $this->agregarMemoCampo($items, 'Asunto', (string) ($documento['asunto'] ?? ''), 8, true);
-        $this->agregarMemoCampo($items, 'Fecha', $this->fechaMemorando($documento), 12);
+        ];
+        if ($esMultiple) {
+            $this->agregarMemoPersonaCampo($items, 'De', $remitenteDetalle, $tamanoCampo);
+        }
+        if ($destinatariosDetalle !== []) {
+            foreach ($destinatariosDetalle as $indice => $destinatario) {
+                $this->agregarMemoPersonaCampo($items, $indice === 0 ? 'A' : '', $destinatario, $tamanoCampo);
+            }
+            $items[] = ['tipo' => 'espacio', 'alto' => 8];
+        } else {
+            $this->agregarMemoCampo($items, 'A', implode('; ', $destinatarios), 8, true, $tamanoCampo);
+        }
+        if (! $esMultiple) {
+            $this->agregarMemoPersonaCampo($items, 'De', $remitenteDetalle, $tamanoCampo);
+        }
+        $this->agregarMemoCampo($items, 'Asunto', (string) ($documento['asunto'] ?? ''), 8, true, $tamanoCampo);
+        $this->agregarMemoCampo($items, 'Fecha', $this->fechaMemorando($documento), 12, false, $tamanoCampo);
         $items[] = ['tipo' => 'linea', 'alto' => 16];
 
         foreach ([$documento['introduccion'] ?? null, $documento['contenido_principal'] ?? null] as $contenido) {
             foreach ($this->separarTexto((string) ($contenido ?? '')) as $parrafo) {
-                $this->agregarMemoTexto($items, $parrafo, 10, false, false, 8, 495, false, 13);
+                $this->agregarMemoTexto($items, $parrafo, $tamanoCuerpo, false, false, 8, 495, false, $altoCuerpo);
             }
         }
 
@@ -285,30 +294,30 @@ class PdfDocumentGenerator
             $this->agregarMemoTexto(
                 $items,
                 (string) ($documento['personas_titulo'] ?? 'Personas mencionadas:'),
-                10,
+                $tamanoCuerpo,
                 false,
                 false,
                 6,
                 495,
                 false,
-                13,
+                $altoCuerpo,
             );
-            $this->agregarMemoColumnas($items, $personasDetalle === [] ? $personas : $personasDetalle, 8);
+            $this->agregarMemoColumnas($items, $personasDetalle === [] ? $personas : $personasDetalle, 8, $tamanoCuerpo);
         }
 
         $items[] = ['tipo' => 'empujar_cierre', 'alto' => 0];
         foreach ($this->separarTexto((string) ($documento['cierre'] ?? '')) as $parrafo) {
-            $this->agregarMemoTexto($items, $parrafo, 10, false, true, 8, 495, false, 13);
+            $this->agregarMemoTexto($items, $parrafo, $tamanoCuerpo, false, ! $esMultiple, 8, 495, false, $altoCuerpo);
         }
 
-        $this->agregarMemoTexto($items, 'Atentamente', 10, false, true, 5, 495, false, 13);
+        $this->agregarMemoTexto($items, 'Atentamente', $tamanoCuerpo, false, true, 5, 495, false, $altoCuerpo);
         $items[] = ['tipo' => 'firma', 'alto' => 52];
         $firmante = trim((string) ($documento['firmante_nombre'] ?? $documento['firmante'] ?? ''));
         $firmanteCargo = trim((string) ($documento['firmante_cargo'] ?? ''));
         $this->agregarMemoTexto($items, '________________________________________', 9, false, true, 2, 250, false, 12);
-        $this->agregarMemoTexto($items, $firmante, 9, true, true, 1, 250, false, 12);
+        $this->agregarMemoTexto($items, $firmante, $tamanoCuerpo, true, true, 1, 300, false, $altoCuerpo);
         if ($firmanteCargo !== '') {
-            $this->agregarMemoTexto($items, $firmanteCargo, 8, false, true, 0, 250, false, 11);
+            $this->agregarMemoTexto($items, $firmanteCargo, $tamanoCuerpo, false, true, 0, 300, false, $altoCuerpo);
         }
 
         $codigo = (string) ($documento['codigo_verificacion'] ?? '');
@@ -358,9 +367,10 @@ class PdfDocumentGenerator
     /**
      * @param  list<array<string, mixed>>  $items
      */
-    private function agregarMemoCampo(array &$items, string $etiqueta, string $valor, int $espacio, bool $valorNegrita = false): void
+    private function agregarMemoCampo(array &$items, string $etiqueta, string $valor, int $espacio, bool $valorNegrita, int $tamano): void
     {
-        $lineas = $this->ajustarMemoLinea(trim($this->textoPlano($valor)), 9, 405);
+        $ancho = 409 - $this->anchoMemoTextoPuntos(': ', $tamano, $valorNegrita);
+        $lineas = $this->ajustarMemoLinea(trim($this->textoPlano($valor)), $tamano, $ancho, $valorNegrita);
 
         if ($lineas === []) {
             $lineas = [''];
@@ -372,7 +382,8 @@ class PdfDocumentGenerator
                 'etiqueta' => $indice === 0 ? $etiqueta : '',
                 'texto' => $linea,
                 'valor_negrita' => $valorNegrita,
-                'alto' => 14,
+                'tamano' => $tamano,
+                'alto' => $tamano + 5,
             ];
         }
 
@@ -382,7 +393,7 @@ class PdfDocumentGenerator
     /**
      * @param  array<string, mixed>  $persona
      */
-    private function agregarMemoPersonaCampo(array &$items, string $etiqueta, array $persona): void
+    private function agregarMemoPersonaCampo(array &$items, string $etiqueta, array $persona, int $tamano): void
     {
         $nombre = trim(implode(' ', array_filter([
             $persona['nombres'] ?? null,
@@ -391,11 +402,11 @@ class PdfDocumentGenerator
         $cargo = trim((string) ($persona['cargo'] ?? ''));
 
         if ($nombre !== '') {
-            $this->agregarMemoCampo($items, $etiqueta, $nombre, 0, true);
+            $this->agregarMemoCampo($items, $etiqueta, $nombre, 0, true, $tamano);
         }
 
         if ($cargo !== '') {
-            $this->agregarMemoCampo($items, '', $cargo, 8);
+            $this->agregarMemoCampo($items, '', $cargo, 8, false, $tamano);
         }
     }
 
@@ -403,20 +414,20 @@ class PdfDocumentGenerator
      * @param  list<array<string, mixed>>  $items
      * @param  list<string|array<string, mixed>>  $personas
      */
-    private function agregarMemoColumnas(array &$items, array $personas, int $espacio): void
+    private function agregarMemoColumnas(array &$items, array $personas, int $espacio, int $tamano): void
     {
         foreach ($personas as $persona) {
             if (is_array($persona)) {
                 $izquierda = $this->ajustarMemoLinea(trim(implode(' ', array_filter([
                     $persona['nombres'] ?? null,
                     $persona['apellidos'] ?? null,
-                ]))), 8, 180);
+                ]))), $tamano, 180);
                 $derecha = $this->ajustarMemoLinea(trim(implode(' · ', array_filter([
                     $persona['cargo'] ?? null,
                     ! empty($persona['dni']) ? 'DNI: '.$persona['dni'] : null,
-                ]))), 8, 235);
+                ]))), $tamano, 235);
             } else {
-                $izquierda = $this->ajustarMemoLinea($this->textoPlano($persona), 8, 180);
+                $izquierda = $this->ajustarMemoLinea($this->textoPlano($persona), $tamano, 180);
                 $derecha = [];
             }
 
@@ -424,7 +435,8 @@ class PdfDocumentGenerator
                 'tipo' => 'columnas',
                 'izquierda' => $izquierda,
                 'derecha' => $derecha,
-                'alto' => max(count($izquierda), count($derecha), 1) * 12,
+                'tamano' => $tamano,
+                'alto' => max(count($izquierda), count($derecha), 1) * ($tamano + 3),
             ];
         }
 
@@ -684,7 +696,7 @@ class PdfDocumentGenerator
     private function anchoMemoTextoPuntos(string $texto, int $tamano, bool $negrita = false): float
     {
         $unidades = 0;
-        $metricas = $this->metricasMemo();
+        $metricas = $this->metricasMemo($negrita);
 
         foreach (mb_str_split($texto) as $caracter) {
             $base = $caracter;
@@ -699,11 +711,11 @@ class PdfDocumentGenerator
             $unidades += $metricas[$base] ?? 600;
         }
 
-        return $unidades * ($tamano / 1000) * ($negrita ? 1.03 : 1.0);
+        return $unidades * ($tamano / 1000);
     }
 
     /** @return array<string, int> */
-    private function metricasMemo(): array
+    private function metricasMemo(bool $negrita = false): array
     {
         static $metricas = [
             ' ' => 278, '!' => 278, '"' => 355, '#' => 556, '$' => 556, '%' => 889, '&' => 667,
@@ -723,7 +735,22 @@ class PdfDocumentGenerator
             '”' => 444, '¿' => 556, '¡' => 278,
         ];
 
-        return $metricas;
+        if (! $negrita) {
+            return $metricas;
+        }
+
+        return array_replace($metricas, [
+            '!' => 333, '"' => 474, '&' => 722, "'" => 238,
+            ':' => 333, ';' => 333, '?' => 611, '@' => 975,
+            'A' => 722, 'B' => 722, 'J' => 556, 'K' => 722, 'L' => 611,
+            '[' => 333, ']' => 333, '^' => 584, 'b' => 611, 'c' => 556, 'd' => 611,
+            'f' => 333, 'g' => 611, 'h' => 611, 'i' => 278, 'j' => 278,
+            'k' => 556, 'l' => 278, 'm' => 889, 'n' => 611, 'o' => 611,
+            'p' => 611, 'q' => 611, 'r' => 389, 's' => 556, 't' => 333,
+            'u' => 611, 'v' => 556, 'w' => 778, 'x' => 556, 'y' => 556,
+            '{' => 389, '|' => 280, '}' => 389,
+            '“' => 500, '”' => 500,
+        ]);
     }
 
     /**
@@ -1195,13 +1222,15 @@ class PdfDocumentGenerator
             if ($tipo === 'columnas') {
                 $izquierda = $linea['izquierda'] ?? [];
                 $derecha = $linea['derecha'] ?? [];
+                $tamano = (int) $linea['tamano'];
+                $altoLinea = $tamano + 3;
 
                 foreach ($izquierda as $indice => $texto) {
-                    $contenido .= 'BT /F1 8 Tf 1 0 0 1 105 '.number_format($y - ($indice * 12), 2, '.', '').' Tm '.$this->pdfTexto((string) $texto)." Tj ET\n";
+                    $contenido .= 'BT /F1 '.$tamano.' Tf 1 0 0 1 105 '.number_format($y - ($indice * $altoLinea), 2, '.', '').' Tm '.$this->pdfTexto((string) $texto)." Tj ET\n";
                 }
 
                 foreach ($derecha as $indice => $texto) {
-                    $contenido .= 'BT /F1 8 Tf 1 0 0 1 300 '.number_format($y - ($indice * 12), 2, '.', '').' Tm '.$this->pdfTexto((string) $texto)." Tj ET\n";
+                    $contenido .= 'BT /F1 '.$tamano.' Tf 1 0 0 1 300 '.number_format($y - ($indice * $altoLinea), 2, '.', '').' Tm '.$this->pdfTexto((string) $texto)." Tj ET\n";
                 }
 
                 continue;
@@ -1218,10 +1247,11 @@ class PdfDocumentGenerator
             if ($tipo === 'campo') {
                 $etiqueta = (string) ($linea['etiqueta'] ?? '');
                 $texto = (string) ($linea['texto'] ?? '');
-                $contenido .= 'BT /F2 9 Tf 1 0 0 1 58 '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($etiqueta)." Tj ET\n";
+                $tamano = (int) $linea['tamano'];
+                $contenido .= 'BT /F2 '.$tamano.' Tf 1 0 0 1 58 '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($etiqueta)." Tj ET\n";
                 $prefijo = $etiqueta === '' ? '  ' : ': ';
                 $fuenteValor = ($linea['valor_negrita'] ?? false) ? 'F2' : 'F1';
-                $contenido .= 'BT /'.$fuenteValor.' 9 Tf 1 0 0 1 136 '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($prefijo.$texto)." Tj ET\n";
+                $contenido .= 'BT /'.$fuenteValor.' '.$tamano.' Tf 1 0 0 1 136 '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($prefijo.$texto)." Tj ET\n";
 
                 continue;
             }

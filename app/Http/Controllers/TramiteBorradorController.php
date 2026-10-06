@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Services\Tramites\GenerateTramiteFinalDocument;
 use App\Services\Tramites\PrepareTramiteForAssignment;
 use App\Services\Tramites\SaveTramiteDraft;
+use App\Services\Tramites\TramiteTypeCatalog;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -82,6 +84,10 @@ class TramiteBorradorController extends Controller
                 ->where('estado', 'publicada')
                 ->where('activa', true)
                 ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
+                ->when(! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento), function (Builder $query) use ($tramite): void {
+                    $query->where('tipo_documento_salida', $tramite->formato_salida)
+                        ->where('modalidad', $tramite->modalidad_documento);
+                })
                 ->orderBy('nombre')
                 ->get(['id', 'codigo', 'nombre', 'descripcion', 'modalidad'])
                 ->map(fn (TramitePlantilla $plantilla): array => [

@@ -605,17 +605,18 @@ export default function TramiteBorrador({
                             <CardHeader>
                                 <CardTitle>Destinatarios</CardTitle>
                                 <CardDescription>
-                                    El memorando múltiple requiere al menos dos
-                                    destinatarios y uno principal.
+                                    {plantillaActual?.modalidad === 'multiple'
+                                        ? 'El memorando múltiple requiere al menos dos destinatarios y uno principal.'
+                                        : 'Registra los destinatarios que correspondan al documento con sus nombres y cargo o función.'}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <FieldGroup className="gap-5">
                                     {form.data.destinatarios.map(
                                         (destinatario, indice) => (
-                                            <div
+                                            <FieldGroup
                                                 key={indice}
-                                                className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2"
+                                                className="grid gap-4 sm:grid-cols-2"
                                             >
                                                 <ShadcnField className="gap-2 sm:col-span-2">
                                                     <FieldLabel
@@ -812,7 +813,7 @@ export default function TramiteBorrador({
                                                         Destinatario principal
                                                     </FieldLabel>
                                                 </ShadcnField>
-                                            </div>
+                                            </FieldGroup>
                                         ),
                                     )}
                                     <FieldError id="destinatarios-error">
@@ -852,8 +853,9 @@ export default function TramiteBorrador({
                             <CardHeader>
                                 <CardTitle>Contenido del borrador</CardTitle>
                                 <CardDescription>
-                                    La vista previa es provisional y no incluye
-                                    firma ni número oficial.
+                                    La vista previa es provisional, puede
+                                    incluir la firma de perfil y no reserva
+                                    número oficial.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -1041,9 +1043,9 @@ export default function TramiteBorrador({
                                 <FieldGroup className="gap-4">
                                     {form.data.personas_mencionadas.map(
                                         (persona, indice) => (
-                                            <div
+                                            <FieldGroup
                                                 key={indice}
-                                                className="grid gap-4 rounded-xl border p-4 sm:grid-cols-4"
+                                                className="grid gap-4 sm:grid-cols-4"
                                             >
                                                 <Field
                                                     id={`persona-${indice}-nombres`}
@@ -1147,7 +1149,7 @@ export default function TramiteBorrador({
                                                         }
                                                     />
                                                 </Field>
-                                            </div>
+                                            </FieldGroup>
                                         ),
                                     )}
                                     <FieldError id="personas-mencionadas-error">
@@ -1318,12 +1320,36 @@ export default function TramiteBorrador({
                             </CardHeader>
                             <CardContent className="flex flex-col gap-4">
                                 {borrador?.id ? (
-                                    <iframe
-                                        title="Vista previa PDF del borrador"
-                                        src={`/tramites/${tramite.id}/borradores/${borrador.id}/pdf`}
-                                        sandbox="allow-same-origin"
-                                        className="h-[720px] w-full rounded-md border bg-muted"
-                                    />
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            render={
+                                                <a
+                                                    href={TramiteBorradorController.pdf.url(
+                                                        {
+                                                            tramite: tramite.id,
+                                                            borrador:
+                                                                borrador.id,
+                                                        },
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                />
+                                            }
+                                        >
+                                            Abrir PDF provisional
+                                        </Button>
+                                        <iframe
+                                            title="Vista previa PDF del borrador"
+                                            src={TramiteBorradorController.pdf.url(
+                                                {
+                                                    tramite: tramite.id,
+                                                    borrador: borrador.id,
+                                                },
+                                            )}
+                                            className="h-[720px] w-full"
+                                        />
+                                    </>
                                 ) : (
                                     <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                                         <p>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
 import TramiteEntregaController from '@/actions/App/Http/Controllers/TramiteEntregaController';
+import SelectField from '@/components/select-field';
 import TramiteStatusBadge from '@/components/tramite-status-badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -150,7 +151,7 @@ export default function TramiteEntregaPage({
                         >
                             <ArrowLeft />
                         </Button>
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                             <p className="text-sm text-muted-foreground">
                                 Entrega y cierre del expediente
                             </p>
@@ -176,7 +177,7 @@ export default function TramiteEntregaPage({
                             confirma su recepción.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="flex flex-col gap-4">
                         {documento ? (
                             <div className="rounded-xl border p-4 text-sm">
                                 <p className="font-medium">
@@ -370,7 +371,7 @@ export default function TramiteEntregaPage({
                             recepción queda pendiente hasta que se confirme.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="flex flex-col gap-4">
                         {puede_registrar_entrega && medios.length > 0 && (
                             <Form
                                 {...TramiteEntregaController.registerDelivery.form(
@@ -379,59 +380,36 @@ export default function TramiteEntregaPage({
                             >
                                 {({ errors, processing }) => (
                                     <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                                        <Field
+                                        <SelectField
                                             id="medio_entrega_id"
                                             label="Medio de entrega"
                                             error={errors.medio_entrega_id}
-                                        >
-                                            <select
-                                                id="medio_entrega_id"
-                                                name="medio_entrega_id"
-                                                required
-                                                defaultValue={String(
-                                                    medios[0].id,
-                                                )}
-                                                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                                            >
-                                                {medios.map((medio) => (
-                                                    <option
-                                                        key={medio.id}
-                                                        value={medio.id}
-                                                    >
-                                                        {medio.nombre}
-                                                        {medio.requiere_evidencia
-                                                            ? ' · requiere evidencia'
-                                                            : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
+                                            defaultValue={String(medios[0].id)}
+                                            options={Object.fromEntries(
+                                                medios.map((medio) => [
+                                                    String(medio.id),
+                                                    `${medio.nombre}${medio.requiere_evidencia ? ' · requiere evidencia' : ''}`,
+                                                ]),
+                                            )}
+                                            required
+                                        />
+                                        <SelectField
                                             id="receptor_tipo"
                                             label="Tipo de receptor"
                                             error={errors.receptor_tipo}
-                                        >
-                                            <select
-                                                id="receptor_tipo"
-                                                name="receptor_tipo"
-                                                required
-                                                defaultValue="Estudiante"
-                                                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                                            >
-                                                {[
+                                            defaultValue={'Estudiante'}
+                                            options={Object.fromEntries(
+                                                [
                                                     'Estudiante',
                                                     'Egresado',
                                                     'Docente',
                                                     'Autoridad',
                                                     'Representante autorizado',
                                                     'Otro',
-                                                ].map((tipo) => (
-                                                    <option key={tipo}>
-                                                        {tipo}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
+                                                ].map((tipo) => [tipo, tipo]),
+                                            )}
+                                            required
+                                        />
                                         <Field
                                             id="receptor_nombre"
                                             label="Nombre del receptor"
@@ -499,7 +477,7 @@ export default function TramiteEntregaPage({
                                         </Field>
                                         <Field
                                             id="medio_utilizado"
-                                            label="Medio digital u otro (opcional)"
+                                            label="Medio utilizado (si no se indica correo)"
                                             error={errors.medio_utilizado}
                                         >
                                             <Input
@@ -508,34 +486,28 @@ export default function TramiteEntregaPage({
                                                 maxLength={255}
                                             />
                                         </Field>
-                                        <Field
+                                        <SelectField
                                             id="tipo_evidencia"
                                             label="Tipo de evidencia"
                                             error={errors.tipo_evidencia}
-                                        >
-                                            <select
-                                                id="tipo_evidencia"
-                                                name="tipo_evidencia"
-                                                defaultValue=""
-                                                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                                            >
-                                                <option value="">
-                                                    Selecciona si corresponde
-                                                </option>
-                                                {[
-                                                    'Constancia firmada',
-                                                    'Fotografía del documento',
-                                                    'Archivo PDF',
-                                                    'Imagen',
-                                                    'Código de confirmación',
-                                                    'Confirmación manual',
-                                                ].map((tipo) => (
-                                                    <option key={tipo}>
-                                                        {tipo}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
+                                            defaultValue={''}
+                                            options={{
+                                                '': 'Selecciona si corresponde',
+                                                ...Object.fromEntries(
+                                                    [
+                                                        'Constancia firmada',
+                                                        'Fotografía del documento',
+                                                        'Archivo PDF',
+                                                        'Imagen',
+                                                        'Código de confirmación',
+                                                        'Confirmación manual',
+                                                    ].map((tipo) => [
+                                                        tipo,
+                                                        tipo,
+                                                    ]),
+                                                ),
+                                            }}
+                                        />
                                         <Field
                                             id="evidencia-entrega"
                                             label="Archivo de evidencia (opcional)"
@@ -799,7 +771,7 @@ export default function TramiteEntregaPage({
                             recepción haya sido confirmada.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="flex flex-col gap-4">
                         {puede_cerrar && (
                             <Form
                                 {...TramiteEntregaController.close.form({

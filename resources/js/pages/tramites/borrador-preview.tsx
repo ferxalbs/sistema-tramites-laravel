@@ -1,12 +1,14 @@
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
+import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
+    CardFooter,
     CardTitle,
 } from '@/components/ui/card';
 
@@ -65,16 +67,18 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                             </time>
                         )}
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="flex flex-col gap-4">
                         <p className="font-medium">
                             BORRADOR SIN NUMERACIÓN OFICIAL
                         </p>
                         {borrador.puede_pdf ? (
                             <iframe
                                 title="Vista previa PDF del borrador guardado"
-                                src={`/tramites/${tramite.id}/borradores/${borrador.id}/pdf`}
-                                sandbox="allow-same-origin"
-                                className="h-[720px] w-full rounded-md border bg-muted"
+                                src={TramiteBorradorController.pdf.url({
+                                    tramite: tramite.id,
+                                    borrador: borrador.id,
+                                })}
+                                className="h-[720px] w-full"
                             />
                         ) : borrador.contenido ? (
                             <p className="break-words whitespace-pre-wrap">
@@ -88,10 +92,31 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                         )}
                         <p className="text-sm text-muted-foreground">
                             {borrador.puede_pdf
-                                ? 'Vista previa PDF provisional. No constituye firma, aprobación ni numeración oficial.'
+                                ? 'PDF provisional; puede incluir la firma del perfil. No constituye aprobación ni numeración oficial.'
                                 : 'Vista previa provisional. No constituye PDF, firma, aprobación ni numeración oficial.'}
                         </p>
                     </CardContent>
+                    {borrador.puede_pdf && (
+                        <CardFooter>
+                            <Button
+                                variant="outline"
+                                render={
+                                    <a
+                                        href={TramiteBorradorController.pdf.url(
+                                            {
+                                                tramite: tramite.id,
+                                                borrador: borrador.id,
+                                            },
+                                        )}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    />
+                                }
+                            >
+                                <Download /> Abrir PDF provisional
+                            </Button>
+                        </CardFooter>
+                    )}
                 </Card>
             </main>
         </>
