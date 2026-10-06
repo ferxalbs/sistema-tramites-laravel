@@ -1,16 +1,19 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Download } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Download } from 'lucide-react';
+import type { ReactElement } from 'react';
 import TramiteBorradorController from '@/actions/App/Http/Controllers/TramiteBorradorController';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
     CardDescription,
-    CardHeader,
     CardFooter,
+    CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 
 type Props = {
     tramite: { id: number; codigo: string };
@@ -33,25 +36,20 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
         <>
             <Head title={`Borrador v${borrador.version} · ${tramite.codigo}`} />
 
-            <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 p-4 md:p-6">
-                <Link
-                    className={buttonVariants({ variant: 'outline' })}
-                    href={TramiteController.show({ tramite: tramite.id })}
-                >
-                    <ArrowLeft data-icon="inline-start" />
-                    Volver al expediente
-                </Link>
-
-                <Card>
+            <main className="flex flex-1 flex-col p-4 md:p-6">
+                <Card className="mx-auto w-full max-w-5xl">
                     <CardHeader>
                         <CardTitle>
-                            {tramite.codigo} · Borrador v{borrador.version}
-                            {borrador.actual ? ' · actual' : ''}
+                            <h1 className="flex flex-wrap items-center gap-2">
+                                {tramite.codigo} · Borrador v{borrador.version}
+                                {borrador.actual && (
+                                    <Badge variant="secondary">Actual</Badge>
+                                )}
+                            </h1>
                         </CardTitle>
                         <CardDescription>
-                            {borrador.plantilla} · plantilla v
-                            {borrador.version_plantilla} ·{' '}
-                            {borrador.estado.replaceAll('_', ' ')}
+                            {borrador.plantilla} (v{borrador.version_plantilla})
+                            · {borrador.estado.replaceAll('_', ' ')}
                             {borrador.creador ? ` · ${borrador.creador}` : ''}
                         </CardDescription>
                         {borrador.created_at && (
@@ -67,10 +65,7 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                             </time>
                         )}
                     </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
-                        <p className="font-medium">
-                            BORRADOR SIN NUMERACIÓN OFICIAL
-                        </p>
+                    <CardContent>
                         {borrador.puede_pdf ? (
                             <iframe
                                 title="Vista previa PDF del borrador guardado"
@@ -78,26 +73,22 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                                     tramite: tramite.id,
                                     borrador: borrador.id,
                                 })}
-                                className="h-[720px] w-full"
+                                className="h-[72vh] min-h-96 w-full"
                             />
-                        ) : borrador.contenido ? (
-                            <p className="break-words whitespace-pre-wrap">
-                                {borrador.contenido}
-                            </p>
                         ) : (
-                            <p>
-                                Esta versión histórica no tiene texto de vista
-                                previa guardado.
+                            <p className="break-words whitespace-pre-wrap">
+                                {borrador.contenido ||
+                                    'Esta versión histórica no tiene texto de vista previa guardado.'}
                             </p>
                         )}
+                    </CardContent>
+                    <CardFooter className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-muted-foreground">
                             {borrador.puede_pdf
                                 ? 'PDF provisional; puede incluir la firma del perfil. No constituye aprobación ni numeración oficial.'
                                 : 'Vista previa provisional. No constituye PDF, firma, aprobación ni numeración oficial.'}
                         </p>
-                    </CardContent>
-                    {borrador.puede_pdf && (
-                        <CardFooter>
+                        {borrador.puede_pdf && (
                             <Button
                                 variant="outline"
                                 render={
@@ -113,12 +104,35 @@ export default function BorradorPreview({ tramite, borrador }: Props) {
                                     />
                                 }
                             >
-                                <Download /> Abrir PDF provisional
+                                <Download data-icon="inline-start" /> Abrir PDF
+                                provisional
                             </Button>
-                        </CardFooter>
-                    )}
+                        )}
+                    </CardFooter>
                 </Card>
             </main>
         </>
     );
 }
+
+BorradorPreview.layout = (page: ReactElement<Props>) => (
+    <AppLayout
+        breadcrumbs={[
+            {
+                title: 'Expediente',
+                href: TramiteController.show({
+                    tramite: page.props.tramite.id,
+                }),
+            },
+            {
+                title: `Vista previa (v${page.props.borrador.version})`,
+                href: TramiteBorradorController.show.url({
+                    tramite: page.props.tramite.id,
+                    borrador: page.props.borrador.id,
+                }),
+            },
+        ]}
+    >
+        {page}
+    </AppLayout>
+);

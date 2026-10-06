@@ -17,7 +17,7 @@ export default function AuthLayout({
                 <div className="absolute -top-40 left-1/2 h-[340px] w-[500px] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
             </div>
 
-            <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-6">
+            <div className="relative z-10 flex w-full flex-col items-center gap-6">
                 <Link
                     href={home()}
                     className="group inline-flex items-center gap-3 transition-opacity hover:opacity-90"
@@ -35,7 +35,9 @@ export default function AuthLayout({
                     </div>
                 </Link>
 
-                <div className="w-full">{children}</div>
+                <div className="flex w-full flex-col items-center">
+                    {children}
+                </div>
             </div>
 
             <HelpTools />

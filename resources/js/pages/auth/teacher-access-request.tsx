@@ -204,8 +204,12 @@ export default function TeacherAccessRequest({
                                     />
                                     <InputError message={errors.motivo} />
                                 </CardContent>
-                                <CardFooter>
-                                    <Button type="submit" disabled={processing}>
+                                <CardFooter className="flex-col gap-2">
+                                    <Button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="w-full"
+                                    >
                                         Enviar solicitud
                                     </Button>
                                     <Button

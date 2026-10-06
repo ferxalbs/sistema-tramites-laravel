@@ -1,16 +1,16 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { Bell } from 'lucide-react';
+import {
+    Bell,
+    CheckCheck,
+    Inbox,
+    ArrowLeft,
+    ArrowRight,
+    FileText,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { index, read, readAll } from '@/routes/notificaciones';
+import { cn } from '@/lib/utils';
 
 type Notification = {
     id: number;
@@ -39,19 +39,43 @@ export default function Notificaciones({ notifications, filters }: Props) {
     return (
         <>
             <Head title="Notificaciones" />
-            <main>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            <Bell /> Notificaciones
-                        </CardTitle>
-                        <CardDescription>
+            <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:p-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            Notificaciones
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
                             Avisos internos de los expedientes que puedes
                             consultar.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <nav aria-label="Estado de notificaciones">
+                        </p>
+                    </div>
+
+                    <Form {...readAll.form()} disableWhileProcessing>
+                        {({ processing }) => (
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                disabled={
+                                    processing ||
+                                    notifications.data.every((n) => n.leida)
+                                }
+                                className="w-full sm:w-auto"
+                            >
+                                <CheckCheck className="mr-2 h-4 w-4" />
+                                Marcar todas como leídas
+                            </Button>
+                        )}
+                    </Form>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <nav
+                            aria-label="Estado de notificaciones"
+                            className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted p-1"
+                        >
                             {[
                                 ['todas', 'Todas'],
                                 ['no_leidas', 'No leídas'],
@@ -64,6 +88,12 @@ export default function Notificaciones({ notifications, filters }: Props) {
                                             ? 'default'
                                             : 'ghost'
                                     }
+                                    size="sm"
+                                    className={cn(
+                                        'h-8 rounded-md px-3 text-sm',
+                                        filters.estado !== value &&
+                                            'text-muted-foreground',
+                                    )}
                                     render={
                                         <Link
                                             href={target(
@@ -77,116 +107,174 @@ export default function Notificaciones({ notifications, filters }: Props) {
                                 </Button>
                             ))}
                         </nav>
-                        <nav aria-label="Prioridad">
+
+                        <div className="hidden h-8 w-px bg-border sm:block" />
+
+                        <nav
+                            aria-label="Prioridad"
+                            className="flex flex-wrap items-center gap-2"
+                        >
+                            <span className="mr-1 ml-1 text-xs font-medium tracking-wider text-muted-foreground uppercase sm:ml-0">
+                                Prioridad:
+                            </span>
                             {[
-                                ['todas', 'Todas las prioridades'],
+                                ['todas', 'Todas'],
                                 ['normal', 'Normal'],
                                 ['alta', 'Alta'],
                                 ['urgente', 'Urgente'],
                                 ['baja', 'Baja'],
                             ].map(([value, label]) => (
-                                <Button
+                                <Link
                                     key={value}
-                                    variant={
+                                    href={target(filters.estado, value)}
+                                    className={cn(
+                                        'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                                         filters.prioridad === value
-                                            ? 'secondary'
-                                            : 'ghost'
-                                    }
-                                    render={
-                                        <Link
-                                            href={target(filters.estado, value)}
-                                        />
-                                    }
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+                                    )}
                                 >
                                     {label}
-                                </Button>
+                                </Link>
                             ))}
                         </nav>
-                    </CardContent>
-                    <CardFooter>
-                        <Form {...readAll.form()} disableWhileProcessing>
-                            {({ processing }) => (
-                                <Button
-                                    type="submit"
-                                    variant="outline"
-                                    disabled={processing}
-                                >
-                                    Marcar todas como leídas
-                                </Button>
-                            )}
-                        </Form>
-                    </CardFooter>
-                </Card>
+                    </div>
+                </div>
 
-                {notifications.data.length === 0 ? (
-                    <Card>
-                        <CardContent>
-                            No hay notificaciones para estos filtros.
-                        </CardContent>
-                    </Card>
-                ) : (
-                    notifications.data.map((notification) => (
-                        <Card key={notification.id}>
-                            <CardHeader>
-                                <CardTitle>{notification.titulo}</CardTitle>
-                                <CardDescription>
-                                    {notification.fecha}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <p>{notification.mensaje}</p>
-                                <Badge
-                                    variant={
-                                        notification.leida
-                                            ? 'secondary'
-                                            : 'default'
-                                    }
-                                >
-                                    {notification.leida ? 'Leída' : 'No leída'}
-                                </Badge>
-                                {notification.prioridad !== 'normal' && (
-                                    <Badge variant="outline">
-                                        {notification.prioridad}
-                                    </Badge>
-                                )}
-                            </CardContent>
-                            <CardFooter>
-                                {notification.url && (
-                                    <Button
-                                        variant="outline"
-                                        render={
-                                            <Link href={notification.url} />
-                                        }
-                                    >
-                                        Ver expediente
-                                    </Button>
-                                )}
-                                {!notification.leida && (
-                                    <Form
-                                        {...read.form(notification.id)}
-                                        disableWhileProcessing
-                                    >
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                disabled={processing}
-                                            >
-                                                Marcar como leída
-                                            </Button>
+                {/* Notifications List */}
+                <div className="flex flex-col gap-4">
+                    {notifications.data.length === 0 ? (
+                        <div className="flex min-h-[400px] animate-in flex-col items-center justify-center rounded-xl border border-dashed bg-card/50 p-8 text-center fade-in-50">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                                <Inbox className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                            <h2 className="mt-6 text-xl font-semibold">
+                                Bandeja limpia
+                            </h2>
+                            <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
+                                No tienes notificaciones nuevas que coincidan
+                                con estos filtros. ¡Todo está al día!
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                            <div className="flex flex-col divide-y">
+                                {notifications.data.map((notification) => (
+                                    <div
+                                        key={notification.id}
+                                        className={cn(
+                                            'flex flex-col gap-4 p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-start sm:p-6',
+                                            !notification.leida
+                                                ? 'bg-primary/5'
+                                                : '',
                                         )}
-                                    </Form>
-                                )}
-                            </CardFooter>
-                        </Card>
-                    ))
-                )}
+                                    >
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-background shadow-sm">
+                                            <Bell
+                                                className={cn(
+                                                    'h-5 w-5',
+                                                    !notification.leida
+                                                        ? 'text-primary'
+                                                        : 'text-muted-foreground',
+                                                )}
+                                            />
+                                        </div>
 
+                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h3
+                                                    className={cn(
+                                                        'text-base font-semibold',
+                                                        !notification.leida &&
+                                                            'text-primary',
+                                                    )}
+                                                >
+                                                    {notification.titulo}
+                                                </h3>
+                                                {!notification.leida && (
+                                                    <Badge
+                                                        variant="default"
+                                                        className="h-5 px-1.5 text-[10px] uppercase"
+                                                    >
+                                                        Nueva
+                                                    </Badge>
+                                                )}
+                                                {notification.prioridad !==
+                                                    'normal' && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="h-5 px-1.5 text-[10px] uppercase"
+                                                    >
+                                                        {notification.prioridad}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <p className="text-sm leading-relaxed text-muted-foreground">
+                                                {notification.mensaje}
+                                            </p>
+                                            <p className="mt-1 text-xs font-medium text-muted-foreground/80">
+                                                {notification.fecha}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
+                                            {notification.url && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full sm:w-auto"
+                                                    render={
+                                                        <Link
+                                                            href={
+                                                                notification.url
+                                                            }
+                                                        />
+                                                    }
+                                                >
+                                                    <FileText className="mr-2 h-4 w-4" />
+                                                    Ver expediente
+                                                </Button>
+                                            )}
+                                            {!notification.leida && (
+                                                <Form
+                                                    {...read.form(
+                                                        notification.id,
+                                                    )}
+                                                    disableWhileProcessing
+                                                    className="w-full sm:w-auto"
+                                                >
+                                                    {({ processing }) => (
+                                                        <Button
+                                                            type="submit"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={
+                                                                processing
+                                                            }
+                                                            className="w-full text-muted-foreground hover:text-foreground sm:w-auto"
+                                                        >
+                                                            Marcar leída
+                                                        </Button>
+                                                    )}
+                                                </Form>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Pagination */}
                 {notifications.last_page > 1 && (
-                    <nav aria-label="Páginas de notificaciones">
-                        {notifications.current_page > 1 && (
-                            <Button
-                                variant="outline"
-                                render={
+                    <div className="mt-2 flex items-center justify-between border-t pt-4">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={notifications.current_page === 1}
+                            render={
+                                notifications.current_page > 1 ? (
                                     <Link
                                         href={target(
                                             filters.estado,
@@ -194,20 +282,28 @@ export default function Notificaciones({ notifications, filters }: Props) {
                                             notifications.current_page - 1,
                                         )}
                                     />
-                                }
-                            >
-                                Anterior
-                            </Button>
-                        )}
-                        <span>
+                                ) : (
+                                    <span />
+                                )
+                            }
+                        >
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Anterior
+                        </Button>
+                        <span className="text-sm font-medium text-muted-foreground">
                             Página {notifications.current_page} de{' '}
                             {notifications.last_page}
                         </span>
-                        {notifications.current_page <
-                            notifications.last_page && (
-                            <Button
-                                variant="outline"
-                                render={
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                                notifications.current_page ===
+                                notifications.last_page
+                            }
+                            render={
+                                notifications.current_page <
+                                notifications.last_page ? (
                                     <Link
                                         href={target(
                                             filters.estado,
@@ -215,12 +311,15 @@ export default function Notificaciones({ notifications, filters }: Props) {
                                             notifications.current_page + 1,
                                         )}
                                     />
-                                }
-                            >
-                                Siguiente
-                            </Button>
-                        )}
-                    </nav>
+                                ) : (
+                                    <span />
+                                )
+                            }
+                        >
+                            Siguiente
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                    </div>
                 )}
             </main>
         </>
