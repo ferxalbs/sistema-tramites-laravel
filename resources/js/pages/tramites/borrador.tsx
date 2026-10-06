@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, setLayoutProps, useForm } from '@inertiajs/react';
 import {
     Children,
     cloneElement,
@@ -183,6 +183,16 @@ export default function TramiteBorrador({
     resumen_observacion,
     observaciones = [],
 }: Props) {
+    setLayoutProps({
+        breadcrumbs: [
+            { title: 'Bandeja de trámites', href: TramiteController.index() },
+            {
+                title: 'Detalle',
+                href: TramiteController.show({ tramite: tramite.id }),
+            },
+            { title: 'Borrador', href: '#' },
+        ],
+    });
     const [destinatariosElegidos, setDestinatariosElegidos] = useState<
         Record<number, string>
     >({});
@@ -366,6 +376,18 @@ export default function TramiteBorrador({
                             guardar(false);
                         }}
                     >
+                        {usuarios.length === 0 && (
+                            <Alert>
+                                <AlertDescription>
+                                    No hay remitentes ni firmantes habilitados.
+                                    Para preparar el documento, un usuario
+                                    activo debe tener un cargo institucional
+                                    asignado. Puedes guardar el borrador
+                                    incompleto mientras se configura al
+                                    responsable.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         {modo === 'corregir' && (
                             <Card>
                                 <CardHeader>
@@ -1593,11 +1615,3 @@ function formatDateTime(value: string): string {
         timeStyle: 'short',
     }).format(new Date(value));
 }
-
-TramiteBorrador.layout = {
-    breadcrumbs: [
-        { title: 'Bandeja de trámites', href: TramiteController.index() },
-        { title: 'Detalle', href: '#' },
-        { title: 'Borrador', href: '#' },
-    ],
-};

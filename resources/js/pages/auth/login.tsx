@@ -1,5 +1,4 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +12,12 @@ import {
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import {
+    Field,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
@@ -52,11 +57,11 @@ export default function Login({ status, canResetPassword }: Props) {
                         resetOnSuccess={['password']}
                     >
                         {({ errors }) => (
-                            <div className="flex flex-col gap-6">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="email">
+                            <FieldGroup>
+                                <Field data-invalid={Boolean(errors.email)}>
+                                    <FieldLabel htmlFor="email">
                                         Correo electrónico
-                                    </Label>
+                                    </FieldLabel>
                                     <Input
                                         id="email"
                                         type="email"
@@ -66,14 +71,22 @@ export default function Login({ status, canResetPassword }: Props) {
                                         autoFocus
                                         tabIndex={1}
                                         autoComplete="email"
+                                        aria-invalid={Boolean(errors.email)}
+                                        aria-describedby={
+                                            errors.email
+                                                ? 'email-error'
+                                                : undefined
+                                        }
                                     />
-                                    <InputError message={errors.email} />
-                                </div>
-                                <div className="grid gap-2">
+                                    <FieldError id="email-error">
+                                        {errors.email}
+                                    </FieldError>
+                                </Field>
+                                <Field data-invalid={Boolean(errors.password)}>
                                     <div className="flex items-center">
-                                        <Label htmlFor="password">
+                                        <FieldLabel htmlFor="password">
                                             Contraseña
-                                        </Label>
+                                        </FieldLabel>
                                         {canResetPassword && (
                                             <Link
                                                 href={request()}
@@ -91,10 +104,18 @@ export default function Login({ status, canResetPassword }: Props) {
                                         tabIndex={2}
                                         autoComplete="current-password"
                                         placeholder="••••••••"
+                                        aria-invalid={Boolean(errors.password)}
+                                        aria-describedby={
+                                            errors.password
+                                                ? 'password-error'
+                                                : undefined
+                                        }
                                     />
-                                    <InputError message={errors.password} />
-                                </div>
-                                <div className="flex items-center gap-2">
+                                    <FieldError id="password-error">
+                                        {errors.password}
+                                    </FieldError>
+                                </Field>
+                                <Field orientation="horizontal">
                                     <Checkbox
                                         id="remember"
                                         name="remember"
@@ -103,8 +124,8 @@ export default function Login({ status, canResetPassword }: Props) {
                                     <Label htmlFor="remember">
                                         Recordar sesión
                                     </Label>
-                                </div>
-                            </div>
+                                </Field>
+                            </FieldGroup>
                         )}
                     </Form>
                 </CardContent>
