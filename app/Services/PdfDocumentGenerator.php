@@ -93,6 +93,12 @@ class PdfDocumentGenerator
             return $this->generarMemorando($documento, $firmaImagen);
         }
 
+        if (($documento['tipo_tramite'] ?? null) === 'CONSTANCIA_MODALIDAD_TITULACION'
+            && ($documento['tipo_documento_salida'] ?? null) === 'constancia'
+            && filled($documento['contenido_renderizado'] ?? null)) {
+            return $this->generarConstanciaTitulacion($documento, $firmaImagen);
+        }
+
         if (filled($documento['contenido_renderizado'] ?? null)) {
             return $this->generarDesdePlantilla($documento, $firmaImagen);
         }
@@ -206,6 +212,74 @@ class PdfDocumentGenerator
         }
 
         return str_contains(mb_strtolower((string) ($documento['tipo_documento'] ?? '')), 'memorando');
+    }
+
+    /**
+     * @param  array<string, mixed>  $documento
+     * @return array{bytes: string, paginas: int}
+     */
+    private function generarConstanciaTitulacion(array $documento, ?string $firmaImagen): array
+    {
+        $items = [];
+        $contenido = trim((string) $documento['contenido_renderizado']);
+        $firmante = trim((string) ($documento['firmante_nombre'] ?? $documento['firmante'] ?? ''));
+        if ($firmante !== '') {
+            $contenido = preg_replace('/\R\s*'.preg_quote($firmante, '/').'\s*\z/u', '', $contenido) ?? $contenido;
+        }
+
+        $parrafos = preg_split('/\R/u', trim($contenido)) ?: [];
+        $fechaConFirma = false;
+        foreach ($parrafos as $indice => $parrafo) {
+            $titulo = $indice === 0;
+            $esFecha = $indice === array_key_last($parrafos)
+                && filled($documento['lugar'] ?? null)
+                && str_starts_with($parrafo, $documento['lugar'].',');
+            if ($esFecha) {
+                $items[] = ['tipo' => 'empujar_cierre', 'alto' => 0];
+                $fechaConFirma = true;
+            }
+            $inicio = count($items);
+            $this->agregarMemoTexto(
+                $items, $parrafo, $titulo ? 14 : 12,
+                $titulo || trim($parrafo) === 'HACE CONSTAR:', $titulo,
+                $titulo ? 20 : ($parrafo === '' ? 8 : 10), 495, $titulo, $titulo ? 18 : 20,
+            );
+            if ($esFecha) {
+                for ($posicion = $inicio; $posicion < count($items); $posicion++) {
+                    $items[$posicion]['alineacion'] = 'derecha';
+                }
+            }
+        }
+
+        if (($documento['decision'] ?? null) === 'rechazado') {
+            foreach (['Resultado de la evaluación' => 'Rechazado', 'Fundamento' => $documento['conclusion'] ?? null, 'Comunicación al interesado' => $documento['comentario_publico'] ?? null] as $titulo => $texto) {
+                if (filled($texto)) {
+                    $this->agregarMemoTexto($items, $titulo, 12, true, false, 4, 495);
+                    $this->agregarMemoTexto($items, (string) $texto, 12, false, false, 10, 495, false, 20);
+                }
+            }
+        }
+
+        if (! $fechaConFirma) {
+            $items[] = ['tipo' => 'empujar_cierre', 'alto' => 0];
+        }
+        if ($firmaImagen !== null) {
+            $items[] = ['tipo' => 'firma', 'alto' => 58];
+        }
+        $this->agregarMemoTexto($items, '________________________________________', 10, false, true, 4, 495);
+        $this->agregarMemoTexto($items, $firmante, 12, true, true, 4, 495);
+        if (filled($documento['firmante_cargo'] ?? null)) {
+            $this->agregarMemoTexto($items, (string) $documento['firmante_cargo'], 10, false, true, 4, 495);
+        }
+        $this->agregarMemoTexto($items, (string) $documento['numero'], 8, false, true, 0, 495);
+
+        $qr = $this->matrizVerificacion((string) $documento['codigo_verificacion']);
+        $paginas = $this->distribuirMemorando($items, (string) $documento['codigo_expediente'], (string) $documento['codigo_verificacion'], true);
+
+        return [
+            'bytes' => $this->construirPdfMemorando($paginas, (string) $documento['numero'], (string) $documento['institucion'], $qr, $firmaImagen, $this->leerEncabezadoInstitucional('simple')),
+            'paginas' => count($paginas),
+        ];
     }
 
     /**
@@ -1278,6 +1352,9 @@ class PdfDocumentGenerator
             $x = $centrado
                 ? max(50, (595 - $this->anchoMemoTextoPuntos($texto, $tamano, (bool) ($linea['negrita'] ?? false))) / 2)
                 : 50;
+            if (($linea['alineacion'] ?? null) === 'derecha') {
+                $x = max(50, 545 - $this->anchoMemoTextoPuntos($texto, $tamano, (bool) ($linea['negrita'] ?? false)));
+            }
             $contenido .= 'BT /'.$fuente.' '.$tamano.' Tf 1 0 0 1 '.number_format($x, 2, '.', '').' '.number_format($y, 2, '.', '').' Tm '.$this->pdfTexto($texto)." Tj ET\n";
 
             if (($linea['subrayado'] ?? false) === true) {

@@ -77,7 +77,7 @@ export default function DocumentoFinal({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Versión aprobada para emisión</CardTitle>
+                        <CardTitle>Versión revisada para emisión</CardTitle>
                         <CardDescription>
                             La numeración se reserva al confirmar. El PDF se
                             genera desde la versión exacta que revisó el

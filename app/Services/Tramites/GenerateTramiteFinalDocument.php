@@ -510,6 +510,7 @@ class GenerateTramiteFinalDocument
             'institucion' => (string) config('app.name', 'Sistema de Gestión Documentaria'),
             'tipo_documento' => $borrador->plantilla->nombre,
             'tipo_documento_salida' => $borrador->plantilla->tipo_documento_salida,
+            'tipo_tramite' => $tramite->tipo_documento,
             'modalidad_documento' => $borrador->plantilla->modalidad,
             'numero' => $numero,
             'codigo_expediente' => $tramite->codigo,

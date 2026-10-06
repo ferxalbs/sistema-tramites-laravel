@@ -312,6 +312,8 @@ test('the final PDF includes the exact resolved body of a constancia', function 
         'tipo_documento' => 'Constancia de titulación',
         'tipo_documento_salida' => 'constancia',
         'numero' => 'CONST-2026-001',
+        'tipo_tramite' => 'CONSTANCIA_MODALIDAD_TITULACION',
+        'lugar' => 'Lima',
         'codigo_expediente' => 'TRM-2026-001',
         'codigo_verificacion' => 'ABCD-EFGH-IJKL-MNOP',
         'firmante_nombre' => 'Docente Firmante',
@@ -324,9 +326,20 @@ test('the final PDF includes the exact resolved body of a constancia', function 
     expect($pdf['bytes'])->toStartWith('%PDF-')
         ->toContain('Ana Perez Soto')
         ->toContain('72345678')
-        ->toContain('Texto especifico aprobado para esta constancia.');
+        ->toContain('Texto especifico aprobado para esta constancia.')
+        ->toContain('/Encabezado')
+        ->toContain(' l S Q');
 
-    $longBody = "CONSTANCIA\n".str_repeat("Texto aprobado de prueba para comprobar el espacio reservado al QR.\n", 30);
+    $renamed = app(PdfDocumentGenerator::class)->generate([
+        ...$document, 'tipo_documento' => 'Plantilla renombrada',
+    ]);
+    expect($renamed['bytes'])->toBe($pdf['bytes']);
+    $other = app(PdfDocumentGenerator::class)->generate([
+        ...$document, 'tipo_tramite' => 'CONSTANCIA_PRACTICA',
+    ]);
+    expect($other['bytes'])->not->toContain('/Encabezado');
+
+    $longBody = "CONSTANCIA\n".str_repeat("Texto aprobado de prueba para comprobar el espacio reservado al QR.\n", 30)."\nLima, 6 de octubre de 2026\nDocente Firmante";
     $preview = app(PdfDocumentGenerator::class)->generate([
         ...$document, 'contenido_renderizado' => $longBody, 'codigo_verificacion' => '',
     ]);
@@ -335,6 +348,10 @@ test('the final PDF includes the exact resolved body of a constancia', function 
     ]);
     expect($issued['paginas'])->toBeGreaterThan(1)
         ->and($preview['paginas'])->toBe($issued['paginas']);
+    foreach ([$preview, $issued] as $output) {
+        preg_match_all('/\d+ 0 obj\n<< \/Length \d+ >>\nstream\n(.*?)\nendstream/s', $output['bytes'], $streams);
+        expect(array_last($streams[1]))->toContain('Lima, 6 de octubre de 2026')->toContain('Docente Firmante');
+    }
 });
 
 test('email delivery sends the official PDF before marking the delivery as registered', function () {

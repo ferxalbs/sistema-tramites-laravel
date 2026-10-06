@@ -16,7 +16,7 @@
 6. En el servicio actual, ejecutar `php artisan storage:verify-persistence --write` y guardar el marcador devuelto. Tras un nuevo despliegue, ejecutar `php artisan storage:verify-persistence --check=MARCADOR`. Un fallo prueba que el almacenamiento privado no sobrevivió. El marcador no contiene datos personales.
 7. Confirmar `php artisan migrate:status` y descargar, con una cuenta autorizada, una firma, un adjunto y un PDF creados antes del despliegue. Registrar el resultado. La prueba del marcador sola no verifica que todos los archivos anteriores estén intactos.
 
-## Estado al 2 de octubre de 2026
+## Estado histórico al 2 de octubre de 2026
 
 La configuración del volumen, sus respaldos, el respaldo de Turso y la prueba de conservación entre dos despliegues **siguen pendientes** porque esta sesión solo tiene acceso al repositorio GitHub. El código y la prueba local de fallo de migración están listos, pero subir el commit no constituye una verificación de persistencia en Railway.
 
@@ -24,7 +24,9 @@ La configuración del volumen, sus respaldos, el respaldo de Turso y la prueba d
 
 - Se obtuvo un respaldo privado de Turso antes del montaje y se restauró en una base SQLite desechable: `integrity_check` correcto, cero infracciones en `foreign_key_check`, 102 tablas y 49 migraciones. La copia queda fuera del repositorio, con permisos locales 0600.
 - La inspección anterior al montaje encontró cero expedientes y cero archivos privados documentales; no se ocultaron PDF, firmas ni evidencias históricas existentes.
-- Se adjuntó `sistema-tramites-laravel-volume` a `/app/storage/app/private`. `findmnt` confirmó el montaje ext4 en esa ruta. `storage:verify-persistence --write` escribió y leyó el marcador; aún debe cotejarse tras el siguiente despliegue.
+- Se adjuntó `sistema-tramites-laravel-volume` a `/app/storage/app/private`. `findmnt` confirmó el montaje ext4 en esa ruta. `storage:verify-persistence --write` escribió y leyó el marcador; el mismo marcador se comprobó correctamente tras los despliegues de `5abfa32` y `d7b7ebf`, en contenedores distintos.
 - `migrate:status` mostró ejecutadas las migraciones actuales. El dominio publicado permitió acceder, con la sesión autorizada, a Notificaciones y Bandeja de trámites.
+- Se descargó y restauró en almacenamiento local desechable un respaldo manual del volumen: el marcador restaurado coincide. La copia queda fuera de Git con permisos 0600.
 - Railway mostró que crear respaldos automáticos y PITR requiere el plan Pro. No se modificó el plan. El respaldo manual de la base no reemplaza una política de copias de los archivos privados del volumen.
-- Permanecen pendientes la conservación entre despliegues, las descargas de archivos creados antes de ellos y el recorrido completo del documento publicado y su QR.
+- Se registró un Memorando ficticio marcado como prueba técnica y se descargó su PDF provisional privado sin numeración oficial. La vista previa se genera al solicitarla; no demuestra persistencia de un PDF almacenado.
+- Permanecen pendientes la carga y descarga de archivos documentales antes y después de desplegar y el recorrido completo publicado con QR. La extensión de Chrome requiere permiso de archivos locales para la carga; hacen falta cuentas autorizadas de los otros roles y responsables con cargo activo. No se inventaron cargos ni se emitieron documentos oficiales de prueba.
