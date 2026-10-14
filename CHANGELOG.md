@@ -4,6 +4,11 @@ Registro de cambios del Sistema de Trámites. Actualizado el **14 de octubre de 
 
 ## 2026-10-14 — Cierre técnico local y verificación del flujo
 
+### Reapertura local
+
+- Se encontró el supervisor local terminado con código `0xC000013A`; la ausencia del proceso, y no un rechazo de credenciales, causaba `ERR_CONNECTION_REFUSED`. Se inició nuevamente y se comprobó respuesta HTTP 200 del login.
+- La tarea de Windows ahora reintenta iniciar el supervisor hasta tres veces, con un minuto entre intentos, si termina con error. Se mantiene el reinicio interno de Laravel y el inicio al entrar en Windows. Esto no garantiza recuperación de todo fallo del sistema operativo.
+
 ### Implementado
 
 - Se conservaron los cambios locales anteriores de logo, colores guinda/blanco, modos de apariencia, login, instalador y preparación de despliegue; el trabajo continúa exclusivamente en `main`.

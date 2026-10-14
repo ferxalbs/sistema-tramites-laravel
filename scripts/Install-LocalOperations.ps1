@@ -19,6 +19,6 @@ $mailTrigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
 Register-ScheduledTask -TaskName 'SistemaTramites-CorreoLocal' -Action $mailAction -Trigger $mailTrigger -Settings $options -Principal $principal -Description 'Inicia la bandeja de correo de pruebas, accesible solo desde esta PC.' -Force | Out-Null
 $serverScript = Join-Path $PSScriptRoot 'Start-SistemaTramitesLocal.ps1'
 $serverAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File "' + $serverScript + '"') -WorkingDirectory $projectRoot
-$serverOptions = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero)
+$serverOptions = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 Register-ScheduledTask -TaskName 'SistemaTramites-ServidorLocal' -Action $serverAction -Trigger $mailTrigger -Settings $serverOptions -Principal $principal -Description 'Mantiene Laravel disponible solo en esta PC, sin depender de XAMPP.' -Force | Out-Null
 Write-Output 'Inicio local, respaldo diario y bandeja de pruebas configurados.'
