@@ -176,6 +176,11 @@ function Test-PortInUse([int] $port) {
 }
 
 function Start-App {
+    if ($Puerto -eq 8000) {
+        & (Join-Path $PSScriptRoot 'Start-SistemaTramitesLocal.ps1') -Launch
+        return
+    }
+
     $url = "http://127.0.0.1:$Puerto/login"
     if (Test-PortInUse $Puerto) {
         Write-Host "El puerto $Puerto ya está en uso; se abre el navegador en $url" -ForegroundColor Yellow

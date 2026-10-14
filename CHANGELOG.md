@@ -8,6 +8,8 @@ Registro de cambios del Sistema de Trámites. Actualizado el **14 de octubre de 
 
 - Se encontró el supervisor local terminado con código `0xC000013A`; la ausencia del proceso, y no un rechazo de credenciales, causaba `ERR_CONNECTION_REFUSED`. Se inició nuevamente y se comprobó respuesta HTTP 200 del login.
 - La tarea de Windows ahora reintenta iniciar el supervisor hasta tres veces, con un minuto entre intentos, si termina con error. Se mantiene el reinicio interno de Laravel y el inicio al entrar en Windows. Esto no garantiza recuperación de todo fallo del sistema operativo.
+- Ante una nueva interrupción, se corrigió `INICIAR_LOCAL.cmd`: su script inicia el servidor a través del Programador de tareas, sin crear el supervisor como hijo del terminal de la aplicación de escritorio. Un disparador periódico cada minuto recupera también salidas normales o cancelaciones; `IgnoreNew` conserva una sola instancia. El lanzador prepara esta tarea si falta, espera respuesta HTTP 200 y permite comprobar el inicio sin abrir otra pestaña con `-NoBrowser`.
+- El instalador utiliza el mismo arranque independiente en su puerto predeterminado 8000. Se detuvo deliberadamente la tarea y Windows la recuperó sin una orden de inicio adicional en **24,4 segundos**; login y `/ready` respondieron HTTP 200. El supervisor se creó desde `svchost.exe`, y una segunda ejecución del lanzador conservó su PID y una sola instancia. No se cerró la aplicación de escritorio durante esta comprobación.
 
 ### Implementado
 

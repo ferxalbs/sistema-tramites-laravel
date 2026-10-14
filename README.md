@@ -8,6 +8,8 @@ Aplicación de la oficina de Desarrollo de Sistemas de Información del I.E.S.T.
 2. Abre <http://127.0.0.1:8000/login> e ingresa con tu cuenta.
 3. El correo de pruebas está en <http://127.0.0.1:8025>. Sus mensajes permanecen en esta PC; no llegan al correo institucional.
 
+El lanzador configura e inicia el servidor mediante el Programador de tareas de Windows. Puedes cerrar el lanzador y la aplicación de escritorio: el servidor funciona en segundo plano. Si su supervisor se detiene, Windows vuelve a iniciarlo en el siguiente intervalo de un minuto; espera a que arranque Laravel y recarga la página. La PC debe estar encendida y tu sesión de Windows debe permanecer abierta.
+
 Esta copia utiliza **SQLite**, PHP 8.3 o superior, Laravel, React y TypeScript. No requiere iniciar MySQL ni Apache de XAMPP. La base local habitual es `database/database.sqlite`; firmas, adjuntos y PDF se conservan en `storage/app/private`. No se incluyen datos privados en GitHub.
 
 Para instalar desde cero en otra PC, sigue [la guía de instalación](INSTALAR_EN_OTRA_PC.md). Una copia del código no incluye automáticamente los usuarios y expedientes de esta PC.

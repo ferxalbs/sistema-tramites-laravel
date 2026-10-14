@@ -1,21 +1,39 @@
 # Mantiene disponible el servidor local de Laravel sin depender de XAMPP/MySQL.
-param([switch] $Launch)
+param([switch] $Launch, [switch] $NoBrowser)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if ($Launch) {
+    Import-Module ScheduledTasks
     $serverScript = Join-Path $PSScriptRoot 'Start-SistemaTramitesLocal.ps1'
-    $parameters = '-NoProfile -ExecutionPolicy RemoteSigned -File "' + $serverScript + '"'
-    Start-Process -FilePath powershell.exe -ArgumentList $parameters -WorkingDirectory $projectRoot -WindowStyle Hidden
-    if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'SistemaTramites\tools\mailpit\mailpit.exe')) {
-        & (Join-Path $PSScriptRoot 'Start-MailboxLocal.ps1')
+    $taskName = 'SistemaTramites-ServidorLocal'
+    $serverTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($serverTask -and (@($serverTask.Actions).Count -ne 1 -or -not $serverTask.Actions[0].Arguments.Contains('"' + $serverScript + '"'))) {
+        throw 'La tarea de servidor existente pertenece a otra carpeta. Revisala antes de iniciar.'
+    }
+    $hasRecoveryTrigger = $serverTask -and @($serverTask.Triggers | Where-Object { $_.Repetition.Interval -eq 'PT1M' }).Count -gt 0
+    if (-not $serverTask -or -not $hasRecoveryTrigger -or -not $serverTask.Settings.Enabled) {
+        & (Join-Path $PSScriptRoot 'Install-LocalOperations.ps1') -ServerOnly
+    }
+    # Windows crea el proceso fuera del terminal y de la aplicacion que abrio el lanzador.
+    Start-ScheduledTask -TaskName $taskName
+    $mailTask = Get-ScheduledTask -TaskName 'SistemaTramites-CorreoLocal' -ErrorAction SilentlyContinue
+    $mailScript = Join-Path $PSScriptRoot 'Start-MailboxLocal.ps1'
+    if ($mailTask -and @($mailTask.Actions).Count -eq 1 -and $mailTask.Actions[0].Arguments.Contains('"' + $mailScript + '"')) {
+        Start-ScheduledTask -TaskName $mailTask.TaskName
     }
     $available = $false
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) { $available = $true; break }
-        Start-Sleep -Milliseconds 300
+    $deadline = (Get-Date).AddSeconds(45)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/login' -UseBasicParsing -TimeoutSec 2
+            if ($response.StatusCode -eq 200) { $available = $true; break }
+        } catch {
+            Start-Sleep -Milliseconds 300
+        }
     }
     if (-not $available) { throw 'No se pudo iniciar el sistema. Revisa storage\logs\local-server-supervisor-v2.log.' }
-    Start-Process 'http://127.0.0.1:8000/login'
+    Write-Output 'Sistema disponible: http://127.0.0.1:8000/login. Windows mantiene el servidor en segundo plano.'
+    if (-not $NoBrowser) { Start-Process 'http://127.0.0.1:8000/login' }
     exit 0
 }
 $logPath = Join-Path $projectRoot 'storage\logs\local-server-supervisor-v2.log'

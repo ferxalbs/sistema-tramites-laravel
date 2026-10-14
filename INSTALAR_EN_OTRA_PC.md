@@ -52,13 +52,15 @@ Si aparece una versión antigua de PHP, ajusta `PATH` para que el ejecutable de 
 
     Guarda la contraseña temporal que aparece una sola vez y cámbiala al iniciar sesión. El comando se bloquea si la base ya contiene usuarios.
 
-6. Inicia el servidor y mantén abierta esa ventana:
+6. Ejecuta **`INICIAR_LOCAL.cmd`**. Configura el servidor en el Programador de tareas de Windows y abre la página. Puedes cerrar la ventana del lanzador y la aplicación de escritorio; Windows mantiene el servidor mientras la PC esté encendida y tu sesión permanezca abierta.
+
+    Para iniciarlo desde PowerShell:
 
     ```powershell
-    php -d ffi.enable=true artisan serve --host=127.0.0.1 --port=8000
+    .\scripts\Start-SistemaTramitesLocal.ps1 -Launch
     ```
 
-    Abre <http://127.0.0.1:8000/login>.
+    Abre <http://127.0.0.1:8000/login>. Si el supervisor se detiene, se recupera en el siguiente intervalo de un minuto, más el tiempo de arranque de Laravel. El comando manual `php artisan serve` depende de mantener abierta su ventana; utiliza el lanzador para el uso cotidiano.
 
 ## Si vas a modificar la interfaz
 
