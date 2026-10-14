@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TramitePlantilla;
 use App\Services\Tramites\TramiteTemplateEligibility;
+use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,12 +20,13 @@ class TramitePlantillaController extends Controller
         return Inertia::render('plantillas', [
             'formatos' => DB::table('tipos_documento_salida')->where('activo', true)->orderBy('nombre')->get(['codigo', 'nombre']),
             'modalidades' => DB::table('modalidades_documento')->where('activo', true)->orderBy('nombre')->get(['codigo', 'nombre']),
+            'tipos' => TramiteTypeCatalog::labels(),
             'plantillas' => TramitePlantilla::query()
                 ->orderBy('codigo')
                 ->orderByDesc('version')
                 ->get([
                     'id', 'codigo', 'version', 'nombre', 'descripcion', 'tipo_documento_salida',
-                    'modalidad', 'contenido', 'estado', 'activa', 'created_at',
+                    'modalidad', 'contenido', 'estado', 'activa', 'created_at', 'tipo_tramite', 'validada_en', 'fuente_modelo', 'modelo_propuesto',
                 ]),
         ]);
     }
@@ -41,7 +43,8 @@ class TramitePlantillaController extends Controller
             'codigo' => ['required', 'regex:/^[A-Z0-9_]{3,80}$/', 'unique:tramite_plantillas,codigo'],
             'nombre' => ['required', 'string', 'min:3', 'max:160'],
             'descripcion' => ['nullable', 'string', 'max:255'],
-            'tipo_documento_salida' => ['required', Rule::in(['informe', 'memorando'])],
+            'tipo_documento_salida' => ['required', Rule::in(['informe', 'memorando', 'constancia'])],
+            'tipo_tramite' => ['nullable', Rule::in(array_keys(TramiteTypeCatalog::labels()))],
             'modalidad' => ['nullable', Rule::in(['simple', 'multiple'])],
             'contenido' => ['required', 'string', 'max:60000'],
         ]);
@@ -50,7 +53,7 @@ class TramitePlantillaController extends Controller
         $formato = $data['tipo_documento_salida'];
         $modalidad = $data['modalidad'] ?? null;
 
-        if (($formato === 'informe' && $modalidad !== null) || ($formato === 'memorando' && $modalidad === null)) {
+        if (($formato !== 'memorando' && $modalidad !== null) || ($formato === 'memorando' && $modalidad === null)) {
             throw ValidationException::withMessages(['modalidad' => 'La modalidad no corresponde al formato documental.']);
         }
 
@@ -60,7 +63,18 @@ class TramitePlantillaController extends Controller
             throw ValidationException::withMessages(['tipo_documento_salida' => 'Seleccione un formato y modalidad activos.']);
         }
 
+        $sourceCode = match ($data['tipo_tramite'] ?? null) {
+            'CONSTANCIA_PRACTICA' => 'CONSTANCIA_PRACTICA_PROPUESTO',
+            'JUSTIFICACION_TARDANZA' => 'JUSTIFICACION_TARDANZA_PROPUESTO',
+            default => match ($formato) {
+                'informe' => 'INFORME_INSTITUCIONAL',
+                'memorando' => $modalidad === 'multiple' ? 'MEMORANDO_MULTIPLE' : 'MEMORANDO_SIMPLE',
+                'constancia' => 'CONSTANCIA_MODALIDAD_TITULACION',
+                default => throw ValidationException::withMessages(['tipo_documento_salida' => 'Seleccione un formato documental válido.']),
+            },
+        };
         $source = TramitePlantilla::query()->where('tipo_documento_salida', $formato)
+            ->where('codigo', $sourceCode)
             ->where('estado', 'publicada')
             ->where('modalidad', $modalidad)->orderByDesc('activa')->orderByDesc('version')->first();
 
@@ -81,6 +95,8 @@ class TramitePlantillaController extends Controller
                 'permite_no_firma' => $source->permite_no_firma,
                 'estado' => 'borrador',
                 'activa' => false,
+                'tipo_tramite' => $data['tipo_tramite'] ?? null,
+                'modelo_propuesto' => $source->modelo_propuesto,
             ]);
             $this->cloneFields($source, $nueva);
             DB::table('tramite_config_events')->insert([
@@ -116,7 +132,7 @@ class TramitePlantillaController extends Controller
         ]);
         $contenido = $this->sanitizeContent($data['contenido']);
 
-        $this->assertEssentialVariables($contenido);
+        $this->assertEssentialVariables($contenido, $plantilla->contenido);
 
         DB::transaction(function () use ($request, $plantilla, $data, $contenido): void {
             $version = ((int) TramitePlantilla::query()
@@ -141,6 +157,8 @@ class TramitePlantillaController extends Controller
                 'permite_no_firma' => $plantilla->permite_no_firma,
                 'estado' => $publicar ? 'publicada' : 'borrador',
                 'activa' => $publicar,
+                'tipo_tramite' => $plantilla->tipo_tramite,
+                'modelo_propuesto' => $plantilla->modelo_propuesto,
             ]);
 
             $this->cloneFields($plantilla, $nueva);
@@ -204,6 +222,31 @@ class TramitePlantillaController extends Controller
         return to_route('admin.templates.index')->with('success', 'Estado de la plantilla actualizado.');
     }
 
+    public function validateModel(Request $request, TramitePlantilla $plantilla): RedirectResponse
+    {
+        if (TramiteTemplateEligibility::isReferentialTemplate($plantilla)) {
+            throw ValidationException::withMessages(['validacion' => 'Cree una versión propia del modelo antes de validar su uso.']);
+        }
+        $data = $request->validate([
+            'fuente_modelo' => ['required', 'string', 'min:10', 'max:255'],
+            'confirmar_validacion' => ['required', 'accepted'],
+        ]);
+        DB::transaction(function () use ($request, $plantilla, $data): void {
+            $plantilla->update([
+                'validada_en' => now(), 'validada_por' => $request->user()->id,
+                'fuente_modelo' => trim($data['fuente_modelo']),
+            ]);
+            DB::table('tramite_config_events')->insert([
+                'actor_id' => $request->user()->id, 'accion' => 'validacion_modelo', 'entidad' => 'plantilla',
+                'entidad_id' => $plantilla->id, 'valor_anterior' => 'pendiente',
+                'valor_nuevo' => json_encode(['fuente' => $plantilla->fuente_modelo, 'version' => $plantilla->version], JSON_THROW_ON_ERROR),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
+
+        return to_route('admin.templates.index')->with('success', 'Validación de esta versión registrada por la administración.');
+    }
+
     public function fields(TramitePlantilla $plantilla): InertiaResponse
     {
         return Inertia::render('plantilla-campos', [
@@ -259,6 +302,7 @@ class TramitePlantillaController extends Controller
                 'activo' => (bool) $data['activo'],
                 'updated_at' => now(),
             ]);
+            $plantilla->update(['validada_en' => null, 'validada_por' => null, 'fuente_modelo' => null]);
             DB::table('tramite_config_events')->insert([
                 'actor_id' => $request->user()->id,
                 'accion' => 'edicion_campo_plantilla',
@@ -301,6 +345,7 @@ class TramitePlantillaController extends Controller
             DB::table('tramite_plantilla_campos')->where('id', $fields[$next]->id)->update([
                 'orden' => $current->orden, 'updated_at' => now(),
             ]);
+            $plantilla->update(['validada_en' => null, 'validada_por' => null, 'fuente_modelo' => null]);
             DB::table('tramite_config_events')->insert([
                 'actor_id' => $request->user()->id,
                 'accion' => 'reordenamiento_campo_plantilla',
@@ -326,11 +371,17 @@ class TramitePlantillaController extends Controller
         return trim($content);
     }
 
-    private function assertEssentialVariables(string $contenido): void
+    private function assertEssentialVariables(string $contenido, ?string $anterior = null): void
     {
-        if (! str_contains($contenido, '{{NUMERO_DOCUMENTO_PREVIO}}') || ! str_contains($contenido, '{{CONTENIDO_PRINCIPAL}}')) {
+        // Older models receive their number from the PDF renderer and use CONTENIDO.
+        $requiereNumero = $anterior === null || str_contains($anterior, '{{NUMERO_DOCUMENTO_PREVIO}}');
+        $tieneCuerpo = str_contains($contenido, '{{CONTENIDO_PRINCIPAL}}')
+            || ($anterior !== null && str_contains($anterior, '{{CONTENIDO}}') && str_contains($contenido, '{{CONTENIDO}}'));
+        if (($requiereNumero && ! str_contains($contenido, '{{NUMERO_DOCUMENTO_PREVIO}}')) || ! $tieneCuerpo) {
             throw ValidationException::withMessages([
-                'contenido' => 'La plantilla debe contener {{NUMERO_DOCUMENTO_PREVIO}} y {{CONTENIDO_PRINCIPAL}}.',
+                'contenido' => $requiereNumero
+                    ? 'La plantilla debe conservar {{NUMERO_DOCUMENTO_PREVIO}} y el contenido principal.'
+                    : 'La plantilla debe conservar {{CONTENIDO_PRINCIPAL}} o su variable de contenido original.',
             ]);
         }
     }

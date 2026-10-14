@@ -717,7 +717,8 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                             <CardHeader>
                                 <CardTitle>Información de recepción</CardTitle>
                                 <CardDescription>
-                                    Datos registrados por la mesa de partes.
+                                    Datos registrados durante la recepción del
+                                    expediente.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
@@ -770,7 +771,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                     value={`${tramite.destino_tipo}: ${tramite.destino_nombre}`}
                                 />
                                 <Detail
-                                    label="Fecha y hora de recepción en Mesa de Partes"
+                                    label="Fecha y hora de recepción"
                                     value={
                                         tramite.fecha_llegada_oficina ??
                                         'No registrada'
@@ -1264,7 +1265,7 @@ export default function TramiteShow({ tramite }: { tramite: TramiteDetail }) {
                                     </CardTitle>
                                     <CardDescription>
                                         Adjunta el documento corregido recibido
-                                        en Mesa de Partes. El estado seguirá
+                                        en la oficina. El estado seguirá
                                         Observado.
                                     </CardDescription>
                                 </CardHeader>

@@ -71,6 +71,17 @@ class TramiteBorradorController extends Controller
         abort_unless(in_array($tramite->estado, ['digitalizado', 'borrador_preparado'], true), 409);
 
         $borrador = $tramite->borradorActual;
+        $plantillas = TramitePlantilla::query()
+            ->where('activa', true)
+            ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
+            ->when(! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento), function (Builder $query) use ($tramite): void {
+                $query->where('tipo_documento_salida', $tramite->formato_salida)
+                    ->where('modalidad', $tramite->modalidad_documento);
+            })
+            ->orderBy('nombre')
+            ->get(['id', 'codigo', 'nombre', 'descripcion', 'tipo_documento_salida', 'modalidad', 'estado', 'activa', 'tipo_tramite', 'modelo_propuesto', 'validada_en'])
+            ->filter(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::availableForDraft($tramite, $plantilla))
+            ->values();
 
         return Inertia::render('tramites/borrador', [
             'modo' => 'borrador',
@@ -81,26 +92,17 @@ class TramiteBorradorController extends Controller
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
             ],
             'hoy' => now()->toDateString(),
-            'modelo_oficial_pendiente' => in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true),
-            'plantillas' => TramitePlantilla::query()
-                ->where('activa', true)
-                ->whereIn('tipo_documento_salida', DB::table('tipos_documento_salida')->where('activo', true)->select('codigo'))
-                ->when(! TramiteTypeCatalog::requiresApplicant($tramite->tipo_documento), function (Builder $query) use ($tramite): void {
-                    $query->where('tipo_documento_salida', $tramite->formato_salida)
-                        ->where('modalidad', $tramite->modalidad_documento);
-                })
-                ->orderBy('nombre')
-                ->get(['id', 'codigo', 'nombre', 'descripcion', 'tipo_documento_salida', 'modalidad', 'estado', 'activa'])
-                ->filter(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::availableForDraft($tramite, $plantilla))
-                ->values()
-                ->map(fn (TramitePlantilla $plantilla): array => [
-                    'id' => $plantilla->id,
-                    'codigo' => $plantilla->codigo,
-                    'nombre' => $plantilla->nombre,
-                    'descripcion' => $plantilla->descripcion,
-                    'modalidad' => $plantilla->modalidad,
-                    'campos' => $this->camposEditables($plantilla),
-                ])->all(),
+            'modelo_oficial_pendiente' => in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true)
+                && ! $plantillas->contains(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::canIssue($tramite, $plantilla) && ! TramiteTemplateEligibility::isDemo($plantilla)),
+            'emision_prueba_disponible' => $plantillas->contains(fn (TramitePlantilla $plantilla): bool => TramiteTemplateEligibility::isDemo($plantilla) && TramiteTemplateEligibility::canIssue($tramite, $plantilla)),
+            'plantillas' => $plantillas->map(fn (TramitePlantilla $plantilla): array => [
+                'id' => $plantilla->id,
+                'codigo' => $plantilla->codigo,
+                'nombre' => $plantilla->nombre,
+                'descripcion' => $plantilla->descripcion,
+                'modalidad' => $plantilla->modalidad,
+                'campos' => $this->camposEditables($plantilla),
+            ])->all(),
             'usuarios' => $this->usuariosAutorizados(),
             'destinatarios_sugeridos' => $this->destinatariosSugeridos(),
             'borrador' => $borrador === null ? null : [
@@ -181,6 +183,8 @@ class TramiteBorradorController extends Controller
 
         return Inertia::render('tramites/borrador', [
             'modo' => 'corregir',
+            'modelo_oficial_pendiente' => ! TramiteTemplateEligibility::canIssue($tramite, $plantilla) || TramiteTemplateEligibility::isDemo($plantilla),
+            'emision_prueba_disponible' => TramiteTemplateEligibility::isDemo($plantilla) && TramiteTemplateEligibility::canIssue($tramite, $plantilla),
             'tramite' => [
                 'id' => $tramite->id,
                 'codigo' => $tramite->codigo,
@@ -303,19 +307,19 @@ class TramiteBorradorController extends Controller
     /** @return array<int, array{id: int, name: string, rol: string, cargo: string, firma_registrada: bool}> */
     private function usuariosAutorizados(): array
     {
-        return DB::table('users as usuario')
+        return User::query()->from('users as usuario')
             ->join('cargos_institucionales as cargo', 'cargo.id', '=', 'usuario.cargo_institucional_id')
             ->where('usuario.activo', true)
             ->where('usuario.estado_cuenta', 'activo')
             ->whereIn('usuario.rol', ['docente', 'administrador'])
             ->orderBy('usuario.name')
-            ->get(['usuario.id', 'usuario.name', 'usuario.rol', 'cargo.nombre as cargo'])
-            ->map(fn ($usuario): array => [
+            ->get(['usuario.id', 'usuario.name', 'usuario.rol', 'usuario.firma_perfil_ruta', 'cargo.nombre as cargo'])
+            ->map(fn (User $usuario): array => [
                 'id' => (int) $usuario->id,
                 'name' => $usuario->name,
                 'rol' => $usuario->rol,
-                'cargo' => $usuario->cargo,
-                'firma_registrada' => Storage::disk('local')->exists('firmas-perfil/'.$usuario->id.'.jpg'),
+                'cargo' => (string) $usuario->getAttribute('cargo'),
+                'firma_registrada' => Storage::disk('local')->exists($usuario->scannedSignaturePath()),
             ])->all();
     }
 

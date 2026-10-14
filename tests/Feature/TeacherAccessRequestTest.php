@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
+beforeEach(function () {
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
+});
+
 test('public teacher request is pending, keeps the teacher role, and awaits verification and approval', function () {
     Notification::fake();
     $program = ProgramaEstudio::factory()->create(['activo' => true]);

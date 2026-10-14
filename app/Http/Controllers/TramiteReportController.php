@@ -144,6 +144,8 @@ class TramiteReportController extends Controller
     }
 
     /**
+     * @param  array<string, string>  $typeLabels
+     * @param  array<string, string>  $classificationLabels
      * @return array<string, string>
      */
     private function reportRow(stdClass $row, array $typeLabels, array $classificationLabels): array

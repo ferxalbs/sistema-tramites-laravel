@@ -9,9 +9,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class ProfileController extends Controller
 {
@@ -70,7 +73,7 @@ class ProfileController extends Controller
         abort_unless(in_array($user->rol, ['estudiante', 'docente', 'administrador'], true), 403);
 
         $data = $request->validate([
-            'firma' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:4096'],
+            'firma' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:4096', Rule::dimensions()->minWidth(40)->minHeight(20)->maxWidth(4000)->maxHeight(4000)],
             'confirmar_uso' => ['required', 'accepted'],
         ]);
 
@@ -94,6 +97,11 @@ class ProfileController extends Controller
         $targetHeight = max(1, (int) round($height * $scale));
         $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
         $blanco = imagecolorallocate($canvas, 255, 255, 255);
+        if ($blanco === false) {
+            imagedestroy($source);
+            imagedestroy($canvas);
+            throw ValidationException::withMessages(['firma' => 'No se pudo preparar la imagen de la firma.']);
+        }
         imagefill($canvas, 0, 0, $blanco);
         imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
         ob_start();
@@ -106,19 +114,36 @@ class ProfileController extends Controller
             throw ValidationException::withMessages(['firma' => 'No se pudo preparar la imagen de la firma.']);
         }
 
-        if (! Storage::disk('local')->put($this->signaturePath($user), $jpeg)) {
+        $signaturePath = 'firmas-perfil/'.$user->id.'/'.Str::uuid().'.jpg';
+        if (! Storage::disk('local')->put($signaturePath, $jpeg)) {
             throw ValidationException::withMessages(['firma' => 'No se pudo guardar la firma en el almacenamiento privado.']);
         }
 
-        DB::table('user_account_events')->insert([
-            'user_id' => $user->id,
-            'actor_id' => $user->id,
-            'accion' => 'update_signature',
-            'estado_anterior' => $user->estado_cuenta,
-            'estado_nuevo' => $user->estado_cuenta,
-            'motivo' => 'Se actualizó la firma escaneada del perfil.',
-            'created_at' => now(),
-        ]);
+        try {
+            DB::transaction(function () use ($user, $signaturePath, $jpeg): void {
+                $user->forceFill([
+                    'firma_perfil_ruta' => $signaturePath,
+                    'firma_perfil_sha256' => hash('sha256', $jpeg),
+                    'firma_perfil_actualizada_en' => now(),
+                ])->save();
+                DB::table('user_account_events')->insert([
+                    'user_id' => $user->id,
+                    'actor_id' => $user->id,
+                    'accion' => 'update_signature',
+                    'estado_anterior' => $user->estado_cuenta,
+                    'estado_nuevo' => $user->estado_cuenta,
+                    'motivo' => 'Se actualizó la firma escaneada del perfil.',
+                    'created_at' => now(),
+                ]);
+            });
+        } catch (Throwable $exception) {
+            // Only the unpublished version can be removed. A previous signature is immutable.
+            $savedPath = User::query()->whereKey($user->id)->value('firma_perfil_ruta');
+            if ($savedPath !== $signaturePath) {
+                Storage::disk('local')->delete($signaturePath);
+            }
+            throw $exception;
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Firma guardada en tu perfil.']);
 
@@ -172,6 +197,6 @@ class ProfileController extends Controller
 
     private function signaturePath(User $user): string
     {
-        return 'firmas-perfil/'.$user->id.'.jpg';
+        return $user->scannedSignaturePath();
     }
 }

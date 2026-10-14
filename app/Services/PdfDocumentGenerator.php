@@ -8,6 +8,10 @@ use BaconQrCode\Encoder\Encoder;
 use RuntimeException;
 use Throwable;
 
+/**
+ * @phpstan-type FlowItem array{text: string, size: int, bold: bool, gap: int, center: bool}|array{firma: true, alto: int}
+ * @phpstan-type PageItem array{text: string, size: int, bold: bool, y: float, center: bool, firma?: true, alto?: int}
+ */
 class PdfDocumentGenerator
 {
     /**
@@ -87,9 +91,19 @@ class PdfDocumentGenerator
      */
     public function generate(array $documento): array
     {
+        if (($documento['es_prueba'] ?? false) === true) {
+            $documento['contenido_renderizado'] = "MODELO PROPUESTO - DOCUMENTO DE PRUEBA\nSIN VALIDACION INSTITUCIONAL\n\n".(string) ($documento['contenido_renderizado'] ?? '');
+            if (! str_starts_with((string) $documento['numero'], 'PRUEBA-')) {
+                $documento['numero'] = 'PRUEBA-'.$documento['numero'];
+            }
+        }
         $firmaImagen = is_string($documento['firma_imagen'] ?? null) ? $documento['firma_imagen'] : null;
 
         if ($this->esMemorando($documento)) {
+            if (filled($documento['contenido_renderizado'] ?? null)) {
+                return $this->generarMemorandoDesdePlantilla($documento, $firmaImagen);
+            }
+
             return $this->generarMemorando($documento, $firmaImagen);
         }
 
@@ -203,6 +217,7 @@ class PdfDocumentGenerator
         ];
     }
 
+    /** @param array<string, mixed> $documento */
     private function esMemorando(array $documento): bool
     {
         $tipoSalida = trim((string) ($documento['tipo_documento_salida'] ?? ''));
@@ -289,6 +304,60 @@ class PdfDocumentGenerator
      * @param  array<string, mixed>  $documento
      * @return array{bytes: string, paginas: int}
      */
+    private function generarMemorandoDesdePlantilla(array $documento, ?string $firmaImagen): array
+    {
+        $multiple = ($documento['modalidad_documento'] ?? '') === 'multiple';
+        $tamano = $multiple ? 10 : 12;
+        $numero = (string) ($documento['numero'] ?? '');
+        $contenido = str_replace('BORRADOR SIN NUMERACIÓN OFICIAL', $numero, (string) $documento['contenido_renderizado']);
+        $parrafos = preg_split('/\R/u', trim($this->textoPlano($contenido))) ?: [];
+        $firmante = trim((string) ($documento['firmante_nombre'] ?? $documento['firmante'] ?? ''));
+        $ultimaLinea = trim((string) end($parrafos));
+        $firmaEnPlantilla = in_array($ultimaLinea, array_filter([$firmante, $documento['firmante'] ?? '']), true);
+        if ($firmaEnPlantilla) {
+            array_pop($parrafos);
+        }
+        $items = [];
+        foreach ($parrafos as $indice => $parrafo) {
+            if ($indice === 0) {
+                $titulo = str_contains($parrafo, $numero) || $numero === '' ? $parrafo : $parrafo.' Nº '.$numero;
+                $this->agregarMemoTexto($items, $titulo, 12, true, true, 12, 495, true, 16);
+            } elseif (preg_match('/^(A|Para|De|Asunto|Fecha|Referencia)\s*:\s*(.*)$/iu', $parrafo, $campo) === 1) {
+                $this->agregarMemoCampo($items, $campo[1], $campo[2], 8, $campo[1] !== 'Fecha', $tamano);
+            } else {
+                $this->agregarMemoTexto($items, $parrafo, $tamano, false, false, $parrafo === '' ? 6 : 4, 495, false, $tamano + 3);
+            }
+        }
+        if (($documento['decision'] ?? null) === 'rechazado') {
+            foreach (['Resultado de la evaluación' => 'Rechazado', 'Fundamento' => $documento['conclusion'] ?? null, 'Comunicación al interesado' => $documento['comentario_publico'] ?? null] as $titulo => $texto) {
+                if (filled($texto)) {
+                    $this->agregarMemoTexto($items, $titulo, $tamano, true, false, 4, 495);
+                    $this->agregarMemoTexto($items, (string) $texto, $tamano, false, false, 8, 495);
+                }
+            }
+        }
+        $items[] = ['tipo' => 'empujar_cierre', 'alto' => 0];
+        if ($firmaImagen !== null) {
+            $items[] = ['tipo' => 'firma', 'alto' => 52];
+        }
+        $this->agregarMemoTexto($items, '________________________________________', 9, false, true, 2, 300, false, 12);
+        $this->agregarMemoTexto($items, $firmaEnPlantilla ? $ultimaLinea : $firmante, $tamano, true, true, 4, 495);
+        if (filled($documento['firmante_cargo'] ?? null)) {
+            $this->agregarMemoTexto($items, (string) $documento['firmante_cargo'], $tamano, false, true, 0, 495);
+        }
+        $codigo = (string) ($documento['codigo_verificacion'] ?? '');
+        $qr = $this->matrizVerificacion($codigo);
+        $paginas = $this->distribuirMemorando($items, (string) ($documento['codigo_expediente'] ?? ''), $codigo, true);
+
+        return [
+            'bytes' => $this->construirPdfMemorando($paginas, $numero, (string) ($documento['institucion'] ?? ''), $qr, $firmaImagen, $this->leerEncabezadoInstitucional($multiple ? 'multiple' : 'simple')),
+            'paginas' => count($paginas),
+        ];
+    }
+
+    /** @param array<string, mixed> $documento
+     * @return array{bytes: string, paginas: int}
+     */
     private function generarMemorando(array $documento, ?string $firmaImagen): array
     {
         $items = [];
@@ -365,7 +434,7 @@ class PdfDocumentGenerator
         }
 
         $personasDetalle = is_array($documento['personas_detalle'] ?? null)
-            ? $documento['personas_detalle']
+            ? array_values(array_filter($documento['personas_detalle'], 'is_array'))
             : [];
         $personas = $personasDetalle === []
             ? array_values(array_filter(array_map('strval', (array) ($documento['personas'] ?? []))))
@@ -481,6 +550,7 @@ class PdfDocumentGenerator
 
     /**
      * @param  array<string, mixed>  $persona
+     * @param  list<array<string, mixed>>  $items
      */
     private function agregarMemoPersonaCampo(array &$items, string $etiqueta, array $persona, int $tamano): void
     {
@@ -595,6 +665,7 @@ class PdfDocumentGenerator
         return $paginas;
     }
 
+    /** @param array<string, mixed> $documento */
     private function fechaMemorando(array $documento): string
     {
         $fecha = trim((string) ($documento['fecha_documento'] ?? ''));
@@ -646,7 +717,7 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array{text: string, size: int, bold: bool, gap: int, center: bool}>  $lineas
+     * @param  list<FlowItem>  $lineas
      */
     private function agregarSeccion(array &$lineas, string $titulo, ?string $contenido): void
     {
@@ -662,7 +733,7 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array{text: string, size: int, bold: bool, gap: int, center: bool}>  $lineas
+     * @param  list<FlowItem>  $lineas
      */
     private function agregarParrafo(array &$lineas, string $texto, int $size = 10, bool $bold = false, int $gap = 4, bool $center = false): void
     {
@@ -843,8 +914,8 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array{text?: string, size?: int, bold?: bool, gap?: int, center?: bool, firma?: bool, alto?: int}>  $lineas
-     * @return list<list<array{text?: string, size?: int, bold?: bool, y: float, center?: bool, firma?: bool, alto?: int}>>
+     * @param  list<FlowItem>  $lineas
+     * @return list<list<PageItem>>
      */
     private function distribuirEnPaginas(array $lineas, string $expediente, string $codigo, bool $conQr = false): array
     {
@@ -853,8 +924,8 @@ class PdfDocumentGenerator
         $y = 786.0;
 
         foreach ($lineas as $linea) {
-            if (($linea['firma'] ?? false) === true) {
-                $altoFirma = (float) ($linea['alto'] ?? 42);
+            if (isset($linea['firma'])) {
+                $altoFirma = (float) $linea['alto'];
 
                 if ($y - $altoFirma - 8 < ($conQr ? 155 : 65)) {
                     $paginas[] = [];
@@ -862,7 +933,10 @@ class PdfDocumentGenerator
                     $y = 786.0;
                 }
 
-                $paginas[$paginaActual][] = ['firma' => true, 'y' => $y - $altoFirma, 'alto' => (int) $altoFirma];
+                $paginas[$paginaActual][] = [
+                    'text' => '', 'size' => 0, 'bold' => false, 'center' => false,
+                    'firma' => true, 'y' => $y - $altoFirma, 'alto' => (int) $altoFirma,
+                ];
                 $y -= $altoFirma + 8;
 
                 continue;
@@ -892,7 +966,17 @@ class PdfDocumentGenerator
             $y -= $alto;
         }
 
-        foreach ($paginas as $indice => &$pagina) {
+        return $this->agregarPiesPagina($paginas, $expediente, $codigo);
+    }
+
+    /**
+     * @param  list<list<PageItem>>  $paginas
+     * @return list<list<PageItem>>
+     */
+    private function agregarPiesPagina(array $paginas, string $expediente, string $codigo): array
+    {
+        $resultado = [];
+        foreach ($paginas as $indice => $pagina) {
             $codigoTexto = trim($codigo) === ''
                 ? 'Borrador sin numeración oficial'
                 : 'Código de verificación '.$codigo;
@@ -903,14 +987,14 @@ class PdfDocumentGenerator
                 'y' => 38.0,
                 'center' => false,
             ];
+            $resultado[] = $pagina;
         }
-        unset($pagina);
 
-        return $paginas;
+        return $resultado;
     }
 
     /**
-     * @param  list<list<array{text: string, size: int, bold: bool, y: float, center: bool}>>  $paginas
+     * @param  list<list<PageItem>>  $paginas
      */
     private function construirPdf(array $paginas, string $numero, string $institucion, ?ByteMatrix $qr = null, ?string $firmaImagen = null): string
     {
@@ -922,13 +1006,13 @@ class PdfDocumentGenerator
         $idsPaginas = [];
         $imagen = $firmaImagen === null ? null : @getimagesizefromstring($firmaImagen);
 
-        if ($firmaImagen !== null && (! is_array($imagen) || ($imagen[2] ?? null) !== IMAGETYPE_JPEG)) {
+        if ($imagen === false || ($imagen !== null && $imagen[2] !== IMAGETYPE_JPEG)) {
             throw new RuntimeException('La firma del perfil no está en un formato de imagen válido.');
         }
 
         $idImagenFirma = $firmaImagen === null ? null : 5;
 
-        if ($firmaImagen !== null && is_array($imagen)) {
+        if ($firmaImagen !== null && $imagen !== null) {
             $objetos[$idImagenFirma] = '<< /Type /XObject /Subtype /Image /Width '.(int) $imagen[0].' /Height '.(int) $imagen[1]
                 .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($firmaImagen)." >>\nstream\n"
                 .$firmaImagen."\nendstream";
@@ -971,14 +1055,18 @@ class PdfDocumentGenerator
     }
 
     /**
-     * @param  list<array{text?: string, size?: int, bold?: bool, y: float, center?: bool, firma?: bool, alto?: int}>  $lineas
+     * @param  list<PageItem>  $lineas
+     * @param  array<int|string, int|string>|null  $imagenFirma
      */
     private function contenidoPagina(array $lineas, ?ByteMatrix $qr = null, ?array $imagenFirma = null): string
     {
         $contenido = "0.18 0.18 0.18 rg\n";
 
         foreach ($lineas as $linea) {
-            if (($linea['firma'] ?? false) === true && is_array($imagenFirma)) {
+            if (isset($linea['firma'])) {
+                if ($imagenFirma === null) {
+                    continue;
+                }
                 $escala = min(150 / (int) $imagenFirma[0], 42 / (int) $imagenFirma[1]);
                 $ancho = (int) round((int) $imagenFirma[0] * $escala, 2);
                 $alto = (int) round((int) $imagenFirma[1] * $escala, 2);
@@ -987,10 +1075,10 @@ class PdfDocumentGenerator
                 continue;
             }
 
-            $fuente = ($linea['bold'] ?? false) ? 'F2' : 'F1';
-            $texto = (string) ($linea['text'] ?? '');
-            $size = (int) ($linea['size'] ?? 10);
-            $x = ($linea['center'] ?? false)
+            $fuente = $linea['bold'] ? 'F2' : 'F1';
+            $texto = $linea['text'];
+            $size = $linea['size'];
+            $x = $linea['center']
                 ? max(50, (595 - ($size * mb_strwidth($texto) * 0.52)) / 2)
                 : 50;
             $contenido .= 'BT /'.$fuente.' '.$size.' Tf 1 0 0 1 '.number_format($x, 2, '.', '').' '.number_format($linea['y'], 2, '.', '').' Tm '.$this->pdfTexto($texto)." Tj ET\n";
@@ -1076,7 +1164,7 @@ class PdfDocumentGenerator
         $siguienteIdImagen = 5;
 
         if ($encabezado !== null) {
-            if (($encabezado['formato'] ?? null) === 'png') {
+            if ($encabezado['formato'] === 'png') {
                 $imagenPng = $this->prepararImagenPngParaPdf($encabezado['bytes']);
 
                 if ($imagenPng !== null) {
@@ -1092,7 +1180,7 @@ class PdfDocumentGenerator
             } else {
                 $medidas = @getimagesizefromstring($encabezado['bytes']);
 
-                if (is_array($medidas) && ($medidas[2] ?? null) === IMAGETYPE_JPEG) {
+                if (is_array($medidas) && $medidas[2] === IMAGETYPE_JPEG) {
                     $idEncabezado = $siguienteIdImagen++;
                     $objetos[$idEncabezado] = '<< /Type /XObject /Subtype /Image /Width '.(int) $medidas[0].' /Height '.(int) $medidas[1]
                         .' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '.strlen($encabezado['bytes'])." >>\nstream\n"
@@ -1104,7 +1192,7 @@ class PdfDocumentGenerator
         if ($firmaImagen !== null) {
             $medidas = @getimagesizefromstring($firmaImagen);
 
-            if (! is_array($medidas) || ($medidas[2] ?? null) !== IMAGETYPE_JPEG) {
+            if (! is_array($medidas) || $medidas[2] !== IMAGETYPE_JPEG) {
                 throw new RuntimeException('La firma del perfil no está en un formato de imagen válido.');
             }
 

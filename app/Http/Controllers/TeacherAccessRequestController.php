@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PerfilDocente;
 use App\Models\ProgramaEstudio;
 use App\Models\User;
+use App\Services\MailReadiness;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -97,6 +98,12 @@ class TeacherAccessRequestController extends Controller
             Log::warning('No se pudo enviar la verificación de una solicitud docente.');
         }
 
-        return to_route('teacher-access.create')->with('status', 'Solicitud recibida. Verifique su correo institucional; la aprobación administrativa continuará siendo necesaria.');
+        $message = $user->verificationMailWasSubmitted()
+            ? (app(MailReadiness::class)->isTestInbox()
+                ? 'Solicitud recibida. La verificación está en la bandeja local de pruebas; la aprobación administrativa continuará siendo necesaria.'
+                : 'Solicitud recibida. Verifique su correo institucional; la aprobación administrativa continuará siendo necesaria.')
+            : 'Solicitud recibida. No se pudo enviar la verificación; contacte con la administración o reintente su envío.';
+
+        return to_route('teacher-access.create')->with('status', $message);
     }
 }

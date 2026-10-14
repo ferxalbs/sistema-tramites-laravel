@@ -12,8 +12,8 @@ class TursoProcessor extends SQLiteProcessor
     /**
      * Return an inserted ID from the same remote transaction that performed the insert.
      *
-     * @param  string  $sql
-     * @param  array<int|string, mixed>  $values
+     * @phpstan-param mixed $sql
+     * @phpstan-param mixed $values
      */
     #[\Override]
     public function processInsertGetId(Builder $query, mixed $sql, mixed $values, mixed $sequence = null): int

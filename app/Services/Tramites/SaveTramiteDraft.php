@@ -385,6 +385,16 @@ class SaveTramiteDraft
             $valores[] = ['id' => (int) $campo->id, 'clave' => $campo->clave_variable, 'valor' => $valor];
         }
 
+        $porClave = array_column($valores, 'valor', 'clave');
+        if (($porClave['HORAS_PRACTICAS'] ?? '') !== ''
+            && (! is_finite((float) $porClave['HORAS_PRACTICAS']) || (float) $porClave['HORAS_PRACTICAS'] <= 0)) {
+            throw ValidationException::withMessages(['campos.HORAS_PRACTICAS' => 'Las horas de prácticas deben ser un número positivo.']);
+        }
+        if (($porClave['PERIODO_INICIO'] ?? '') !== '' && ($porClave['PERIODO_FIN'] ?? '') !== ''
+            && $porClave['PERIODO_FIN'] < $porClave['PERIODO_INICIO']) {
+            throw ValidationException::withMessages(['campos.PERIODO_FIN' => 'El fin del periodo no puede ser anterior al inicio.']);
+        }
+
         return $valores;
     }
 
@@ -420,9 +430,9 @@ class SaveTramiteDraft
         $academicos = [];
 
         foreach ([
-            'Estudiante' => $estudiante?->name ?? $tramite->persona_nombre,
-            'DNI' => $estudiante?->dni ?? $tramite->persona_identificador,
-            'Código' => $estudiante?->dni ?? $tramite->persona_identificador,
+            'Estudiante' => $estudiante->name ?? $tramite->persona_nombre,
+            'DNI' => $estudiante->dni ?? $tramite->persona_identificador,
+            'Código' => $estudiante->dni ?? $tramite->persona_identificador,
             'Ciclo' => $perfil === null ? null : $perfil->ciclo_actual,
             'Año de egreso' => $perfil === null ? null : $perfil->anio_egreso,
         ] as $etiqueta => $valor) {
@@ -438,9 +448,9 @@ class SaveTramiteDraft
             'FECHA' => $fecha,
             'LUGAR_FECHA' => $this->fechaDocumentoEspanol($fecha, $lugar),
             'PROGRAMA_ESTUDIO' => (string) ($programa ?? ''),
-            'ESTUDIANTE_NOMBRE' => (string) ($estudiante?->name ?? $tramite->persona_nombre ?? ''),
-            'DNI' => (string) ($estudiante?->dni ?? $tramite->persona_identificador ?? ''),
-            'CODIGO_ESTUDIANTE' => (string) ($estudiante?->dni ?? $tramite->persona_identificador ?? ''),
+            'ESTUDIANTE_NOMBRE' => (string) ($estudiante->name ?? $tramite->persona_nombre ?? ''),
+            'DNI' => (string) ($estudiante->dni ?? $tramite->persona_identificador ?? ''),
+            'CODIGO_ESTUDIANTE' => (string) ($estudiante->dni ?? $tramite->persona_identificador ?? ''),
             'CICLO' => (string) ($perfil === null ? '' : $perfil->ciclo_actual),
             'ANIO_EGRESO' => (string) ($perfil === null ? '' : $perfil->anio_egreso),
             'DESTINATARIO_NOMBRE' => $destinatario === null ? '' : $nombre($destinatario),
@@ -570,8 +580,7 @@ class SaveTramiteDraft
             $errores['destinatarios'] = 'La plantilla exige exactamente un destinatario principal.';
         }
 
-        if ($tramite->fecha_recepcion !== null
-            && $datos['fecha_documento'] < $tramite->fecha_recepcion->toDateString()
+        if ($datos['fecha_documento'] < $tramite->fecha_recepcion->toDateString()
             && ! (bool) ($datos['confirmar_fecha_anterior'] ?? false)) {
             $errores['confirmar_fecha_anterior'] = 'Confirme expresamente la fecha anterior a la recepción.';
         }

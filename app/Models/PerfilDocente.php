@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $codigo_docente
  * @property string|null $especialidad
  * @property string|null $condicion_laboral
+ */
+/**
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 #[Fillable(['user_id', 'programa_estudio_id', 'codigo_docente', 'especialidad', 'condicion_laboral'])]
 class PerfilDocente extends Model

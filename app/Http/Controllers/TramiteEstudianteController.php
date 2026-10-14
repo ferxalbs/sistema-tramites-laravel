@@ -166,7 +166,7 @@ class TramiteEstudianteController extends Controller
                 'receptor_nombre' => $entrega->receptor_nombre,
                 'receptor_documento' => $entrega->receptor_documento,
                 'receptor_tipo' => $entrega->receptor_tipo,
-                'fecha_entrega' => $entrega->fecha_entrega?->toIso8601String(),
+                'fecha_entrega' => $entrega->fecha_entrega->toIso8601String(),
                 'confirmado' => $entrega->confirmado,
             ],
             'puede_confirmar_entrega' => $tramite->estado === 'listo_entrega'

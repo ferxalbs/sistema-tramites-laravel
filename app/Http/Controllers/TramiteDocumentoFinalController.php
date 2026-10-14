@@ -10,6 +10,7 @@ use App\Models\TramiteEvento;
 use App\Models\TramiteRondaRevision;
 use App\Models\User;
 use App\Services\Tramites\GenerateTramiteFinalDocument;
+use App\Services\Tramites\TramiteTemplateEligibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,8 @@ class TramiteDocumentoFinalController extends Controller
         abort_unless($ronda?->versionBorrador !== null, 409);
 
         return Inertia::render('tramites/documento-final', [
-            'modelo_oficial_pendiente' => in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true),
+            'modelo_oficial_pendiente' => ! TramiteTemplateEligibility::canIssue($tramite, $ronda->versionBorrador->plantilla),
+            'emision_prueba' => TramiteTemplateEligibility::isDemo($ronda->versionBorrador->plantilla),
             'tramite' => [
                 'id' => $tramite->id,
                 'codigo' => $tramite->codigo,
@@ -58,7 +60,7 @@ class TramiteDocumentoFinalController extends Controller
                 'fecha_documento' => $ronda->versionBorrador->fecha_documento->toDateString(),
                 'firmante' => $ronda->versionBorrador->firmante?->name,
                 'firma_perfil_registrada' => $ronda->versionBorrador->firmante !== null
-                    && Storage::disk('local')->exists('firmas-perfil/'.$ronda->versionBorrador->firmante->id.'.jpg'),
+                    && Storage::disk('local')->exists($ronda->versionBorrador->firmante->scannedSignaturePath()),
             ],
         ]);
     }
@@ -77,7 +79,9 @@ class TramiteDocumentoFinalController extends Controller
         }
 
         return redirect()->route('tramites.show', $tramite)
-            ->with('success', 'Se emitió el documento oficial '.$documento->numero_documento.'.');
+            ->with('success', ($documento->contenido_snapshot['es_prueba'] ?? false)
+                ? 'Se generó el PDF de prueba '.$documento->numero_documento.'. No tiene validación institucional.'
+                : 'Se emitió el documento oficial '.$documento->numero_documento.'.');
     }
 
     public function annul(Request $request, Tramite $tramite, TramiteDocumentoFinal $documento): RedirectResponse

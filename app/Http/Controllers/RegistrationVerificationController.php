@@ -38,6 +38,6 @@ class RegistrationVerificationController extends Controller
             }
         }, 300);
 
-        return back()->with('status', 'Si la cuenta está pendiente, se enviará un enlace de verificación al correo indicado.');
+        return back()->with('status', 'Si la cuenta está pendiente y el servicio de correo está disponible, se enviará un enlace de verificación.');
     }
 }

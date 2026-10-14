@@ -1,6 +1,43 @@
 # Changelog
 
-Registro de cambios del Sistema de Trámites. Actualizado el **6 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
+Registro de cambios del Sistema de Trámites. Actualizado el **14 de octubre de 2026** a partir del historial de Git, el código y las verificaciones realizadas. No contiene contraseñas, claves SMTP ni tokens.
+
+## 2026-10-14 — Cierre técnico local y verificación del flujo
+
+### Implementado
+
+- Se conservaron los cambios locales anteriores de logo, colores guinda/blanco, modos de apariencia, login, instalador y preparación de despliegue; el trabajo continúa exclusivamente en `main`.
+- Prácticas y tardanza cuentan con modelos propios propuestos, campos específicos y validaciones de periodo y horas. La opción de prueba solo funciona en local o testing; PDF, mensajes de emisión y verificación pública distinguen los documentos de prueba de los oficiales. La respuesta prevista de nuevas tardanzas es Informe; no se reescriben expedientes históricos.
+- El administrador puede registrar el origen y validación de cada modelo. Otra versión o cambios en sus campos anulan la validación. Las versiones antiguas que usan `CONTENIDO` o reciben numeración del generador conservan su compatibilidad. Los modelos referenciales permanecen solo para borrador.
+- Se corrigió el filtro del catálogo de borradores para no ofrecer el modelo propuesto de tardanza a un Informe genérico. Los avisos de disponibilidad reflejan modelos validados o de prueba.
+- El PDF de los memorandos usa el cuerpo completo de la plantilla revisada y conserva cláusulas fijas, anexos y fundamentos de rechazo. Las constancias mantienen su texto resuelto completo y los PDF históricos conservan sus bytes.
+- Firma de perfil almacenada por versiones inmutables, con huella y límites de tamaño/dimensiones. Un fallo de guardado conserva la firma anterior. La emisión comprueba la huella antes de utilizar la nueva firma. No se crearon firmas de profesores reales.
+- Correo local capturado en Mailpit, con mensajes de recuperación, verificación y reenvío en español. Se corrigió el aviso de éxito ante fallo de transporte; registro y solicitud docente conservan la cuenta pendiente cuando no se envió el enlace. Los transportes `log`, `array` y alternativas que pueden terminar en log no se aceptan como entrega real de PDF.
+- Se añadieron cabeceras de seguridad, CSP con nonce y un endpoint `/ready` que comprueba base y almacenamiento sin exponer detalles.
+- Respaldo SQLite consistente y archivos privados cifrados con AES-256, manifiesto de huellas, verificación y restauración de comprobación fuera de la base activa. Se añadió recuperación controlada de una cuenta administradora existente por consola, con revocación de sesiones y sin cambiar otras cuentas; no se ejecutó contra una cuenta real durante esta revisión.
+- Inicio local supervisado, correo de pruebas y respaldo diario a las 03:00 mediante tareas de Windows. Se corrigió el bloqueo de inicio con batería y se admite PHP compatible instalado mediante WinGet o disponible en PATH. La tarea de correo prepara Mailpit desde su descarga oficial con SHA-256 fijado si no lo encuentra.
+- Cuatro migraciones nuevas para metadatos de validación y firma, modelos propuestos, conservación del índice parcial de versión activa y formato previsto de tardanza. Se aplicaron en la instalación local conservando los datos.
+- El contenedor exige almacenamiento persistente al detectar las variables oficiales de Railway y se detiene si falta el volumen o falla una migración. Los datos privados de importación inicial se excluyen de nuevas subidas e imágenes.
+- Se corrigieron los tipos de modelos, consultas y adaptador Turso hasta pasar PHPStan, sin baselines ni exclusiones. Se retiró una dependencia CLI innecesaria de la aplicación, conservando sus estilos de componentes y atribuciones, y se reforzaron los controles de CI.
+
+### Comprobado
+
+- Suite final sobre SQLite: **192 pruebas aprobadas, 6 pruebas remotas de Turso omitidas y 3661 aserciones**. Incluye titulación, prácticas y tardanza desde recepción hasta entrega confirmada y cierre, así como roles, observaciones, rechazo, privacidad, firma y recuperación.
+- PHPStan nivel 7: **cero errores**, frente a 539 al comenzar la revisión. Pint, formato/lint, TypeScript y compilación pasaron. La prueba del entrypoint confirma fallos de migración, volumen e importación y preservación de una base existente.
+- Auditorías de Composer y pnpm: **cero vulnerabilidades reportadas** el 14 de octubre.
+- Inspección visual de seis tipos de PDF, incluido un memorando de dos páginas: texto conservado, firma, pie y QR sin superposición. Se usaron datos ficticios y no se emitió un documento para una persona real.
+- Navegador con sesión de administrador: catálogo de ocho plantillas, selección del modelo propio de prácticas, campos específicos y avisos de prueba. Apariencias clara y guinda revisadas.
+- Respaldo cifrado actual creado y verificado: **7 componentes** íntegros. Las tareas de respaldo y correo terminaron con código 0; el supervisor local quedó en ejecución.
+- La restauración real adicional en una carpeta temporal y su limpieza fueron bloqueadas por la revisión automática de herramientas, sin motivo específico. No se ejecutaron. La integridad actual sí fue verificada sin extraer datos; las pruebas de restauración y la comprobación realizada el 13 de octubre se conservan como evidencia anterior.
+
+### Pendiente para uso institucional
+
+- Validar con la oficina los modelos, criterios, destinatarios y presentación de prácticas y tardanza, y registrar la autorización de la versión correspondiente.
+- Registrar firmas y cargos reales. Las cuentas, firmas y datos de demostración no sustituyen a los responsables institucionales.
+- Obtener SMTP autorizado y comprobar recepción externa de enlaces y PDF. Mailpit solo acredita correo local de pruebas.
+- Conservar copias y clave de recuperación fuera de esta PC. Verificar el código actual en Railway, su persistencia y la restauración del servidor después del despliegue; esta revisión no acredita esos pasos de producción.
+
+La guía de uso y pruebas está en `README.md`; los diagnósticos históricos de las secciones siguientes corresponden a sus fechas y no sustituyen este estado vigente.
 
 ## 2026-10-06 — Constancia institucional y almacenamiento publicado
 

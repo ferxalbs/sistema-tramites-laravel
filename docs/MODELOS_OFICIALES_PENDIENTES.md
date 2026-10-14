@@ -1,8 +1,22 @@
 # Modelos institucionales pendientes
 
+## Actualización — 14 de octubre de 2026
+
+Se prepararon **dos modelos propios propuestos** para constancia de prácticas y evaluación de justificación de tardanza, adicionales a los modelos referenciales. No se presentan como modelos aprobados del instituto.
+
+- Prácticas captura centro, módulo, periodo y horas positivas; el fin no puede ser anterior al inicio.
+- Tardanza captura fecha, unidad didáctica y motivo. Su respuesta prevista para registros nuevos es un Informe; los expedientes anteriores conservan el formato que tenían.
+- En local, `TRAMITES_MODELOS_PRUEBA=true` permite completar revisión, PDF, entrega y cierre. Los PDF llevan `PRUEBA` y la advertencia de falta de validación institucional; su consulta pública también los identifica como prueba.
+- La emisión oficial requiere que el administrador registre el origen o autorización y confirme la revisión de esa versión desde **Plantillas documentales**. El sistema conserva quién la validó y cuándo. Crear otra versión o cambiar sus campos anula esa validación.
+- Un modelo no puede utilizarse para un tipo de trámite distinto. Los modelos referenciales anteriores permanecen limitados al borrador.
+
+Se comprobaron los tres recorridos estudiantiles con datos ficticios y se inspeccionaron los PDF. Esto prueba el funcionamiento técnico; no establece criterios académicos, responsables ni aprobación institucional. No se inventaron firmas de profesores reales.
+
+## Contexto y referencias anteriores
+
 La **constancia de modalidad de examen de titulación** tiene un ejemplo aportado por el usuario y el PDF final ya incorpora el texto completo del borrador aprobado. Falta verificar la presentación visual contra un archivo fuente oficial.
 
-Para **justificación de tardanza** y **constancia de prácticas**, aún no se han recibido los modelos institucionales. No se debe inventar texto oficial, firmas, destinatarios obligatorios ni criterios de aprobación. El sistema permite registrar el FUT y preparar un borrador con un **modelo referencial propio para cada tipo**. La vista previa PDF muestra «MODELO REFERENCIAL — NO OFICIAL» y la emisión del PDF oficial de estos dos tipos continúa bloqueada.
+Para **justificación de tardanza** y **constancia de prácticas**, aún no se han recibido los modelos institucionales. Los modelos propios descritos arriba permiten realizar pruebas; la validación del responsable sigue pendiente. La vista previa referencial continúa mostrando «MODELO REFERENCIAL — NO OFICIAL» y por sí sola no habilita emisión oficial.
 
 ## Referencias públicas examinadas el 5 de octubre de 2026
 

@@ -8,6 +8,7 @@ use App\Models\PerfilEstudiante;
 use App\Models\ProgramaEstudio;
 use App\Models\User;
 use App\Notifications\AdministrativeResetPassword;
+use App\Services\MailReadiness;
 use App\Services\Tramites\LinkApplicantAccount;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -391,6 +392,7 @@ class UserAccountController extends Controller
         });
 
         Storage::disk('local')->delete('firmas-perfil/'.$user->id.'.jpg');
+        Storage::disk('local')->deleteDirectory('firmas-perfil/'.$user->id);
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario eliminado correctamente.']);
 
         return to_route('admin.users.index');
@@ -407,6 +409,8 @@ class UserAccountController extends Controller
             throw ValidationException::withMessages(['reset' => 'La cuenta debe estar activa y tener correo institucional.']);
         }
 
+        $readiness = app(MailReadiness::class);
+        $readiness->requireDelivery('reset');
         $token = PasswordBroker::broker(config('fortify.passwords'))->createToken($user);
 
         try {
@@ -417,12 +421,12 @@ class UserAccountController extends Controller
         }
 
         $this->recordEvent($user, $actor, 'reset_link', $user->estado_cuenta, $user->estado_cuenta,
-            $sent ? 'Enlace enviado al correo institucional.' : 'El correo no pudo enviarse.');
+            $sent ? $readiness->sentMessage() : 'El correo no pudo enviarse.');
 
         Inertia::flash('toast', [
             'type' => $sent ? 'success' : 'error',
             'message' => $sent
-                ? 'Se generó y envió un enlace seguro de restablecimiento.'
+                ? $readiness->sentMessage()
                 : 'El enlace no pudo enviarse. Revise la configuración de correo y reintente.',
         ]);
 

@@ -106,6 +106,14 @@ final class TursoHttpClient
             throw new RuntimeException('Turso returned an incomplete pipeline result.');
         }
 
+        $normalizedResults = [];
+        foreach ($results as $result) {
+            if (! is_array($result)) {
+                throw new RuntimeException('Turso returned an invalid pipeline result.');
+            }
+            $normalizedResults[] = $result;
+        }
+
         if ($closeStream) {
             $this->assertStreamClosed($body['results'][$closeResultIndex] ?? null);
 
@@ -117,7 +125,7 @@ final class TursoHttpClient
         }
 
         return [
-            'results' => $results,
+            'results' => $normalizedResults,
             'setup_error' => $setupError,
             'baton' => $nextBaton,
         ];
@@ -377,6 +385,6 @@ final class TursoHttpClient
             throw new RuntimeException('Turso returned an invalid HTTP pipeline path.');
         }
 
-        return 'https://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '').$path;
+        return 'https://'.$host.(isset($parts['port']) ? ':'.$parts['port'] : '').$path;
     }
 }

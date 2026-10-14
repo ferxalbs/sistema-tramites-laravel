@@ -1,24 +1,25 @@
-import type { SVGAttributes } from 'react';
+import type { HTMLAttributes } from 'react';
+import { cn } from 'cn';
 
 export default function AppLogoIcon({
     className,
     ...props
-}: SVGAttributes<SVGElement>) {
+}: HTMLAttributes<HTMLSpanElement>) {
     return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            xmlns="http://www.w3.org/2000/svg"
+        <span
+            aria-hidden="true"
+            className={cn(
+                'relative inline-flex shrink-0 overflow-hidden rounded-lg bg-[#3b0a12] align-middle',
+                className,
+            )}
             {...props}
         >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <path d="m9 15 2 2 4-4" />
-        </svg>
+            <img
+                src="/brand/dsi-seoane.jpg"
+                alt=""
+                draggable={false}
+                className="absolute inset-0 size-full scale-[1.6] object-cover"
+            />
+        </span>
     );
 }

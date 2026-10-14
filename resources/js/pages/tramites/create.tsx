@@ -356,7 +356,7 @@ export default function TramiteCreate({
                                             ? 'Registra el asunto, los destinatarios y los datos de control del documento.'
                                             : seleccion?.tipo_documento ===
                                                 'FUT'
-                                              ? 'Transcribe los datos del FUT recibido. La fecha escrita en el FUT y la fecha de recepción en Mesa de Partes son distintas.'
+                                              ? 'Transcribe los datos del FUT recibido. La fecha escrita en el FUT y la fecha de recepción en la oficina son distintas.'
                                               : seleccion
                                                 ? 'Completa los datos del documento recibido para este tipo de trámite.'
                                                 : 'Registra los datos del ingreso y del documento entregado físicamente.'}
@@ -877,7 +877,7 @@ export default function TramiteCreate({
                                             label={
                                                 esDocumentoInstitucional
                                                     ? 'Fecha y hora de registro'
-                                                    : 'Fecha y hora de recepción en Mesa de Partes'
+                                                    : 'Fecha y hora de recepción en la oficina'
                                             }
                                             description={
                                                 esDocumentoInstitucional

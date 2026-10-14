@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Bot, MessageCircle, Send, X } from 'lucide-react';
+import { MessageCircle, Send, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { index as supportIndex } from '@/routes/support';
@@ -203,9 +204,7 @@ export default function ChatbotWidget() {
                 >
                     <header className="flex items-center justify-between gap-3 bg-primary px-4 py-3 text-primary-foreground">
                         <div className="flex min-w-0 items-center gap-3">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15">
-                                <Bot className="size-5" aria-hidden="true" />
-                            </span>
+                            <AppLogoIcon className="size-10 rounded-full ring-1 ring-primary-foreground/20" />
                             <div className="min-w-0">
                                 <h2 className="truncate text-sm font-semibold">
                                     Chatbot de trámites

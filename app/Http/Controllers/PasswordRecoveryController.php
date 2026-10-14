@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\MailReadiness;
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Http\Controllers\PasswordResetLinkController;
 use Laravel\Fortify\Http\Requests\SendPasswordResetLinkRequest;
+use Throwable;
 
 class PasswordRecoveryController extends PasswordResetLinkController
 {
@@ -26,9 +29,14 @@ class PasswordRecoveryController extends PasswordResetLinkController
             if (str_ends_with($email, '@seoane.edu.pe')) {
                 $user = User::query()->where('email', $email)->first();
 
-                if ($user?->activo && $user->estado_cuenta === 'activo'
+                if ($user?->activo && $user->estado_cuenta === 'activo' && app(MailReadiness::class)->canSend()
                     && ($user->rol !== 'estudiante' || preg_match('/\Aa\.[a-z0-9._-]+@seoane\.edu\.pe\z/D', $email) === 1)) {
-                    Password::broker(config('fortify.passwords'))->sendResetLink(['email' => $email]);
+                    try {
+                        Password::broker(config('fortify.passwords'))->sendResetLink(['email' => $email]);
+                    } catch (Throwable $exception) {
+                        // Keep the response neutral and never log tokens, addresses or SMTP credentials.
+                        Log::warning('Password recovery mail could not be submitted.', ['exception' => $exception::class]);
+                    }
                 }
             }
         }

@@ -161,6 +161,7 @@ type Props = {
     tramite: TramiteSummary;
     hoy: string;
     modelo_oficial_pendiente?: boolean;
+    emision_prueba_disponible?: boolean;
     plantillas: Plantilla[];
     usuarios: StaffUser[];
     destinatarios_sugeridos: RecipientSuggestion[];
@@ -176,6 +177,7 @@ export default function TramiteBorrador({
     tramite,
     hoy,
     modelo_oficial_pendiente = false,
+    emision_prueba_disponible = false,
     plantillas,
     usuarios,
     destinatarios_sugeridos,
@@ -483,11 +485,9 @@ export default function TramiteBorrador({
                                 </CardDescription>
                                 {modelo_oficial_pendiente && (
                                     <p className="text-sm text-muted-foreground">
-                                        Este trámite usa un modelo referencial
-                                        para preparar y revisar el borrador. La
-                                        vista previa PDF indica «NO OFICIAL»; la
-                                        emisión final espera el modelo aprobado
-                                        por el instituto.
+                                        {emision_prueba_disponible
+                                            ? 'Hay un modelo propuesto para probar el recorrido completo. Su PDF lleva una marca de prueba y no tiene validación institucional.'
+                                            : 'Este trámite permite preparar y revisar un borrador referencial. La emisión final requiere un modelo validado por el instituto.'}
                                     </p>
                                 )}
                             </CardHeader>
@@ -497,7 +497,7 @@ export default function TramiteBorrador({
                                         id="plantilla_id"
                                         label={
                                             modelo_oficial_pendiente
-                                                ? 'Modelo referencial'
+                                                ? 'Modelo disponible'
                                                 : 'Plantilla publicada'
                                         }
                                         value={form.data.plantilla_id}
@@ -1354,8 +1354,7 @@ export default function TramiteBorrador({
                                     <Eye className="size-4" /> Vista previa
                                 </CardTitle>
                                 <CardDescription>
-                                    PDF institucional sin reservar numeración
-                                    oficial
+                                    PDF provisional, sin numeración oficial
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col gap-4">

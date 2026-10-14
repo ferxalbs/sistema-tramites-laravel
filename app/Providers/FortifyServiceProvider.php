@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\PendingRegistrationResponse;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Models\ProgramaEstudio;
 use App\Models\User;
+use App\Services\MailReadiness;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -24,6 +26,7 @@ use Inertia\Inertia;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Controllers\EmailVerificationNotificationController;
 use Laravel\Fortify\Http\Controllers\PasswordResetLinkController;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -35,6 +38,7 @@ class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->singleton(RegisterResponse::class, PendingRegistrationResponse::class);
         $this->app->bind(PasswordResetLinkController::class, PasswordRecoveryController::class);
+        $this->app->bind(EmailVerificationNotificationController::class, EmailVerificationController::class);
     }
 
     /**
@@ -88,6 +92,7 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
+            'bandeja_pruebas' => app(MailReadiness::class)->isTestInbox(),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [
@@ -102,6 +107,7 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
             'status' => $request->session()->get('status'),
+            'bandeja_pruebas' => app(MailReadiness::class)->isTestInbox(),
         ]));
 
         Fortify::registerView(fn (Request $request) => Inertia::render('auth/register', [

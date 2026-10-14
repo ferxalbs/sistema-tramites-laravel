@@ -10,6 +10,7 @@ use Laravel\Fortify\Features;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::resetPasswords());
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
 });
 
 test('reset password link screen can be rendered', function () {

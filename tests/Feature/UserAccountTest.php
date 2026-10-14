@@ -470,6 +470,7 @@ test('temporary password must be changed before accessing the application', func
 });
 
 test('only administrators can send an administrative reset link to an active institutional account', function () {
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
     Notification::fake();
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $teacher = User::factory()->create(['rol' => 'docente', 'email' => 'docente.enlace@seoane.edu.pe']);
@@ -513,6 +514,7 @@ test('only administrators can send an administrative reset link to an active ins
 });
 
 test('administrative reset reports delivery failure without disclosing the token', function () {
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
     $administrator = User::factory()->create(['rol' => 'administrador']);
     $teacher = User::factory()->create(['rol' => 'docente', 'email' => 'docente.fallo@seoane.edu.pe']);
     Notification::shouldReceive('send')->once()->andThrow(new RuntimeException('transport unavailable'));

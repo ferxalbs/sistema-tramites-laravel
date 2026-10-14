@@ -282,7 +282,7 @@ class ManageTramiteAssignment
             'name' => $user->name,
             'dni' => $user->dni,
             'rol' => $user->rol,
-            'carga_activa' => (int) $user->carga_activa,
+            'carga_activa' => (int) $user->getAttribute('carga_activa'),
         ];
     }
 }

@@ -1,4 +1,6 @@
 import { Head } from '@inertiajs/react';
+import AppLogoIcon from '@/components/app-logo-icon';
+import AppearanceSwitch from '@/components/appearance-switch';
 import HelpTools from '@/components/help-tools';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +21,7 @@ type DocumentoVerificado = {
 };
 
 type ResultadoVerificacion = {
-    estado: 'vigente' | 'anulado' | 'sustituido' | 'invalido';
+    estado: 'vigente' | 'anulado' | 'sustituido' | 'invalido' | 'prueba';
     documento: DocumentoVerificado | null;
 };
 
@@ -39,9 +41,13 @@ export default function VerificacionPublica({
             <Head title="Verificar documento">
                 <meta name="robots" content="noindex,nofollow" />
             </Head>
-            <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center px-4 py-12">
+            <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center gap-4 px-4 py-12">
+                <div className="flex w-full justify-end">
+                    <AppearanceSwitch />
+                </div>
                 <Card className="w-full">
                     <CardHeader>
+                        <AppLogoIcon className="mb-2 size-12" />
                         <CardTitle className="text-2xl">
                             Verificación de documento
                         </CardTitle>
@@ -118,6 +124,13 @@ export default function VerificacionPublica({
                                 </section>
                             )}
 
+                        {resultado?.estado === 'prueba' && (
+                            <p className="rounded-xl border p-4 text-sm">
+                                Documento de prueba. El modelo no tiene
+                                validación institucional y no debe presentarse
+                                como un documento oficial.
+                            </p>
+                        )}
                         {resultado?.estado === 'anulado' && (
                             <p
                                 role="status"

@@ -70,7 +70,7 @@ class TramiteEntregaController extends Controller
                 'receptor_tipo' => $entrega->receptor_tipo,
                 'correo_destino' => $entrega->correo_destino,
                 'medio_utilizado' => $entrega->medio_utilizado,
-                'fecha_entrega' => $entrega->fecha_entrega?->toIso8601String(),
+                'fecha_entrega' => $entrega->fecha_entrega->toIso8601String(),
                 'confirmado' => $entrega->confirmado,
                 'confirmado_por_estudiante' => $entrega->confirmado_por_estudiante,
                 'observaciones' => $entrega->observaciones,
@@ -87,7 +87,7 @@ class TramiteEntregaController extends Controller
             'cierre' => $cierre === null ? null : [
                 'resumen' => $cierre->resumen,
                 'observacion' => $cierre->observacion,
-                'fecha_cierre' => $cierre->fecha_cierre?->toIso8601String(),
+                'fecha_cierre' => $cierre->fecha_cierre->toIso8601String(),
                 'informe' => $informe === null ? null : [
                     'id' => $informe->id,
                     'nombre_archivo' => $informe->nombre_archivo,

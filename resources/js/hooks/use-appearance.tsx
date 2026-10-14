@@ -10,7 +10,8 @@ export type UseAppearanceReturn = {
 };
 
 const listeners = new Set<() => void>();
-let currentAppearance: Appearance = 'system';
+let currentAppearance: Appearance = 'dark';
+const paletteVersionKey = 'appearance-palette-v2';
 
 const prefersDark = (): boolean => {
     if (typeof window === 'undefined') {
@@ -31,10 +32,10 @@ const setCookie = (name: string, value: string, days = 365): void => {
 
 const getStoredAppearance = (): Appearance => {
     if (typeof window === 'undefined') {
-        return 'system';
+        return 'dark';
     }
 
-    return (localStorage.getItem('appearance') as Appearance) || 'system';
+    return (localStorage.getItem('appearance') as Appearance) || 'dark';
 };
 
 const isDarkMode = (appearance: Appearance): boolean => {
@@ -68,17 +69,25 @@ const mediaQuery = (): MediaQueryList | null => {
     return window.matchMedia('(prefers-color-scheme: dark)');
 };
 
-const handleSystemThemeChange = (): void => applyTheme(currentAppearance);
+const handleSystemThemeChange = (): void => {
+    applyTheme(currentAppearance);
+    notify();
+};
 
 export function initializeTheme(): void {
     if (typeof window === 'undefined') {
         return;
     }
 
-    if (!localStorage.getItem('appearance')) {
-        localStorage.setItem('appearance', 'system');
-        setCookie('appearance', 'system');
+    const stored = localStorage.getItem('appearance');
+    if (
+        stored === null ||
+        (localStorage.getItem(paletteVersionKey) !== '1' && stored === 'light')
+    ) {
+        localStorage.setItem('appearance', 'dark');
+        setCookie('appearance', 'dark');
     }
+    localStorage.setItem(paletteVersionKey, '1');
 
     currentAppearance = getStoredAppearance();
     applyTheme(currentAppearance);
@@ -91,12 +100,15 @@ export function useAppearance(): UseAppearanceReturn {
     const appearance: Appearance = useSyncExternalStore(
         subscribe,
         () => currentAppearance,
-        () => 'system',
+        () => 'dark',
     );
 
-    const resolvedAppearance: ResolvedAppearance = isDarkMode(appearance)
-        ? 'dark'
-        : 'light';
+    const resolvedAppearance = useSyncExternalStore(
+        subscribe,
+        (): ResolvedAppearance =>
+            isDarkMode(currentAppearance) ? 'dark' : 'light',
+        (): ResolvedAppearance => 'dark',
+    );
 
     const updateAppearance = (mode: Appearance): void => {
         currentAppearance = mode;

@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, CircleHelp } from 'lucide-react';
+import AppLogoIcon from '@/components/app-logo-icon';
+import AppearanceSwitch from '@/components/appearance-switch';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -37,6 +39,9 @@ export default function Ayuda({
         <>
             <Head title="Ayuda y soporte" />
             <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:py-12">
+                <div className="flex justify-end">
+                    <AppearanceSwitch />
+                </div>
                 <header className="flex items-start gap-3">
                     <Button
                         variant="outline"
@@ -46,6 +51,7 @@ export default function Ayuda({
                     >
                         <ArrowLeft />
                     </Button>
+                    <AppLogoIcon className="size-10" />
                     <div className="flex flex-col gap-1">
                         <h1 className="flex items-center gap-2 text-2xl font-semibold">
                             <CircleHelp className="size-6" /> Ayuda y soporte

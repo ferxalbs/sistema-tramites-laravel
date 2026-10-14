@@ -1,15 +1,20 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'dark') == 'dark'])>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
-        <script>
+        <script nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}">
             (function() {
-                const appearance = '{{ $appearance ?? "system" }}';
+                const appearance = '{{ $appearance ?? "dark" }}';
+                const storedAppearance = window.localStorage.getItem('appearance');
+                const firstGuindaVisit = window.localStorage.getItem('appearance-palette-v2') !== '1'
+                    && (storedAppearance === null || storedAppearance === 'light');
 
-                if (appearance === 'system') {
+                if (firstGuindaVisit) {
+                    document.documentElement.classList.add('dark');
+                } else if (appearance === 'system') {
                     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
                     if (prefersDark) {
@@ -22,17 +27,17 @@
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
         <style>
             html {
-                background-color: oklch(1 0 0);
+                background-color: #f6f1f2;
             }
 
             html.dark {
-                background-color: oklch(0.145 0 0);
+                background-color: #3b0a12;
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <meta name="theme-color" content="#3B0A12">
+        <link rel="icon" href="/brand/dsi-seoane.jpg" type="image/jpeg">
+        <link rel="apple-touch-icon" href="/brand/dsi-seoane.jpg">
 
         @fonts
 

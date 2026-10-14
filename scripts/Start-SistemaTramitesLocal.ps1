@@ -1,6 +1,23 @@
 # Mantiene disponible el servidor local de Laravel sin depender de XAMPP/MySQL.
+param([switch] $Launch)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if ($Launch) {
+    $serverScript = Join-Path $PSScriptRoot 'Start-SistemaTramitesLocal.ps1'
+    $parameters = '-NoProfile -ExecutionPolicy RemoteSigned -File "' + $serverScript + '"'
+    Start-Process -FilePath powershell.exe -ArgumentList $parameters -WorkingDirectory $projectRoot -WindowStyle Hidden
+    if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'SistemaTramites\tools\mailpit\mailpit.exe')) {
+        & (Join-Path $PSScriptRoot 'Start-MailboxLocal.ps1')
+    }
+    $available = $false
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) { $available = $true; break }
+        Start-Sleep -Milliseconds 300
+    }
+    if (-not $available) { throw 'No se pudo iniciar el sistema. Revisa storage\logs\local-server-supervisor-v2.log.' }
+    Start-Process 'http://127.0.0.1:8000/login'
+    exit 0
+}
 $logPath = Join-Path $projectRoot 'storage\logs\local-server-supervisor-v2.log'
 $mutex = [System.Threading.Mutex]::new($false, 'Local\SistemaTramitesLaravel8000')
 $hasLock = $false
@@ -12,15 +29,16 @@ function Write-SupervisorLog([string] $message) {
 
 function Find-CompatiblePhp {
     $packagesRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages'
-    if (-not (Test-Path -LiteralPath $packagesRoot)) {
-        return $null
+    $candidates = @()
+    if (Test-Path -LiteralPath $packagesRoot) {
+        $candidates += Get-ChildItem -LiteralPath $packagesRoot -Directory -Filter 'PHP.PHP.8.*' |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName 'php.exe' }
     }
+    $pathPhp = Get-Command php -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($pathPhp) { $candidates += $pathPhp.Source }
 
-    $packages = Get-ChildItem -LiteralPath $packagesRoot -Directory -Filter 'PHP.PHP.8.*' |
-        Sort-Object Name -Descending
-
-    foreach ($package in $packages) {
-        $candidate = Join-Path $package.FullName 'php.exe'
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
         if (-not (Test-Path -LiteralPath $candidate)) {
             continue
         }

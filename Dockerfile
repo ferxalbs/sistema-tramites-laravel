@@ -16,6 +16,7 @@ RUN install-php-extensions \
     ffi \
     pdo_pgsql \
     pdo_mysql \
+    pdo_sqlite \
     bcmath \
     zip \
     intl \
@@ -43,7 +44,7 @@ RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --opti
 
 # 2. Install Node.js dependencies (cached layer)
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --prod=false
 
 # 3. Copy application codebase
 COPY . .

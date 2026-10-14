@@ -10,9 +10,9 @@ use App\Models\Tramite;
 use App\Models\TramiteDocumento;
 use App\Models\TramiteDocumentoFinal;
 use App\Models\TramiteEvento;
-use App\Models\TramiteRondaRevision;
 use App\Models\User;
 use App\Services\Tramites\TramiteClassificationCatalog;
+use App\Services\Tramites\TramiteReviewSummary;
 use App\Services\Tramites\TramiteTypeCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -115,7 +115,7 @@ class TramiteController extends Controller
                 'tipo_documento_salida_sugerido', 'modalidad_documento_sugerida',
             ]);
         $requiereSolicitante = $tipo === null || (bool) $tipo->requiere_solicitante;
-        $dni = is_array($seleccion) && is_string($seleccion['dni'] ?? null) ? $seleccion['dni'] : null;
+        $dni = is_string($seleccion['dni'] ?? null) ? $seleccion['dni'] : null;
 
         if ($tipo === null || ($requiereSolicitante && (! is_string($dni) || preg_match('/^[0-9]{8}$/', $dni) !== 1))) {
             $request->session()->forget('tramite_selection');
@@ -467,9 +467,9 @@ class TramiteController extends Controller
                 'codigo' => $tramite->codigo,
                 'fecha_recepcion' => $tramite->fecha_recepcion->toDateString(),
                 'fecha_documento' => $tramite->fecha_presentacion_original?->toDateString(),
-                'fecha_registro' => ($recepcion?->created_at ?? $tramite->created_at)?->toIso8601String(),
+                'fecha_registro' => ($recepcion->created_at ?? $tramite->created_at)?->toIso8601String(),
                 'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
-                'estado_inicial' => config('tramites.estados.'.($recepcion?->estado_nuevo ?? $tramite->estado), $recepcion?->estado_nuevo ?? $tramite->estado),
+                'estado_inicial' => config('tramites.estados.'.($recepcion->estado_nuevo ?? $tramite->estado), $recepcion->estado_nuevo ?? $tramite->estado),
                 'destino' => $tramite->destino_nombre ?: 'Pendiente',
                 'interesado' => $tramite->persona_nombre ?? 'Documento institucional',
                 'asunto' => $tramite->asunto,
@@ -617,27 +617,7 @@ class TramiteController extends Controller
                     'actual' => $borrador->es_actual,
                     'created_at' => $borrador->created_at?->toIso8601String(),
                 ])->all(),
-                'revision_rondas' => $tramite->rondasRevision->map(fn (TramiteRondaRevision $ronda): array => [
-                    'numero' => $ronda->numero_ronda,
-                    'estado' => $ronda->estado,
-                    'revisor' => $ronda->revisor?->name,
-                    'version' => $ronda->versionBorrador?->version,
-                    'resumen_observacion' => $ronda->resumen_observacion,
-                    'resumen_correccion' => $ronda->resumen_correccion,
-                    'conclusion' => $ronda->conclusion,
-                    'comentario_publico' => $ronda->comentario_publico,
-                    'comentario_interno' => $ronda->comentario_interno,
-                    'observaciones' => $ronda->observaciones->map(fn ($observacion): array => [
-                        'id' => $observacion->id,
-                        'categoria' => $observacion->categoria,
-                        'titulo' => $observacion->titulo,
-                        'descripcion' => $observacion->descripcion,
-                        'seccion' => $observacion->seccion,
-                        'obligatoria' => $observacion->obligatoria,
-                        'visible_para_interesado' => $observacion->visible_para_interesado,
-                        'respuesta' => $observacion->respuesta?->respuesta,
-                    ])->all(),
-                ])->all(),
+                'revision_rondas' => $tramite->rondasRevision->map(TramiteReviewSummary::make(...))->all(),
                 'documentos' => $tramite->documentos->map(fn (TramiteDocumento $documento): array => [
                     'id' => $documento->id,
                     'categoria' => $documento->categoria,

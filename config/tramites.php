@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'modelos_prueba' => (bool) env('TRAMITES_MODELOS_PRUEBA', false),
     // La recepción y revisión pueden probarse, pero no se debe emitir un PDF
     // oficial de estos tipos hasta cargar y verificar el modelo institucional.
     'modelos_oficiales_pendientes' => [

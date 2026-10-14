@@ -1,6 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Printer } from 'lucide-react';
 import TramiteController from '@/actions/App/Http/Controllers/TramiteController';
+import AppLogoIcon from '@/components/app-logo-icon';
+import AppearanceSwitch from '@/components/appearance-switch';
 import HelpTools from '@/components/help-tools';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,8 +31,12 @@ export default function TramiteComprobante({
         <>
             <Head title={`Comprobante · ${comprobante.codigo}`} />
             <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-4 p-4 py-8 print:min-h-0 print:max-w-none print:p-0">
+                <div className="flex justify-end print:hidden">
+                    <AppearanceSwitch />
+                </div>
                 <Card className="print:rounded-none print:border-foreground print:shadow-none">
                     <CardHeader className="border-b text-center">
+                        <AppLogoIcon className="mx-auto mb-2 size-16" />
                         <CardTitle className="text-xl">{institucion}</CardTitle>
                         <p>Comprobante de recepción de trámite</p>
                     </CardHeader>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MailReadiness;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -13,9 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Throwable;
 
 /**
  * @property int $id
@@ -43,11 +46,16 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property string|null $firma_perfil_ruta
+ * @property string|null $firma_perfil_sha256
+ * @property Carbon|null $firma_perfil_actualizada_en
  */
 #[Fillable(['name', 'email', 'password', 'rol', 'activo', 'estado_cuenta', 'nombres', 'apellidos', 'dni', 'celular', 'cargo_institucional_id', 'correo_alternativo', 'debe_cambiar_password', 'cuenta_provisional'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'firma_perfil_ruta', 'firma_perfil_sha256'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
+    private bool $verificationMailSubmitted = false;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
@@ -67,6 +75,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'debe_cambiar_password' => 'boolean',
             'cuenta_provisional' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
+            'firma_perfil_actualizada_en' => 'datetime',
         ];
     }
 
@@ -78,9 +87,28 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     public function sendEmailVerificationNotification(): void
     {
+        $this->verificationMailSubmitted = false;
+        if (! app(MailReadiness::class)->canSend()) {
+            return;
+        }
         $this->increment('verification_version');
         $this->refresh();
-        $this->notify(new VerifyEmail);
+        try {
+            $this->notify(new VerifyEmail);
+            $this->verificationMailSubmitted = true;
+        } catch (Throwable $exception) {
+            Log::warning('Verification mail could not be submitted.', ['exception' => $exception::class]);
+        }
+    }
+
+    public function verificationMailWasSubmitted(): bool
+    {
+        return $this->verificationMailSubmitted;
+    }
+
+    public function scannedSignaturePath(): string
+    {
+        return $this->firma_perfil_ruta ?? 'firmas-perfil/'.$this->id.'.jpg';
     }
 
     /** @return HasMany<TramiteAsignacion, $this> */

@@ -13,6 +13,7 @@ use App\Models\TramiteObservacionRevision;
 use App\Models\TramiteRondaRevision;
 use App\Models\User;
 use App\Services\Tramites\ManageTramiteAssignment;
+use App\Services\Tramites\TramiteReviewSummary;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -325,26 +326,7 @@ class TramiteAsignacionController extends Controller
                 'puede_iniciar' => $asignacion->activa && in_array($tramite->estado, ['asignado', 'corregido'], true),
                 'puede_observar' => $asignacion->activa && $tramite->estado === 'en_revision' && $rondaActual !== null,
                 'puede_decidir' => $asignacion->activa && $tramite->estado === 'en_revision' && $rondaActual !== null,
-                'rondas' => $rondas->map(fn (TramiteRondaRevision $ronda): array => [
-                    'numero' => $ronda->numero_ronda,
-                    'estado' => $ronda->estado,
-                    'version' => $ronda->versionBorrador?->version,
-                    'resumen_observacion' => $ronda->resumen_observacion,
-                    'resumen_correccion' => $ronda->resumen_correccion,
-                    'conclusion' => $ronda->conclusion,
-                    'comentario_publico' => $ronda->comentario_publico,
-                    'comentario_interno' => $ronda->comentario_interno,
-                    'observaciones' => $ronda->observaciones->map(fn ($observacion): array => [
-                        'id' => $observacion->id,
-                        'categoria' => $observacion->categoria,
-                        'titulo' => $observacion->titulo,
-                        'descripcion' => $observacion->descripcion,
-                        'seccion' => $observacion->seccion,
-                        'obligatoria' => $observacion->obligatoria,
-                        'visible_para_interesado' => $observacion->visible_para_interesado,
-                        'respuesta' => $observacion->respuesta?->respuesta,
-                    ])->all(),
-                ])->all(),
+                'rondas' => $rondas->map(TramiteReviewSummary::make(...))->all(),
             ],
         ]);
     }

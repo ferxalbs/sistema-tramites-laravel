@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
 
-test('a scanned student request reaches an approved PDF and confirmed delivery', function () {
+test('a scanned student request reaches an approved PDF and confirmed delivery', function (string $type, string $format, string $templateCode, array $fields) {
     Storage::fake('local');
     config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
+    config(['tramites.modelos_prueba' => true]);
     $this->seed();
 
     $directorPosition = DB::table('cargos_institucionales')->where('codigo', 'director_general')->value('id');
@@ -40,13 +41,13 @@ test('a scanned student request reaches an approved PDF and confirmed delivery',
     Storage::disk('local')->put('firmas-perfil/'.$teacher->id.'.jpg', $signatureBytes);
 
     $this->actingAs($admin)->post(route('tramites.start'), [
-        'tipo_documento' => 'CONSTANCIA_MODALIDAD_TITULACION', 'dni' => $student->dni,
+        'tipo_documento' => $type, 'dni' => $student->dni,
     ])->assertRedirect(route('tramites.create'));
     $this->get(route('tramites.create'))->assertOk();
     $this->post(route('tramites.store'), [
         'clasificacion' => 'estudiantil',
-        'tipo_documento' => 'CONSTANCIA_MODALIDAD_TITULACION',
-        'formato_salida' => 'constancia',
+        'tipo_documento' => $type,
+        'formato_salida' => $format,
         'propietario_id' => $student->id,
         'persona_nombre' => $student->name,
         'persona_identificador' => $student->dni,
@@ -68,7 +69,7 @@ test('a scanned student request reaches an approved PDF and confirmed delivery',
         ->and($tramite->propietario_id)->toBe($student->id)
         ->and($tramite->documentos()->count())->toBe(1);
 
-    $plantilla = TramitePlantilla::query()->where('codigo', 'CONSTANCIA_MODALIDAD_TITULACION')->sole();
+    $plantilla = TramitePlantilla::query()->where('codigo', $templateCode)->sole();
     $this->get(route('tramites.borradores.create', $tramite))->assertOk();
     $this->post(route('tramites.borradores.store', $tramite), [
         'plantilla_id' => $plantilla->id,
@@ -82,6 +83,7 @@ test('a scanned student request reaches an approved PDF and confirmed delivery',
             'nombres' => 'Ana', 'apellidos' => 'Pérez Soto', 'cargo' => 'Estudiante', 'principal' => true,
         ]],
         'preparar' => true,
+        'campos' => $fields,
     ])->assertRedirect(route('tramites.show', $tramite))->assertSessionHasNoErrors();
     expect($tramite->fresh()->estado)->toBe('borrador_preparado');
 
@@ -103,7 +105,10 @@ test('a scanned student request reaches an approved PDF and confirmed delivery',
 
     $this->actingAs($admin)->get(route('tramites.documento-final.preview', $tramite))->assertOk();
     $this->post(route('tramites.documento-final.emit', $tramite), ['confirmar' => true])
-        ->assertRedirect(route('tramites.show', $tramite))->assertSessionHasNoErrors();
+        ->assertRedirect(route('tramites.show', $tramite))->assertSessionHasNoErrors()
+        ->assertSessionHas('success', fn (string $message): bool => $plantilla->modelo_propuesto
+            ? str_contains($message, 'PDF de prueba') && ! str_contains($message, 'documento oficial')
+            : str_contains($message, 'documento oficial'));
     $document = TramiteDocumentoFinal::query()->where('tramite_id', $tramite->id)->sole();
     expect($tramite->fresh()->estado)->toBe('documento_final_generado')
         ->and($document->estado)->toBe('emitido')
@@ -149,4 +154,13 @@ test('a scanned student request reaches an approved PDF and confirmed delivery',
     $report = TramiteInformeCierre::query()->where('tramite_id', $tramite->id)->sole();
     expect($tramite->fresh()->estado)->toBe('cerrado')
         ->and(Storage::disk('local')->get($report->ruta))->toStartWith('%PDF-');
-});
+})->with([
+    'titulación' => ['CONSTANCIA_MODALIDAD_TITULACION', 'constancia', 'CONSTANCIA_MODALIDAD_TITULACION', []],
+    'prácticas propuesta' => ['CONSTANCIA_PRACTICA', 'constancia', 'CONSTANCIA_PRACTICA_PROPUESTO', [
+        'CENTRO_PRACTICAS' => 'Empresa ficticia', 'MODULO_PRACTICAS' => 'Módulo I',
+        'PERIODO_INICIO' => '2026-09-01', 'PERIODO_FIN' => '2026-09-30', 'HORAS_PRACTICAS' => '120',
+    ]],
+    'tardanza propuesta' => ['JUSTIFICACION_TARDANZA', 'informe', 'JUSTIFICACION_TARDANZA_PROPUESTO', [
+        'FECHA_TARDANZA' => '2026-09-25', 'UNIDAD_DIDACTICA' => 'Desarrollo de software', 'MOTIVO_TARDANZA' => 'Motivo de prueba documentado',
+    ]],
+]);

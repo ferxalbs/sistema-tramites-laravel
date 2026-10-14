@@ -18,6 +18,7 @@ import TramiteDocumentoFinalController from '@/actions/App/Http/Controllers/Tram
 
 type Props = {
     modelo_oficial_pendiente: boolean;
+    emision_prueba: boolean;
     tramite: {
         id: number;
         codigo: string;
@@ -45,6 +46,7 @@ export default function DocumentoFinal({
     revision,
     borrador,
     modelo_oficial_pendiente,
+    emision_prueba,
 }: Props) {
     return (
         <>
@@ -64,7 +66,9 @@ export default function DocumentoFinal({
                     </Link>
                     <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">
-                            Emisión de documento oficial
+                            {emision_prueba
+                                ? 'Emisión de documento de prueba'
+                                : 'Emisión de documento oficial'}
                         </p>
                         <h1 className="text-2xl font-semibold tracking-tight">
                             {tramite.codigo}
@@ -85,6 +89,13 @@ export default function DocumentoFinal({
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-5 sm:grid-cols-2">
+                        {emision_prueba && (
+                            <p className="text-sm text-primary sm:col-span-2">
+                                Este modelo es una propuesta. El PDF llevará una
+                                marca de prueba y no acredita validación
+                                institucional.
+                            </p>
+                        )}
                         {modelo_oficial_pendiente && (
                             <p className="text-sm text-destructive sm:col-span-2">
                                 Falta el modelo institucional aprobado para este
@@ -164,8 +175,11 @@ export default function DocumentoFinal({
                                             htmlFor="confirmar-emision"
                                             className="items-start leading-5"
                                         >
-                                            Confirmo la emisión oficial y
-                                            entiendo que el correlativo no se
+                                            Confirmo la emisión{' '}
+                                            {emision_prueba
+                                                ? 'de prueba'
+                                                : 'oficial'}{' '}
+                                            y entiendo que el correlativo no se
                                             reutiliza, aunque falle la
                                             generación del PDF.
                                         </Label>
@@ -199,7 +213,9 @@ export default function DocumentoFinal({
                                             ) : (
                                                 <FileCheck2 data-icon="inline-start" />
                                             )}
-                                            Emitir documento oficial
+                                            {emision_prueba
+                                                ? 'Generar PDF de prueba'
+                                                : 'Emitir documento oficial'}
                                         </Button>
                                     </div>
                                 </CardFooter>

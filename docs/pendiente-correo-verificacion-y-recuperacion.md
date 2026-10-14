@@ -1,5 +1,7 @@
 # Pendiente futuro: correo, verificación y recuperación
 
+**Actualización del 14 de octubre de 2026:** la instalación local ya captura los mensajes en Mailpit; no usa `log` para entregar enlaces. La activación de correo externo sigue pendiente. La configuración vigente está en [Correo institucional](CORREO_INSTITUCIONAL.md). Lo siguiente conserva el diagnóstico del 29 de septiembre, no la configuración actual.
+
 Este documento registra el estado revisado el 29 de septiembre de 2026. La configuración y las pruebas con un proveedor de correo quedan para una sesión futura.
 
 ## Estado actual del proyecto

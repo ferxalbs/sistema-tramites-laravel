@@ -92,7 +92,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
             </Card>
 
             {status && (
-                <div className="mt-4 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
+                <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-center text-sm font-medium text-foreground">
                     {status}
                 </div>
             )}

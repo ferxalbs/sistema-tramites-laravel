@@ -8,6 +8,7 @@ use Laravel\Fortify\Features;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::emailVerification());
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
 });
 
 test('email verification screen can be rendered', function () {

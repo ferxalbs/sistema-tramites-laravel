@@ -6,7 +6,21 @@ use App\Services\Tramites\CreateTramiteNotifications;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $tramite_id
+ * @property int|null $usuario_id
+ * @property string $accion
+ * @property string $descripcion
+ * @property string|null $estado_anterior
+ * @property string|null $estado_nuevo
+ * @property array<array-key, mixed>|null $metadatos
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property string|null $clave_dedupe
+ */
 #[Fillable([
     'tramite_id',
     'usuario_id',

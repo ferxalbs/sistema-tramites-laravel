@@ -12,6 +12,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import AppearanceSwitch from '@/components/appearance-switch';
 import HelpTools from '@/components/help-tools';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,23 +50,22 @@ export default function Welcome() {
             <ScrollArea className="h-screen w-full">
                 <div className="flex min-h-screen flex-col bg-background text-foreground">
                     {/* Top Navigation Bar */}
-                    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-xs">
-                        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+                    <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 shadow-sm shadow-primary/5 backdrop-blur-xs dark:bg-background/95">
+                        <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8">
                             <Link href="/" className="flex items-center gap-3">
-                                <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-                                    <AppLogoIcon className="size-5" />
-                                </div>
+                                <AppLogoIcon className="size-10 shadow-xs ring-1 ring-primary/15" />
                                 <div className="flex flex-col text-left">
                                     <span className="text-sm font-semibold tracking-tight">
                                         Sistema de Trámites
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                        Gestión Documental Institucional
+                                        Desarrollo de Sistemas de Información
                                     </span>
                                 </div>
                             </Link>
 
-                            <nav className="flex items-center gap-4">
+                            <nav className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end lg:gap-4">
+                                <AppearanceSwitch />
                                 <div className="hidden items-center gap-6 text-sm md:flex">
                                     <Link
                                         href="/verificar-documento"
@@ -100,7 +100,12 @@ export default function Welcome() {
                                                 variant="ghost"
                                                 render={<Link href={login()} />}
                                             >
-                                                Iniciar Sesión
+                                                <span className="sm:hidden">
+                                                    Entrar
+                                                </span>
+                                                <span className="hidden sm:inline">
+                                                    Iniciar Sesión
+                                                </span>
                                             </Button>
                                             <Button
                                                 render={
@@ -119,7 +124,7 @@ export default function Welcome() {
                     {/* Main Content Area */}
                     <main className="flex-1">
                         {/* Hero Section: Spacious 2-Column Desktop Layout */}
-                        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+                        <section className="mx-auto max-w-7xl rounded-b-3xl bg-gradient-to-br from-[#e7cdd4] via-[#f2e4e8] to-background px-4 py-16 sm:px-6 lg:px-8 lg:py-24 dark:from-secondary/70 dark:via-background dark:to-background">
                             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
                                 {/* Left Column: Headline, Description, Primary CTAs & Value Props */}
                                 <div className="flex flex-col items-start gap-6 lg:col-span-7">
@@ -432,7 +437,7 @@ export default function Welcome() {
                     <footer className="border-t py-10 text-sm text-muted-foreground">
                         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
                             <div className="flex items-center gap-2">
-                                <AppLogoIcon className="size-4 text-primary" />
+                                <AppLogoIcon className="size-7" />
                                 <span>
                                     Sistema de Trámites y Gestión Documental
                                 </span>

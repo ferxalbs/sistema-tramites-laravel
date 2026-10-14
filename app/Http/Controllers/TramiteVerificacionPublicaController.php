@@ -29,6 +29,7 @@ class TramiteVerificacionPublicaController extends Controller
                         'estado',
                         'activo',
                         'fecha_emision',
+                        'contenido_snapshot',
                     ])
                     ->with('tramite:id,codigo')
                     ->where('codigo_verificacion', $codigo)
@@ -43,6 +44,8 @@ class TramiteVerificacionPublicaController extends Controller
                 $documento === null => 'invalido',
                 strtolower($documento->estado) === 'anulado' => 'anulado',
                 strtolower($documento->estado) === 'sustituido' => 'sustituido',
+                strtolower($documento->estado) === 'emitido' && $documento->activo
+                    && ($documento->contenido_snapshot['es_prueba'] ?? false) === true => 'prueba',
                 strtolower($documento->estado) === 'emitido' && $documento->activo => 'vigente',
                 strtolower($documento->estado) === 'emitido' => 'sustituido',
                 default => 'invalido',
@@ -50,7 +53,7 @@ class TramiteVerificacionPublicaController extends Controller
 
             $resultado = [
                 'estado' => $estado,
-                'documento' => in_array($estado, ['vigente', 'anulado', 'sustituido'], true) ? [
+                'documento' => in_array($estado, ['vigente', 'anulado', 'sustituido', 'prueba'], true) ? [
                     'tipo' => $documento->tipo_documento,
                     'numero' => $documento->numero_documento,
                     'expediente' => $documento->tramite?->codigo,

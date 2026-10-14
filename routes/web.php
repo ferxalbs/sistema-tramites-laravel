@@ -5,6 +5,7 @@ use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InstitutionalPositionController;
 use App\Http\Controllers\InstitutionalRecipientController;
 use App\Http\Controllers\OutputDocumentTypeController;
+use App\Http\Controllers\ReadinessController;
 use App\Http\Controllers\RegistrationVerificationController;
 use App\Http\Controllers\TeacherAccessRequestController;
 use App\Http\Controllers\TramiteAsignacionController;
@@ -31,6 +32,8 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+
+Route::get('ready', ReadinessController::class)->middleware('throttle:10,1')->name('system.ready');
 
 Route::inertia('/', 'welcome')->name('home');
 Route::get('solicitud-docente', [TeacherAccessRequestController::class, 'create'])->middleware('guest')->name('teacher-access.create');
@@ -152,6 +155,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->whereNumber('format')->name('admin.output-formats.update');
         Route::get('admin/plantillas', [TramitePlantillaController::class, 'index'])->name('admin.templates.index');
         Route::post('admin/plantillas', [TramitePlantillaController::class, 'store'])->name('admin.templates.store');
+        Route::post('admin/plantillas/{plantilla}/validar', [TramitePlantillaController::class, 'validateModel'])->name('admin.templates.validate-model');
         Route::post('admin/plantillas/{plantilla}/versiones', [TramitePlantillaController::class, 'version'])
             ->name('admin.templates.version');
         Route::patch('admin/plantillas/{plantilla}/estado', [TramitePlantillaController::class, 'state'])

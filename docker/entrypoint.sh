@@ -18,8 +18,29 @@ if [ -n "${RAILWAY_VOLUME_MOUNT_PATH:-}" ]; then
         echo "Persistent storage error: mount the Railway volume at /app/storage/app/private." >&2
         exit 1
     fi
-elif [ -n "${RAILWAY_ENVIRONMENT:-}" ]; then
-    echo "WARNING: Railway has no volume at /app/storage/app/private; uploaded files and PDFs are not persistent." >&2
+elif [ -n "${RAILWAY_ENVIRONMENT:-}" ] || [ -n "${RAILWAY_ENVIRONMENT_ID:-}" ] \
+    || [ -n "${RAILWAY_PROJECT_ID:-}" ] || [ "${REQUIRE_PERSISTENT_STORAGE:-0}" = "1" ]; then
+    echo "Persistent storage error: a volume at /app/storage/app/private is required." >&2
+    exit 1
+fi
+
+# Import the authorized local copy only on the first boot of a new persistent
+# SQLite installation. An existing database is never replaced by the snapshot.
+if [ "${IMPORT_LOCAL_SNAPSHOT:-0}" = "1" ] && [ "${DB_CONNECTION:-}" = "sqlite" ] && [ ! -f "${DB_DATABASE:-}" ]; then
+    if [ "${DB_DATABASE:-}" != "/app/storage/app/private/database.sqlite" ] || [ "${RAILWAY_VOLUME_MOUNT_PATH:-}" != "/app/storage/app/private" ]; then
+        echo "Import error: the SQLite copy requires the private persistent volume." >&2
+        exit 1
+    fi
+    if [ ! -f /app/.deployment-seed/database.sqlite ] || [ ! -f /app/.deployment-seed/SHA256SUMS ]; then
+        echo "Import error: the authorized local snapshot is missing." >&2
+        exit 1
+    fi
+    (cd /app/.deployment-seed && sha256sum --status -c SHA256SUMS)
+    cp /app/.deployment-seed/database.sqlite "$DB_DATABASE"
+    if [ -d /app/.deployment-seed/private ]; then
+        cp -a /app/.deployment-seed/private/. /app/storage/app/private/
+    fi
+    echo "Local database and private files imported into the persistent volume."
 fi
 
 chown -R www-data:www-data /app/storage /app/bootstrap/cache

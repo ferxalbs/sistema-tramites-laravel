@@ -163,5 +163,41 @@ class TramitePlantillaSeeder extends Seeder
                 ]);
             }
         }
+        $this->seedProposedModels();
+    }
+
+    private function seedProposedModels(): void
+    {
+        $contents = [
+            'CONSTANCIA_PRACTICA' => "CONSTANCIA DE PRÁCTICAS\n\nSe deja constancia de la evaluación de la documentación presentada por {{ESTUDIANTE_NOMBRE}}, con DNI {{DNI}}, del programa de {{PROGRAMA_ESTUDIO}}.\n\nCentro de prácticas: {{CENTRO_PRACTICAS}}\nMódulo formativo: {{MODULO_PRACTICAS}}\nPeriodo: {{PERIODO_INICIO}} al {{PERIODO_FIN}}\nHoras declaradas y verificadas: {{HORAS_PRACTICAS}}\nDocumentos de sustento: {{DOCUMENTOS_ADJUNTOS}}\n\nResultado y alcance de la constancia:\n{{CONTENIDO_PRINCIPAL}}\n\n{{LUGAR_FECHA}}\n\n{{FIRMANTE}}",
+            'JUSTIFICACION_TARDANZA' => "EVALUACIÓN DE JUSTIFICACIÓN DE TARDANZA\n\nA: {{DESTINATARIO}}\nDe: {{REMITENTE}}\nFecha: {{FECHA}}\n\nSolicitante: {{ESTUDIANTE_NOMBRE}}\nDNI: {{DNI}}\nPrograma: {{PROGRAMA_ESTUDIO}}\nUnidad didáctica: {{UNIDAD_DIDACTICA}}\nFecha de tardanza: {{FECHA_TARDANZA}}\nMotivo presentado: {{MOTIVO_TARDANZA}}\nSustento revisado: {{DOCUMENTOS_ADJUNTOS}}\n\nResultado de la evaluación y observaciones:\n{{CONTENIDO_PRINCIPAL}}\n\nLa decisión se comunica al docente responsable para su registro según las disposiciones académicas aplicables.\n\n{{LUGAR_FECHA}}\n\n{{FIRMANTE}}",
+        ];
+        // Migrations precede seeds on a new installation, so create these models here too.
+        foreach ($contents as $type => $content) {
+            DB::transaction(function () use ($type, $content): void {
+                if (DB::table('tramite_plantillas')->where('codigo', $type.'_PROPUESTO')->exists()) {
+                    return;
+                }
+                $source = DB::table('tramite_plantillas')->where('codigo', $type.'_REFERENCIAL')->first();
+                if ($source === null) {
+                    return;
+                }
+                $data = (array) $source;
+                unset($data['id']);
+                $id = DB::table('tramite_plantillas')->insertGetId([
+                    ...$data, 'codigo' => $type.'_PROPUESTO', 'version' => 1,
+                    'nombre' => $type === 'CONSTANCIA_PRACTICA' ? 'Constancia de prácticas - modelo propio' : 'Justificación de tardanza - modelo propio',
+                    'descripcion' => 'Modelo propuesto. El uso oficial requiere revisión y validación de la institución.',
+                    'contenido' => $content, 'modelo_propuesto' => true, 'tipo_tramite' => $type,
+                    'estado' => 'publicada', 'activa' => true, 'validada_en' => null, 'validada_por' => null, 'fuente_modelo' => null,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                foreach (DB::table('tramite_plantilla_campos')->where('plantilla_id', $source->id)->get() as $field) {
+                    $copy = (array) $field;
+                    unset($copy['id']);
+                    DB::table('tramite_plantilla_campos')->insert([...$copy, 'plantilla_id' => $id]);
+                }
+            });
+        }
     }
 }

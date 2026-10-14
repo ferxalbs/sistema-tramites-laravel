@@ -31,6 +31,8 @@
         <env name="TURSO_TEST_AUTH_TOKEN" value=""/>
         <env name="TURSO_TEST_DATABASE_DISPOSABLE" value="false"/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="MAIL_TEST_INBOX" value="false"/>
+        <env name="TRAMITES_MODELOS_PRUEBA" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

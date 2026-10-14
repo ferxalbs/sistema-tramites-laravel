@@ -206,7 +206,7 @@ class StoreTramiteRequest extends FormRequest
             'asunto' => 'resumen de la solicitud (sumilla)',
             'descripcion' => 'fundamentación del pedido',
             'prioridad' => 'prioridad',
-            'fecha_llegada_oficina' => 'fecha y hora de recepción en Mesa de Partes',
+            'fecha_llegada_oficina' => 'fecha y hora de recepción en la oficina',
             'fecha_presentacion_original' => 'fecha del documento (FUT)',
             'observacion_recepcion' => 'observación de recepción',
             'folios' => 'número de folios',

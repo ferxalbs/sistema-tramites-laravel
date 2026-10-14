@@ -16,21 +16,25 @@ class TursoConnection extends SQLiteConnection
 {
     private ?string $baton = null;
 
+    /** @param array<string, mixed> $config */
     public function __construct(
         private readonly TursoHttpClient $client,
         string $database,
         string $tablePrefix = '',
         array $config = [],
     ) {
-        parent::__construct(null, $database, $tablePrefix, $config);
+        parent::__construct(static fn (): PDO => throw new LogicException('Turso HTTP does not provide a PDO connection.'), $database, $tablePrefix, $config);
     }
 
     /**
      * Execute a select through Turso's HTTP pipeline.
      *
-     * @param  string  $query
-     * @param  array<int|string, mixed>  $bindings
      * @param  array<int, mixed>  $fetchUsing
+     *
+     * @phpstan-param mixed $query
+     * @phpstan-param mixed $bindings
+     * @phpstan-param mixed $useReadPdo
+     *
      * @return array<int, object|array<string|int, mixed>|mixed>
      */
     #[\Override]
@@ -60,8 +64,8 @@ class TursoConnection extends SQLiteConnection
     /**
      * Execute a statement through Turso's HTTP pipeline.
      *
-     * @param  string  $query
-     * @param  array<int|string, mixed>  $bindings
+     * @phpstan-param mixed $query
+     * @phpstan-param mixed $bindings
      */
     #[\Override]
     public function statement(mixed $query, mixed $bindings = []): bool
@@ -90,8 +94,8 @@ class TursoConnection extends SQLiteConnection
     /**
      * Execute a write query and return its affected row count.
      *
-     * @param  string  $query
-     * @param  array<int|string, mixed>  $bindings
+     * @phpstan-param mixed $query
+     * @phpstan-param mixed $bindings
      */
     #[\Override]
     public function affectingStatement(mixed $query, mixed $bindings = []): int
@@ -280,6 +284,8 @@ class TursoConnection extends SQLiteConnection
 
     /**
      * Prevent the base connection from retrying ambiguous HTTP writes.
+     *
+     * @param  array<int|string, mixed>  $bindings
      */
     #[\Override]
     protected function handleQueryException(QueryException $exception, $query, $bindings, Closure $callback): void
@@ -433,11 +439,17 @@ class TursoConnection extends SQLiteConnection
      */
     private function formatRows(array $result, array $fetchUsing): array
     {
-        $columns = array_map(
-            static fn (array $column, int $index): string => is_string($column['name'] ?? null) ? $column['name'] : (string) $index,
-            $result['cols'] ?? [],
-            array_keys($result['cols'] ?? []),
-        );
+        $rawColumns = $result['cols'] ?? [];
+        if (! is_array($rawColumns)) {
+            throw new RuntimeException('Turso returned invalid SQL columns.');
+        }
+        $columns = [];
+        foreach (array_values($rawColumns) as $index => $column) {
+            if (! is_array($column)) {
+                throw new RuntimeException('Turso returned an invalid SQL column.');
+            }
+            $columns[] = is_string($column['name'] ?? null) ? $column['name'] : (string) $index;
+        }
         $mode = $fetchUsing[0] ?? $this->fetchMode;
 
         return array_map(function (array $row) use ($columns, $fetchUsing, $mode): mixed {
@@ -477,6 +489,7 @@ class TursoConnection extends SQLiteConnection
         }, $result['rows'] ?? []);
     }
 
+    /** @param array<string, mixed> $value */
     private function decodeValue(array $value): mixed
     {
         return match ($value['type'] ?? null) {

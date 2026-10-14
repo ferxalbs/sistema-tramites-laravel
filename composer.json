@@ -65,6 +65,8 @@
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
+            "@lint:check",
+            "@types:check",
             "pnpm run check",
             "pnpm run types:check",
             "@php artisan test"

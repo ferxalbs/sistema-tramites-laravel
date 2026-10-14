@@ -30,7 +30,10 @@ class GenerateTramiteFinalDocument
     public function execute(Tramite $tramite, User $actor): TramiteDocumentoFinal
     {
         abort_unless($actor->activo && $actor->rol === 'administrador', 403);
-        if (in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true)) {
+        $plantillaActual = $tramite->borradorActual?->plantilla;
+        $requiereModelo = in_array($tramite->tipo_documento, config('tramites.modelos_oficiales_pendientes', []), true);
+        if (($plantillaActual === null && $requiereModelo)
+            || ($plantillaActual !== null && ! TramiteTemplateEligibility::canIssue($tramite, $plantillaActual))) {
             throw ValidationException::withMessages([
                 'documento' => 'Falta el modelo institucional aprobado para este tipo de trámite. Se puede registrar y revisar el expediente, pero aún no emitir su PDF oficial.',
             ]);
@@ -173,7 +176,7 @@ class GenerateTramiteFinalDocument
 
         $remitente = $borrador->remitente ?? $actor;
         $firmante = $borrador->firmante ?? $actor;
-        $rutaFirma = 'firmas-perfil/'.$firmante->id.'.jpg';
+        $rutaFirma = $firmante->scannedSignaturePath();
         $firmaImagen = Storage::disk('local')->exists($rutaFirma)
             ? Storage::disk('local')->get($rutaFirma)
             : null;
@@ -280,8 +283,11 @@ class GenerateTramiteFinalDocument
             $firmante = $borrador->firmante;
 
             abort_unless($plantilla !== null && $remitente !== null && $firmante !== null, 409);
+            if (! TramiteTemplateEligibility::canIssue($registro, $plantilla)) {
+                throw ValidationException::withMessages(['documento' => 'El modelo necesita validación institucional o el modo local de pruebas.']);
+            }
 
-            $rutaFirma = 'firmas-perfil/'.$firmante->id.'.jpg';
+            $rutaFirma = $firmante->scannedSignaturePath();
 
             if (! Storage::disk('local')->exists($rutaFirma)) {
                 throw ValidationException::withMessages([
@@ -290,13 +296,18 @@ class GenerateTramiteFinalDocument
             }
 
             $firmaImagen = Storage::disk('local')->get($rutaFirma);
+            if ($firmante->firma_perfil_sha256 !== null && ! hash_equals($firmante->firma_perfil_sha256, hash('sha256', $firmaImagen))) {
+                throw ValidationException::withMessages(['firmante_id' => 'La firma guardada no supera la verificación de integridad. Vuelva a registrarla desde Mi perfil.']);
+            }
 
             if ($ronda->estado === 'rechazado' && trim((string) $ronda->comentario_publico) === '') {
                 throw ValidationException::withMessages(['documento' => 'El rechazo necesita un fundamento público antes de emitir el documento.']);
             }
 
             $modalidad = $plantilla->modalidad ?? 'unica';
-            $configuracion = collect(config('tramites.series_documentales', []))->first(
+            $seriesConfiguradas = config('tramites.series_documentales', []);
+            abort_unless(is_array($seriesConfiguradas), 500);
+            $configuracion = collect($seriesConfiguradas)->first(
                 fn (array $serie): bool => $serie['tipo_documento_salida'] === $plantilla->tipo_documento_salida
                     && $serie['modalidad'] === $modalidad,
             );
@@ -340,6 +351,9 @@ class GenerateTramiteFinalDocument
 
             $correlativo = (int) $secuencia->ultimo_correlativo;
             $numero = $this->formatearNumero($serie, $configuracion, $anio, $correlativo);
+            if (TramiteTemplateEligibility::isDemo($plantilla)) {
+                $numero = 'PRUEBA-'.$numero;
+            }
             $codigoVerificacion = implode('-', str_split(Str::upper(bin2hex(random_bytes(8))), 4));
             $snapshot = $this->crearSnapshot($registro, $borrador, $ronda, $remitente, $firmante, $numero, $codigoVerificacion, hash('sha256', $firmaImagen));
 
@@ -538,12 +552,14 @@ class GenerateTramiteFinalDocument
             'firmante' => $firmanteNombre.' · '.($roles[$firmante->rol] ?? $firmante->rol),
             'firmante_id' => (int) $firmante->id,
             'firma_perfil_sha256' => $firmaHash,
-            'decision' => $ronda?->estado ?? 'previsualizacion',
+            'decision' => $ronda->estado ?? 'previsualizacion',
             'conclusion' => $ronda?->conclusion,
             'comentario_publico' => $ronda?->comentario_publico,
             'codigo_verificacion' => $codigoVerificacion,
             'version_borrador' => (int) $borrador->version,
             'contenido_renderizado' => $borrador->contenido_renderizado,
+            'es_prueba' => TramiteTemplateEligibility::isDemo($borrador->plantilla),
+            'fuente_modelo' => $borrador->plantilla->fuente_modelo,
             'borrador_renderizado_sha256' => $borrador->contenido_renderizado === null
                 ? null : hash('sha256', $borrador->contenido_renderizado),
             'requiere_firma_fisica' => false,
@@ -569,7 +585,7 @@ class GenerateTramiteFinalDocument
      *
      * @param  array<string, mixed>  $configuracion
      */
-    private function formatearNumero(object $serie, array $configuracion, int $anio, int $correlativo): string
+    private function formatearNumero(TramiteSerieDocumental $serie, array $configuracion, int $anio, int $correlativo): string
     {
         $formato = $configuracion['numero_formato'] ?? null;
 

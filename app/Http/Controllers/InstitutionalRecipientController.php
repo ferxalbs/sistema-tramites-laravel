@@ -59,6 +59,7 @@ class InstitutionalRecipientController extends Controller
         return to_route('admin.recipients.index')->with('success', 'Destinatario actualizado.');
     }
 
+    /** @return array<string, mixed> */
     private function validateData(Request $request): array
     {
         $request->merge([
@@ -79,6 +80,10 @@ class InstitutionalRecipientController extends Controller
         return [...$data, 'activo' => (bool) $data['activo']];
     }
 
+    /**
+     * @param  array<string, mixed>|null  $before
+     * @param  array<string, mixed>  $after
+     */
     private function audit(Request $request, int $id, ?array $before, array $after): void
     {
         DB::table('tramite_config_events')->insert([

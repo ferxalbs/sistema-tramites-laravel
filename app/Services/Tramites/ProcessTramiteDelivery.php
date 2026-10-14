@@ -13,6 +13,7 @@ use App\Models\TramiteFirma;
 use App\Models\TramiteInformeCierre;
 use App\Models\TramiteMedioEntrega;
 use App\Models\User;
+use App\Services\MailReadiness;
 use App\Services\PdfDocumentGenerator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -154,8 +155,8 @@ class ProcessTramiteDelivery
     {
         $this->authorizeStaff($actor);
         $medioSolicitado = TramiteMedioEntrega::query()->find((int) $datos['medio_entrega_id']);
-        if ($medioSolicitado?->codigo === 'correo_electronico' && in_array(config('mail.default'), ['log', 'array'], true)) {
-            throw ValidationException::withMessages(['medio_entrega_id' => 'El envío por correo requiere configurar el servidor SMTP institucional.']);
+        if ($medioSolicitado?->codigo === 'correo_electronico') {
+            app(MailReadiness::class)->requireDelivery('medio_entrega_id');
         }
         $archivo = $evidencia === null ? null : $this->storePrivateFile($evidencia, $tramite->id, 'evidencias-entrega');
 
@@ -603,7 +604,17 @@ class ProcessTramiteDelivery
         return $documento->load('borrador');
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array{
+     * institucion: string, codigo_expediente: string, documento_oficial: string,
+     * clasificacion: string, tipo_tramite: string, interesado: string, recibido_en: string,
+     * revisor: string, resultado_revision: string, medio_entrega: string, receptor: string,
+     * fecha_entrega: string, evidencias: list<string>, resumen_cierre: string,
+     * observacion_cierre: ?string, cerrado_por: string, fecha_cierre: string,
+     * linea_tiempo: list<array{fecha: string, estado_anterior: string, estado_nuevo: string}>,
+     * codigo_verificacion: string
+     * }
+     */
     private function datosInforme(Tramite $tramite, TramiteEntrega $entrega, TramiteCierre $cierre, User $actor): array
     {
         $classificationLabels = TramiteClassificationCatalog::labels();
@@ -622,25 +633,25 @@ class ProcessTramiteDelivery
             'documento_oficial' => $documento->numero_documento,
             'clasificacion' => $classificationLabels[$tramite->clasificacion] ?? $tramite->clasificacion,
             'tipo_tramite' => $typeLabels[$tramite->tipo_documento] ?? $tramite->tipo_documento,
-            'interesado' => $tramite->propietario?->name ?? $tramite->persona_nombre ?? 'No aplica',
+            'interesado' => $tramite->propietario->name ?? $tramite->persona_nombre ?? 'No aplica',
             'recibido_en' => $tramite->fecha_recepcion->toDateString(),
-            'revisor' => $ronda?->revisor?->name ?? 'No registrado',
-            'resultado_revision' => config('tramites.estados.'.$ronda?->estado, $ronda?->estado ?? 'No registrado'),
+            'revisor' => $ronda->revisor->name ?? 'No registrado',
+            'resultado_revision' => (string) config('tramites.estados.'.$ronda?->estado, $ronda->estado ?? 'No registrado'),
             'medio_entrega' => $entrega->medio->nombre,
             'receptor' => $entrega->receptor_nombre.' · '.$entrega->receptor_tipo,
             'fecha_entrega' => $entrega->fecha_entrega->format('Y-m-d H:i'),
-            'evidencias' => $entrega->evidencias->map(fn (TramiteEvidenciaEntrega $evidencia): string => $evidencia->tipo_evidencia)->unique()->values()->all(),
+            'evidencias' => array_values($entrega->evidencias->map(fn (TramiteEvidenciaEntrega $evidencia): string => $evidencia->tipo_evidencia)->unique()->values()->all()),
             'resumen_cierre' => $cierre->resumen,
             'observacion_cierre' => $cierre->observacion,
             'cerrado_por' => $actor->name,
             'fecha_cierre' => $cierre->fecha_cierre->format('Y-m-d H:i'),
-            'linea_tiempo' => $eventos->map(fn (TramiteEvento $evento): array => [
+            'linea_tiempo' => array_values($eventos->map(fn (TramiteEvento $evento): array => [
                 'fecha' => $evento->created_at?->format('Y-m-d H:i') ?? '',
                 'estado_anterior' => $evento->estado_anterior === null
                     ? ''
-                    : config('tramites.estados.'.$evento->estado_anterior, $evento->estado_anterior),
-                'estado_nuevo' => config('tramites.estados.'.$evento->estado_nuevo, $evento->estado_nuevo),
-            ])->all(),
+                    : (string) config('tramites.estados.'.$evento->estado_anterior, $evento->estado_anterior),
+                'estado_nuevo' => (string) config('tramites.estados.'.$evento->estado_nuevo, $evento->estado_nuevo),
+            ])->all()),
             'codigo_verificacion' => $this->codigoVerificacion(),
         ];
     }

@@ -4,7 +4,24 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $tramite_id
+ * @property int $cierre_id
+ * @property int|null $generado_por
+ * @property string $disco
+ * @property string $ruta
+ * @property string $nombre_archivo
+ * @property string $sha256
+ * @property int $tamano_bytes
+ * @property int $numero_paginas
+ * @property string $codigo_verificacion
+ * @property bool $activo
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class TramiteInformeCierre extends Model
 {
     protected $table = 'tramite_informes_cierre';
@@ -32,16 +49,19 @@ class TramiteInformeCierre extends Model
         ];
     }
 
+    /** @return BelongsTo<Tramite, $this> */
     public function tramite(): BelongsTo
     {
         return $this->belongsTo(Tramite::class);
     }
 
+    /** @return BelongsTo<TramiteCierre, $this> */
     public function cierre(): BelongsTo
     {
         return $this->belongsTo(TramiteCierre::class, 'cierre_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function generador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'generado_por');

@@ -315,6 +315,7 @@ test('institutional reports and memorandums register without a request applicant
             ->and($tramite->modalidad_documento)->toBe($modalidad)
             ->and($tramite->estado)->toBe('digitalizado');
         $compatible = TramitePlantilla::query()->where('tipo_documento_salida', $formato)
+            ->where('codigo', $tipo === 'INFORME' ? 'INFORME_INSTITUCIONAL' : $tipo)
             ->where('modalidad', $modalidad)
             ->where('estado', 'publicada')
             ->sole();
@@ -574,7 +575,7 @@ test('administrators version templates and drafts retain the selected content', 
     $this->actingAs($admin)->get(route('admin.templates.index'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('plantillas')->has('plantillas'));
     $this->post(route('admin.templates.version', $original), [
-        ...$payload, 'contenido' => '<p>{{CONTENIDO_PRINCIPAL}}</p>',
+        ...$payload, 'contenido' => '<p>{{NUMERO_DOCUMENTO_PREVIO}}</p>',
     ])->assertSessionHasErrors('contenido');
     expect(TramitePlantilla::query()->where('codigo', $original->codigo)->count())->toBe(1);
 
@@ -942,7 +943,10 @@ test('draft suggests the director and active teachers as editable recipients', f
             && ! collect($people)->contains('key', 'docente-'.$inactiveTeacher->id)));
 });
 
-test('reception validates and preserves the planned output format and memorandum modality', function () {
+test('reception validates and preserves a configured memorandum response format and modality', function () {
+    // A catalog configured for the historical memorandum response remains supported.
+    DB::table('tipos_tramite')->where('codigo', 'JUSTIFICACION_TARDANZA')
+        ->update(['tipo_documento_salida_sugerido' => 'memorando']);
     $officeAdmin = User::factory()->create(['rol' => 'administrador']);
     $admin = User::factory()->create(['rol' => 'administrador']);
     $student = User::factory()->create(['rol' => 'estudiante', 'dni' => '90000005']);

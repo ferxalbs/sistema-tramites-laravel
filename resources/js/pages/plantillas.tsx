@@ -40,6 +40,8 @@ import {
     FieldLabel,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
@@ -62,18 +64,24 @@ type Plantilla = {
     contenido: string;
     estado: string;
     activa: boolean;
+    tipo_tramite: string | null;
+    modelo_propuesto: boolean;
+    validada_en: string | null;
+    fuente_modelo: string | null;
 };
 
 type Props = {
     plantillas: Plantilla[];
     formatos: Array<{ codigo: string; nombre: string }>;
     modalidades: Array<{ codigo: string; nombre: string }>;
+    tipos: Record<string, string>;
 };
 
 export default function Plantillas({
     plantillas,
     formatos,
     modalidades,
+    tipos,
 }: Props) {
     const [showNewForm, setShowNewForm] = useState(false);
 
@@ -107,6 +115,7 @@ export default function Plantillas({
                     <NuevaPlantillaCard
                         formatos={formatos}
                         modalidades={modalidades}
+                        tipos={tipos}
                         onCancel={() => setShowNewForm(false)}
                     />
                 )}
@@ -156,10 +165,12 @@ export default function Plantillas({
 function NuevaPlantillaCard({
     formatos,
     modalidades,
+    tipos,
     onCancel,
 }: {
     formatos: Array<{ codigo: string; nombre: string }>;
     modalidades: Array<{ codigo: string; nombre: string }>;
+    tipos: Record<string, string>;
     onCancel: () => void;
 }) {
     return (
@@ -183,6 +194,31 @@ function NuevaPlantillaCard({
                     <>
                         <CardContent>
                             <FieldGroup className="gap-5">
+                                <Field
+                                    id="tipo-tramite-nuevo"
+                                    label="Trámite asociado"
+                                    error={errors.tipo_tramite}
+                                >
+                                    <select
+                                        id="tipo-tramite-nuevo"
+                                        name="tipo_tramite"
+                                        className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                                    >
+                                        <option value="">
+                                            General para este formato
+                                        </option>
+                                        {Object.entries(tipos).map(
+                                            ([codigo, nombre]) => (
+                                                <option
+                                                    key={codigo}
+                                                    value={codigo}
+                                                >
+                                                    {nombre}
+                                                </option>
+                                            ),
+                                        )}
+                                    </select>
+                                </Field>
                                 {/* Grid 2 Columnas para metadatos */}
                                 <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <Field
@@ -454,6 +490,78 @@ function PlantillaItem({ plantilla }: { plantilla: Plantilla }) {
                     <p className="text-sm text-muted-foreground">
                         {plantilla.descripcion}
                     </p>
+                </CardContent>
+            )}
+
+            {!esReferencial && (
+                <CardContent className="space-y-3 border-t pt-4">
+                    {plantilla.validada_en ? (
+                        <p className="text-sm">
+                            Modelo validado para esta versión. Fuente:{' '}
+                            {plantilla.fuente_modelo}
+                        </p>
+                    ) : (
+                        <Form
+                            action={`/admin/plantillas/${plantilla.id}/validar`}
+                            method="post"
+                            onBefore={() =>
+                                window.confirm(
+                                    '¿Confirmas que esta versión fue revisada y autorizada para su uso en la oficina?',
+                                )
+                            }
+                        >
+                            {({ errors, processing }) => (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-muted-foreground">
+                                        {plantilla.modelo_propuesto
+                                            ? 'Modelo propio propuesto. La emisión local lleva una marca de prueba hasta validarlo.'
+                                            : 'Registra la revisión y el origen de este modelo antes de utilizarlo institucionalmente.'}
+                                    </p>
+                                    <Label htmlFor={`fuente-${plantilla.id}`}>
+                                        Origen o autorización del modelo
+                                    </Label>
+                                    <Input
+                                        id={`fuente-${plantilla.id}`}
+                                        name="fuente_modelo"
+                                        minLength={10}
+                                        maxLength={255}
+                                        required
+                                        placeholder="Modelo de la oficina, revisado por la persona responsable…"
+                                    />
+                                    <FieldError>
+                                        {errors.fuente_modelo}
+                                    </FieldError>
+                                    <div className="flex items-start gap-2">
+                                        <Checkbox
+                                            id={`validacion-${plantilla.id}`}
+                                            name="confirmar_validacion"
+                                            value="1"
+                                            required
+                                        />
+                                        <Label
+                                            htmlFor={`validacion-${plantilla.id}`}
+                                            className="text-sm leading-5"
+                                        >
+                                            Confirmo que revisé el texto, los
+                                            campos, destinatarios y firma, y que
+                                            esta versión está autorizada para
+                                            usarse.
+                                        </Label>
+                                    </div>
+                                    <FieldError>
+                                        {errors.confirmar_validacion}
+                                    </FieldError>
+                                    <Button
+                                        type="submit"
+                                        disabled={processing}
+                                        variant="outline"
+                                    >
+                                        Registrar validación
+                                    </Button>
+                                </div>
+                            )}
+                        </Form>
+                    )}
                 </CardContent>
             )}
 

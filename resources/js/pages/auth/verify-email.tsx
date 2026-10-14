@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,15 +15,22 @@ import { markLoggedOut } from '@/lib/auth-history';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
 
-export default function VerifyEmail({ status }: { status?: string }) {
+export default function VerifyEmail({
+    status,
+    bandeja_pruebas,
+}: {
+    status?: string;
+    bandeja_pruebas: boolean;
+}) {
     return (
         <>
             <Head title="Verificación de Correo" />
 
             {status === 'verification-link-sent' && (
-                <div className="mb-4 rounded-lg border border-green-500/20 bg-green-500/10 p-3 text-center text-sm font-medium text-green-600 dark:text-green-400">
-                    Se ha enviado un nuevo enlace de verificación al correo
-                    electrónico que proporcionaste durante el registro.
+                <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-center text-sm font-medium text-foreground">
+                    {bandeja_pruebas
+                        ? 'El nuevo enlace está en la bandeja local de pruebas; no se envió a un correo externo.'
+                        : 'El servidor de correo aceptó el nuevo enlace de verificación.'}
                 </div>
             )}
 
@@ -32,8 +40,8 @@ export default function VerifyEmail({ status }: { status?: string }) {
                         Verificación de Correo
                     </CardTitle>
                     <CardDescription className="text-sm">
-                        Por favor verifica tu correo electrónico haciendo clic
-                        en el enlace que te acabamos de enviar.
+                        Verifica tu dirección usando el enlace recibido. Puedes
+                        solicitar un nuevo enlace si lo necesitas.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
@@ -42,22 +50,25 @@ export default function VerifyEmail({ status }: { status?: string }) {
                         {...send.form()}
                         className="text-center"
                     >
-                        {({ processing }) => (
-                            <Button
-                                type="submit"
-                                disabled={processing}
-                                variant="secondary"
-                                className="w-full"
-                            >
-                                {processing ? (
-                                    <>
-                                        <Spinner className="mr-2 h-4 w-4" />
-                                        Reenviando correo...
-                                    </>
-                                ) : (
-                                    'Reenviar correo de verificación'
-                                )}
-                            </Button>
+                        {({ processing, errors }) => (
+                            <>
+                                <InputError message={errors.email} />
+                                <Button
+                                    type="submit"
+                                    disabled={processing}
+                                    variant="secondary"
+                                    className="w-full"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Spinner className="mr-2 h-4 w-4" />
+                                            Reenviando correo...
+                                        </>
+                                    ) : (
+                                        'Reenviar correo de verificación'
+                                    )}
+                                </Button>
+                            </>
                         )}
                     </Form>
                 </CardContent>

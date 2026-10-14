@@ -9,6 +9,7 @@ use Laravel\Fortify\Features;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::registration());
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
     $this->seed(ProgramaEstudioSeeder::class);
 });
 

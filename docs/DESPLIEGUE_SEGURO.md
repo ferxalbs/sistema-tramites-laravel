@@ -1,10 +1,22 @@
 # Despliegue y conservación de documentos
 
+## Estado de esta entrega — 14 de octubre de 2026
+
+Las correcciones de esta entrega se verifican localmente. Las comprobaciones publicadas del 6 de octubre, conservadas abajo, no acreditan el despliegue del código actual. No se ha verificado esta versión de la aplicación en Railway.
+
+El arranque actual exige un volumen real en `/app/storage/app/private` cuando detecta `RAILWAY_ENVIRONMENT_ID`, `RAILWAY_PROJECT_ID`, la variable histórica `RAILWAY_ENVIRONMENT` o `REQUIRE_PERSISTENT_STORAGE=1`. Una variable de ruta sin montaje real no basta. Un error de migración detiene el servidor.
+
+La copia actual local utiliza SQLite. Si el servicio publicado también usa SQLite, `DB_DATABASE` debe apuntar a `/app/storage/app/private/database.sqlite` para que base y archivos sobrevivan al despliegue. No cambies el motor de un servicio existente sin migrar y verificar sus datos.
+
+La importación de una copia local autorizada es únicamente para el primer arranque: verifica sus huellas y nunca reemplaza una base existente. `.deployment-seed`, bases, archivos privados, `.env` y respaldos se excluyen de nuevas subidas e imágenes. Para un nuevo traslado, transfiere esos datos por un canal privado autorizado; no los añadas al repositorio.
+
+Ya existe respaldo integrado SQLite cifrado y una tarea diaria local. Falta configurar su equivalente periódico en el servidor, conservar una copia fuera del volumen y comprobar la restauración. El volumen por sí solo no constituye un respaldo.
+
 ## Lo que ya verifica el proyecto
 
 - El arranque ejecuta `php artisan migrate --force --no-interaction` y termina con error si la migración falla, si falta `DB_CONNECTION` o si la base SQLite indicada no existe. La prueba `tests/Deployment/entrypoint-failure.sh` simula esos fallos y comprueba que el servidor no arranque.
 - Firmas de perfil, solicitudes adjuntas, evidencias y PDF finales se guardan en el disco privado de Laravel, en `/app/storage/app/private` dentro del contenedor. Una instalación local conserva esos archivos en su disco; un contenedor de Railway necesita un volumen en **esa ruta exacta**.
-- Si Railway declara `RAILWAY_VOLUME_MOUNT_PATH`, el arranque comprueba que el volumen está realmente montado en `/app/storage/app/private` y se detiene si no lo está. Si Railway no declara ningún volumen, el arranque advierte del riesgo en los registros. El código no puede crear un volumen ni activar sus copias de seguridad desde GitHub.
+- Si Railway declara `RAILWAY_VOLUME_MOUNT_PATH`, el arranque comprueba que el volumen está realmente montado en `/app/storage/app/private` y se detiene si no lo está. En Railway también se detiene si no se declaró ningún volumen. El código no puede crear un volumen ni activar sus copias de seguridad desde GitHub.
 
 ## Antes de publicar con documentos reales
 

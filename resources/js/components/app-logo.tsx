@@ -6,15 +6,13 @@ export default function AppLogo() {
 
     return (
         <>
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-                <AppLogoIcon className="size-4.5" />
-            </div>
+            <AppLogoIcon className="size-9 shadow-xs ring-1 ring-primary/15" />
             <div className="ml-1 grid flex-1 text-left text-sm leading-none">
                 <span className="truncate font-semibold tracking-tight">
                     {name || 'Sistema de Trámites'}
                 </span>
                 <span className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    Gestión Institucional
+                    Desarrollo de Sistemas de Información
                 </span>
             </div>
         </>

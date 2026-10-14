@@ -7,6 +7,7 @@ use Laravel\Fortify\Features;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::emailVerification());
+    config(['mail.default' => 'smtp', 'mail.test_inbox' => false]);
 });
 
 test('sends verification notification', function () {

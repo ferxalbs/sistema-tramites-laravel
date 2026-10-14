@@ -27,16 +27,23 @@ import { create as requestTeacherAccess } from '@/routes/teacher-access';
 type Props = {
     status?: string;
     canResetPassword: boolean;
+    bandeja_pruebas?: boolean;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({
+    status,
+    canResetPassword,
+    bandeja_pruebas,
+}: Props) {
     return (
         <>
             <Head title="Iniciar Sesión" />
 
-            <Card className="w-full max-w-sm">
+            <Card className="w-full max-w-md border border-border/80 shadow-xl shadow-primary/10">
                 <CardHeader>
-                    <CardTitle>Iniciar Sesión</CardTitle>
+                    <CardTitle className="text-2xl font-semibold tracking-tight">
+                        Iniciar Sesión
+                    </CardTitle>
                     <CardDescription>
                         Ingresa a tu cuenta para gestionar y consultar tus
                         trámites
@@ -51,6 +58,21 @@ export default function Login({ status, canResetPassword }: Props) {
                     </CardAction>
                 </CardHeader>
                 <CardContent>
+                    {bandeja_pruebas && (
+                        <p className="mb-4 rounded-lg border bg-muted p-3 text-sm">
+                            Modo local: los correos de recuperación y
+                            verificación llegan a la{' '}
+                            <a
+                                className="font-medium underline"
+                                href="http://127.0.0.1:8025"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                bandeja de pruebas
+                            </a>
+                            . No se envían a correos externos.
+                        </p>
+                    )}
                     <Form
                         id="login-form"
                         {...store.form()}
@@ -149,7 +171,7 @@ export default function Login({ status, canResetPassword }: Props) {
             </Card>
 
             {status && (
-                <div className="text-center text-sm font-medium text-green-600">
+                <div className="mt-4 rounded-xl border border-primary/20 bg-secondary px-4 py-3 text-center text-sm font-medium text-secondary-foreground">
                     {status}
                 </div>
             )}
